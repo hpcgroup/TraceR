@@ -22,10 +22,6 @@ class MsgEntry {
     int thread;	// destination thread in node
     unsigned long long sendOffset;
     MsgID msgId;
-
-    //BILGE
-    //Event* createEvents(unsigned long long startTime, int numWth);
-    //int numEvents;
 };
 
 #endif /* MSGENTRY_H_ */

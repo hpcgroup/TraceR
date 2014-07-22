@@ -98,10 +98,10 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     int smsgID = bglog->msgId.msgID();
     if(sPe >= 0) {
       // some task set it before so it is a broadcast
-      if( msgDestLogs[(sPe/numWth)%numEmPes][smsgID]==-1){
-        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = logInd + firstLog;
+      if( *msgDestLogs[smsgID]==-1){
+        *msgDestLogs[smsgID] = logInd + firstLog;
           } else // it may be a broadcast
-        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
+        *msgDestLogs[smsgID] = -100;
     }
   }
   firstLog += tlinerec.length();

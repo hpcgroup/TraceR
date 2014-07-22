@@ -1,7 +1,10 @@
-
-/* SUMMARY:
- * Trace reading support for codes simulations.
- * The simulation will be driven by the bigsim traces.
+/* 
+ *
+ * SUMMARY:
+ * Trace support for codes simulations.
+ * The simulation will be driven by bigsim traces.
+ *
+ * Author: Bilge Acun
  *
  */
 
@@ -16,6 +19,7 @@
 #include "codes/codes_mapping.h"
 #include "codes/configuration.h"
 #include "codes/lp-type-lookup.h"
+
 #include "tests/bigsim/CWrapper.h"
 
 static int net_id = 0;
@@ -26,6 +30,7 @@ static int offset = 2;
 static int num_routers_per_rep = 0;
 static int num_servers_per_rep = 0;
 static int lps_per_rep = 0;
+static int total_lps = 0;
 
 typedef struct proc_msg proc_msg;
 typedef struct proc_state proc_state;
@@ -46,7 +51,7 @@ struct proc_state
     int local_recvd_count; /* number of local messages received */
     tw_stime start_ts;    /* time that we started sending requests */
     tw_stime end_ts;      /* time that we ended sending requests */
-    PE* my_pe;          /* bigsim trace timeline*/
+    PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     TraceReader* trace_reader; /* for reading the bigsim traces */
     int* msgDestTask;   /* mapping from msgID to destination task for faster access */
 };
@@ -89,6 +94,7 @@ extern const tw_lptype* proc_get_lp_type();
 static void proc_add_lp_type();
 static tw_stime ns_to_s(tw_stime ns);
 static tw_stime s_to_ns(tw_stime ns);
+
 //event handler declarations
 static void handle_kickoff_event(
     proc_state * ns,
@@ -110,6 +116,7 @@ static void handle_exec_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+
 //reverse event handler declarations
 static void handle_kickoff_rev_event(
     proc_state * ns,
@@ -138,7 +145,7 @@ const tw_optdef app_opt [] =
 	TWOPT_END()
 };
 
-//BILGE decls
+//helper function declarations
 static void exec_task(
 		proc_state * ns,
         int task_id,
@@ -157,6 +164,8 @@ static int send_msg(
 static int find_task_from_msg(
         proc_state * ns,
         MsgID* msg_id);
+
+static int pe_to_lpid(int pe);
 
 int main(
     int argc,
@@ -338,7 +347,7 @@ static void handle_kickoff_event(
     lps_per_rep = num_servers_per_rep * 2 + num_routers_per_rep;
 
     int opt_offset = 0;
-    int total_lps = num_servers * 2 + num_routers;
+    total_lps = num_servers * 2 + num_routers;
 
     if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
           opt_offset = num_servers_per_rep + num_routers_per_rep; /* optional offset due to dragonfly mapping */
@@ -384,7 +393,7 @@ static void handle_kickoff_rev_event(
     tw_lp * lp)
 {
     ns->msg_sent_count--;
-    model_net_event_rc(net_id, lp, m->msg_id.size);
+    model_net_event_rc(net_id, lp, MsgID_getSize(m->msg_id));
     return;
 }
 
@@ -440,7 +449,7 @@ static void handle_recv_rev_event(
     //decrease the currentTask 
     PE_set_currentTask(ns->my_pe, task_id-1);
 
-    model_net_event_rc(net_id, lp, m->msg_id.size);
+    model_net_event_rc(net_id, lp, MsgID_getSize(m->msg_id));
 }
 static void handle_exec_rev_event(
 		proc_state * ns,
@@ -460,6 +469,8 @@ static void handle_exec_rev_event(
     //Decrement the current task
     PE_set_currentTask(ns->my_pe, task_id-1);
 }
+
+//executes the task with the specified id
 static void exec_task(
 		proc_state * ns,
         int task_id,
@@ -477,26 +488,32 @@ static void exec_task(
     //for each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
-    MsgEntry* taskEntries = PE_getTaskMsgEntries(ns->my_pe, task_id);
+    MsgEntry** taskEntries = PE_getTaskMsgEntries(ns->my_pe, task_id);
 
     for(int i=0; i<msgEntCount; i++){
         int dest_id = 0;
-        int myPE = ns->my_pe->myEmPE;
+        int myPE = PE_get_myEmPE(ns->my_pe);
         int myNode = myPE/num_servers;
-        unsigned long long sendOffset = 0;
+        int node = MsgEntry_getNode(taskEntries[i]);
+        int thread = MsgEntry_getThread(taskEntries[i]);
+        unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntries[i]);
+        unsigned long long copyTime = 0;
+        unsigned long long delay = 0;
 
         // if there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
         {
             if(node == -100-myNode && thread != -1)
             {
-                int destPE = myNode*num_servers - 1;
+              int destPE = myNode*num_servers - 1;
               for(int i=0; i<num_servers; i++)
               {        
                 destPE++;
                 if(i == thread) continue;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), destPE, sendOffset);
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
+                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                        pe_to_lpid(destPE), sendOffset, lp);
               }
             } else if(node != -100-myNode && node <= -100) {
               int destPE = myNode*num_servers - 1;
@@ -504,25 +521,33 @@ static void exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), destPE, sendOffset);
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
+                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                        pe_to_lpid(destPE), sendOffset, lp);
               }
             } else if(thread >= 0) {
               int destPE = myNode*num_servers + thread;
               delay += copyTime;
-              send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), destPE, sendOffset);
+              send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]),
+                  MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]),
+                      pe_to_lpid(destPE), sendOffset, lp);
             } else if(thread==-1) { // broadcast to all work cores
               int destPE = myNode*num_servers - 1;
               for(int i=0; i<num_servers; i++)
               {
                 destPE++;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), destPE, sendOffset);
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
+                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                        pe_to_lpid(destPE), sendOffset, lp);
               }
             }
           }
           if(node != myNode)
           {
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), destPE, sendOffset);
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
+                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                        pe_to_lpid(myPE), sendOffset, lp);
           }
    }
     //mark the task as done, create a complete exec event 
@@ -536,6 +561,7 @@ static void exec_task(
     }
 
 }
+//creates and sends the message
 static int send_msg(
         proc_state * ns,
         int task_id,
@@ -569,9 +595,11 @@ static int send_msg(
         */
         model_net_event(net_id, "test", dest_id, size, offset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
-
+    
+    return 0;
 }
 
+//returs the task id that the message belongs to using msgDestTask map
 static int find_task_from_msg(
         proc_state * ns,
         MsgID* msg_id){
@@ -580,6 +608,17 @@ static int find_task_from_msg(
         int task_id = 0;
         //TODO: search task map and return the task id
         return task_id;
+}
+
+//utility function to convert pe number to tw_lpid number
+static int pe_to_lpid(int pe){
+    int lp_id = 0;
+    if(net_id == DRAGONFLY){
+        lp_id = (lps_per_rep*pe)%total_lps;
+    }else{
+        lp_id = pe;
+    }
+    return lp_id;
 }
 /*
  * Local variables:
