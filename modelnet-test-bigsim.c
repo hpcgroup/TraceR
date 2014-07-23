@@ -158,8 +158,14 @@ static int send_msg(
         int src_pe,
         int id,
         int dest_id,
-        unsigned long long offset,
+        unsigned long long timeOffset,
         tw_lp * lp);
+
+static int exec_comp(
+    proc_state * ns,
+    int task_id,
+    unsigned long long sendOffset,
+    tw_lp * lp);
               
 static int find_task_from_msg(
         proc_state * ns,
@@ -356,18 +362,18 @@ static void handle_kickoff_event(
     int my_pe_num = (lp->gid/lps_per_rep)*(num_routers_per_rep+num_servers_per_rep) + (lp->gid%lps_per_rep); //TODO: check this
     ns->my_pe = newPE();
     ns->trace_reader = newTraceReader();
-    int* tot=0, *totn=0, *emPes=0, *nwth=0;
-    long long unsigned int* startTime=0;
-    TraceReader_readTrace(ns->trace_reader, tot, totn, emPes, nwth, ns->my_pe, my_pe_num, startTime, ns->msgDestTask);
+    int tot=0, totn=0, emPes=0, nwth=0;
+    long long unsigned int startTime=0;
+    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime, ns->msgDestTask);
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
         printf("ERROR: BigSim traces do not match the codes config file..\n");
         MPI_Finalize();
-	    return 0;
+	    return;
     }
     //PE_set_busy(ns->my_pe, true);
     //execute the first task
-    exec_task(ns, *startTime, lp);
+    exec_task(ns, startTime, lp);
 
 }
 static void handle_local_event(
@@ -414,7 +420,8 @@ static void handle_recv_event(
     tw_lpid dest_id = (lp->gid + offset + opt_offset)%(num_servers*2 + num_routers);
 
     assert(m->src == dest_id);
-
+    //Set the PE as busy 
+    PE_set_busy(ns->my_pe, true);
     //find which task the message belongs to
     //then call exec_task
     int task_id = find_task_from_msg(ns, m->msg_id);
@@ -427,10 +434,15 @@ static void handle_exec_event(
 		tw_lp * lp)
 {
     //Mark the task as done
-    int task_id = find_task_from_msg(ns, m->msg_id);
+    //For exec complete event msg_id contains the task_id for convenience
+    int task_id = MsgID_getID(m->msg_id); 
     PE_set_taskDone(ns->my_pe, task_id, true);
-    //Increment the current task
+
+    //Increment the current task .. TODO: check of this is needed
     PE_set_currentTask(ns->my_pe, task_id+1);
+
+    //Task completed, pe is not busy anymore
+    PE_set_busy(ns->my_pe, false);
 }
 
 static void handle_recv_rev_event(
@@ -560,7 +572,8 @@ static void exec_task(
     for(int i=0; i<fwd_dep_size; i++){
         exec_task(ns, fwd_deps[i], lp);
     }
-
+    //complete the task
+    exec_comp(ns, task_id, execTime, lp);
 }
 //creates and sends the message
 static int send_msg(
@@ -570,13 +583,13 @@ static int send_msg(
         int src_pe,
         int id,
         int dest_id,
-        unsigned long long offset,
+        unsigned long long sendOffset,
         tw_lp * lp) {
 
         proc_msg * m_local = malloc(sizeof(proc_msg));
         proc_msg * m_remote = malloc(sizeof(proc_msg));
 
-        m_local->proc_event_type = EXEC_COMP;
+        m_local->proc_event_type = LOCAL;
         m_local->src = lp->gid;
         m_local->msg_id = newMsgID(size, src_pe, id);
 
@@ -595,9 +608,29 @@ static int send_msg(
              const void* self_event,
              tw_lp *sender
         */
-        model_net_event(net_id, "test", dest_id, size, offset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        model_net_event(net_id, "test", dest_id, size, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
     
+    return 0;
+}
+static int exec_comp(
+    proc_state * ns,
+    int task_id,
+    unsigned long long sendOffset,
+    tw_lp * lp)
+{
+    proc_msg * m_local = malloc(sizeof(proc_msg));
+    proc_msg * m_remote = malloc(sizeof(proc_msg));
+
+    m_local->proc_event_type = LOCAL;
+    m_local->src = lp->gid;
+    m_local->msg_id = newMsgID(0, lp->gid, task_id);
+
+    memcpy(m_remote, m_local, sizeof(proc_msg));
+    m_remote->proc_event_type = EXEC_COMP;
+
+    model_net_event(net_id, "test", lp->gid, 0, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+
     return 0;
 }
 

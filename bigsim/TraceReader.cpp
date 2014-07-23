@@ -49,7 +49,9 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
   currTlineIdx = penum;               // set global variable
+  printf("Trace: before BgReadProc\n");
   int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
+  printf("Trace: after BgReadProc\n");
   assert(status!=-1);
 
  // find number of messages per PE
@@ -77,6 +79,8 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
   assert(status!=-1);
   
+  printf("Trace read tasks\n");
+
    // read tasks
   // read the window
   status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog, totalTlineLength);
