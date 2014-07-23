@@ -22,7 +22,7 @@ TraceReader::TraceReader() {
 }
 
 //void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
-void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int** msgDestLogs)
+void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int**& msgDestLogs)
 {
   int numX, numY, numZ, numCth;
   BgLoadTraceSummary("bgTrace", totalWorkerProcs, numX, numY, numZ, numCth, numWth, numEmPes);
@@ -40,7 +40,8 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   totalTlineLength=0;
 
   /* create message map arrays for each emulating PE*/
-  int emPeMaxMsgs = 0;
+  int *emPeMaxMsgs = new int[numEmPes];
+  memset(emPeMaxMsgs, 0, numEmPes*sizeof(int));
   
   int nodeNum = penum/numWth;
   int myEmulPe = nodeNum%numEmPes;
@@ -57,17 +58,20 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     BgTimeLog *bglog=tlinerec[j];
     if(bglog->msgs.length()>0)
     {
-      if(bglog->msgs[bglog->msgs.length()-1]->msgID > emPeMaxMsgs)
+      if(bglog->msgs[bglog->msgs.length()-1]->msgID > emPeMaxMsgs[myEmulPe])
       {
-        emPeMaxMsgs = bglog->msgs[bglog->msgs.length()-1]->msgID;
+        emPeMaxMsgs[myEmulPe] = bglog->msgs[bglog->msgs.length()-1]->msgID;
       }
       break;
     }
   }
-  *msgDestLogs = new int[emPeMaxMsgs+1];
-  for(int j=0; j<emPeMaxMsgs+1; j++)
-    *msgDestLogs[j] = -1;
-
+  msgDestLogs = new int*[numEmPes];
+  for(int i=0; i<numEmPes; i++)
+  {
+    msgDestLogs[i] = new int[emPeMaxMsgs[i]+1];
+    for(int j=0; j<emPeMaxMsgs[i]+1; j++)
+      msgDestLogs[i][j] = -1;
+  }
   // update fileLoc
   // call to update fileLoc
   status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
@@ -98,10 +102,10 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     int smsgID = bglog->msgId.msgID();
     if(sPe >= 0) {
       // some task set it before so it is a broadcast
-      if( *msgDestLogs[smsgID]==-1){
-        *msgDestLogs[smsgID] = logInd + firstLog;
+      if( msgDestLogs[(sPe/numWth)%numEmPes][smsgID]==-1){
+        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = logInd + firstLog;
           } else // it may be a broadcast
-        *msgDestLogs[smsgID] = -100;
+        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
     }
   }
   firstLog += tlinerec.length();
