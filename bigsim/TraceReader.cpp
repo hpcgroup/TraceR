@@ -49,9 +49,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
   currTlineIdx = penum;               // set global variable
-  printf("Trace: before BgReadProc\n");
   int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
-  printf("Trace: after BgReadProc\n");
   assert(status!=-1);
 
  // find number of messages per PE
@@ -100,7 +98,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     }
 
     // first job's index is zero
-    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, 0, msgDestLogs);
+    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, msgDestLogs);
 
     int sPe = bglog->msgId.pe();
     int smsgID = bglog->msgId.msgID();
@@ -116,7 +114,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
 
 }
 
-void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int jobPEindex, int** msgDestLogs)
+void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, int**& msgDestLogs)
 {
   t->execTime=(unsigned long long)(((double)TIME_MULT * bglog->execTime));
   t->myMsgId.pe = bglog->msgId.pe() + jobPEindex;
@@ -141,8 +139,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int jobP
     // mark broadcast
     if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
     {
-      *msgDestLogs[bglog->msgs[i]->msgID] = -100;
-      //Engine::engine.msgDestTask[Engine::engine.pes[taskPE].myEmPE][bglog->msgs[i]->msgID] = -100;
+      msgDestLogs[myEmPE][bglog->msgs[i]->msgID] = -100;
     }
 
     // sendTime is absolute

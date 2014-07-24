@@ -25,7 +25,7 @@ public:
 	TraceReader();
 	//void readTrace(int &tot, int& numnodes, int& empes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& dests*/);
     void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int**& dest);
-	void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int jobPEindex, int** dest);
+	void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, int**& dest);
 
     int numEmPes;	// number of emulation PEs, there is a trace file for each of them
     int totalWorkerProcs;

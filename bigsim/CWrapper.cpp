@@ -26,6 +26,7 @@ extern "C" {
     //PE
     PE* newPE(){return new PE();}
     void PE_set_busy(PE* p, bool b){p->busy = b;}
+    bool PE_is_busy(PE* p){return p->busy;}
     bool PE_noUnsatDep(PE* p, int tInd){return p->noUnsatDep(tInd);}
     unsigned long long PE_getTaskExecTime(PE* p, int tInd){return p->noUnsatDep(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
@@ -35,6 +36,15 @@ extern "C" {
     int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
     void PE_set_currentTask(PE* p, int tInd){p->currentTask=tInd;}
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
+    void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
+    int PE_getNextBuffedMsg(PE* p){
+        if(p->msgBuffer.size()<0) return -1;
+        else{
+            int id = p->msgBuffer.front();
+            p->msgBuffer.erase(p->msgBuffer.begin());
+            return id;
+        }
+    }
 
     //TraceReader
     TraceReader* newTraceReader(){return new TraceReader();}

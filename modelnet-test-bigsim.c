@@ -64,6 +64,7 @@ struct proc_msg
     MsgID* msg_id;
 };
 
+
 static void proc_init(
     proc_state * ns,
     tw_lp * lp);
@@ -137,29 +138,29 @@ static void handle_exec_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
-   tw_lp * lp);
+    tw_lp * lp);
 
 const tw_optdef app_opt [] =
 {
-	TWOPT_GROUP("Model net test case" ),
-	TWOPT_END()
+    TWOPT_GROUP("Model net test case" ),
+    TWOPT_END()
 };
 
 //helper function declarations
 static void exec_task(
-		proc_state * ns,
-        int task_id,
-		tw_lp * lp);
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp);
 
 static int send_msg(
-        proc_state * ns,
-        int task_id,
-        int size,
-        int src_pe,
-        int id,
-        int dest_id,
-        unsigned long long timeOffset,
-        tw_lp * lp);
+    proc_state * ns,
+    int task_id,
+    int size,
+    int src_pe,
+    int id,
+    int dest_id,
+    unsigned long long timeOffset,
+    tw_lp * lp);
 
 static int exec_comp(
     proc_state * ns,
@@ -168,14 +169,12 @@ static int exec_comp(
     tw_lp * lp);
               
 static int find_task_from_msg(
-        proc_state * ns,
-        MsgID* msg_id);
+    proc_state * ns,
+    MsgID* msg_id);
 
 static int pe_to_lpid(int pe);
 
-int main(
-    int argc,
-    char **argv)
+int main(int argc, char **argv)
 {
     int nprocs;
     int rank;
@@ -188,9 +187,9 @@ int main(
     
     if(argc < 2)
     {
-	    printf("\n Usage: mpirun <args> --sync=2/3 mapping_file_name.conf (optional --nkp) ");
-	    MPI_Finalize();
-	    return 0;
+	printf("\n Usage: mpirun <args> --sync=2/3 mapping_file_name.conf (optional --nkp) ");
+	MPI_Finalize();
+	return 0;
     }
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -204,8 +203,8 @@ int main(
     num_servers = codes_mapping_get_group_reps("MODELNET_GRP") * codes_mapping_get_lp_count("MODELNET_GRP", "server");
     if(net_id == DRAGONFLY)
     {
-	  num_routers = codes_mapping_get_group_reps("MODELNET_GRP") * codes_mapping_get_lp_count("MODELNET_GRP", "dragonfly_router"); 
-	  offset = 1;
+        num_routers = codes_mapping_get_group_reps("MODELNET_GRP") * codes_mapping_get_lp_count("MODELNET_GRP", "dragonfly_router"); 
+	offset = 1;
     }
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
@@ -227,12 +226,12 @@ int main(
 
 const tw_lptype* proc_get_lp_type()
 {
-	    return(&proc_lp);
+    return(&proc_lp);
 }
 
 static void proc_add_lp_type()
 {
-  lp_type_register("server", proc_get_lp_type());
+    lp_type_register("server", proc_get_lp_type());
 }
 
 static void proc_init(
@@ -272,9 +271,9 @@ static void proc_event(
         case KICKOFF:
             handle_kickoff_event(ns, b, m, lp);
             break;
-	    case LOCAL:
-	        handle_local_event(ns, b, m, lp); 
-	        break;
+	case LOCAL:
+	    handle_local_event(ns, b, m, lp); 
+	    break;
         case RECV_MSG:
             handle_recv_event(ns, b, m, lp);
             break;
@@ -282,7 +281,7 @@ static void proc_event(
             handle_exec_event(ns, b, m, lp);
             break;
         default:
-	        printf("\n Invalid message type %d ", m->proc_event_type);
+	    printf("\n Invalid message type %d ", m->proc_event_type);
             assert(0);
         break;
     }
@@ -406,10 +405,10 @@ static void handle_kickoff_rev_event(
 }
 
 static void handle_recv_event(
-		proc_state * ns,
-		tw_bf * b,
-		proc_msg * m,
-		tw_lp * lp)
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp)
 {
     /* safety check that this request got to the right server */
     //printf("\n m->src %d lp->gid %d ", m->src, lp->gid);
@@ -420,11 +419,18 @@ static void handle_recv_event(
     tw_lpid dest_id = (lp->gid + offset + opt_offset)%(num_servers*2 + num_routers);
 
     assert(m->src == dest_id);
+    int task_id = find_task_from_msg(ns, m->msg_id);
+    //Check if the PE is busy
+    //buffer the message if it arrives when pe is busy
+    if(PE_is_busy(ns->my_pe)){
+        //add the task_id to the vector 
+        PE_addToBuffer(ns->my_pe, task_id);
+        return;
+    }
     //Set the PE as busy 
     PE_set_busy(ns->my_pe, true);
     //find which task the message belongs to
     //then call exec_task
-    int task_id = find_task_from_msg(ns, m->msg_id);
     exec_task(ns,task_id, lp);
 }
 static void handle_exec_event(
@@ -443,6 +449,11 @@ static void handle_exec_event(
 
     //Task completed, pe is not busy anymore
     PE_set_busy(ns->my_pe, false);
+
+    //Execute the buffered messages that are recevied while the pe is busy
+    while(PE_getNextBuffedMsg(ns->my_pe) != -1){
+        exec_task(ns, task_id, lp);
+    }
 }
 
 static void handle_recv_rev_event(
@@ -460,7 +471,7 @@ static void handle_recv_rev_event(
     for(int i=0; i<fwd_dep_size; i++){
         PE_set_taskDone(ns->my_pe, fwd_deps[i], false);
     }
-    //decrease the currentTask 
+    //decrease the currentTask .. TODO: check this...
     PE_set_currentTask(ns->my_pe, task_id-1);
 
     model_net_event_rc(net_id, lp, MsgID_getSize(m->msg_id));
@@ -472,7 +483,7 @@ static void handle_exec_rev_event(
 		tw_lp * lp)
 {
     //Mark the task as not done
-    int task_id = find_task_from_msg(ns, m->msg_id);
+    int task_id = MsgID_getID(m->msg_id); 
     PE_set_taskDone(ns->my_pe, task_id, false);
     //mark it's forward dependencies as not done
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
@@ -480,14 +491,14 @@ static void handle_exec_rev_event(
     for(int i=0; i<fwd_dep_size; i++){
         PE_set_taskDone(ns->my_pe, fwd_deps[i], false);
     }
-    //Decrement the current task
+    //Decrement the current task .. TODO: check this 
     PE_set_currentTask(ns->my_pe, task_id-1);
 }
 
 //executes the task with the specified id
 static void exec_task(
-		proc_state * ns,
-        int task_id,
+	        proc_state * ns,
+                int task_id,
 		tw_lp * lp)
 {
     //check if the backward dependencies are satisfied

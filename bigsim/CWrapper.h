@@ -30,6 +30,7 @@ typedef struct Event event;
 typedef struct PE PE;
 PE* newPE();
 void PE_set_busy(PE* p, bool b);
+bool PE_is_busy(PE* p);
 bool PE_noUnsatDep(PE* p, int tInd);
 unsigned long long PE_getTaskExecTime(PE* p, int tInd);
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
@@ -39,6 +40,8 @@ int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);
 void PE_set_currentTask(PE* p, int tInd);
 int PE_get_myEmPE(PE* p);
+void PE_addToBuffer(PE* p, int task_id);
+int PE_getNextBuffedMsg(PE* p);
 
 //TraceReader
 typedef struct TraceReader TraceReader;
