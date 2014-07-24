@@ -14,6 +14,7 @@
 #include <cstring>
 #include "Task.h"
 #include <vector>
+#include <map>
 
 using namespace std;
 class Task;
@@ -42,6 +43,9 @@ class PE {
 
     //BILGE
     unsigned long long getTaskExecTime(int tInd);
+    map<int, int>* msgDestLogs;
+    int findTaskFromMsg(MsgID* msg);
+
 };
 
 #endif /* PE_H_ */

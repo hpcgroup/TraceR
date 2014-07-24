@@ -304,3 +304,10 @@ void PE::printState()
 unsigned long long PE::getTaskExecTime(int tInd){
     return myTasks[tInd].execTime;
 }
+int PE::findTaskFromMsg(MsgID* msgId){
+    map<int, int>::iterator it;
+    int sPe = msgId->pe;
+    int smsgID = msgId->id;
+    it = msgDestLogs[sPe].find(smsgID);
+    return it->second;
+}

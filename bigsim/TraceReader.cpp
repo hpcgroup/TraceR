@@ -22,7 +22,7 @@ TraceReader::TraceReader() {
 }
 
 //void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
-void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int**& msgDestLogs)
+void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
 {
   int numX, numY, numZ, numCth;
   BgLoadTraceSummary("bgTrace", totalWorkerProcs, numX, numY, numZ, numCth, numWth, numEmPes);
@@ -39,39 +39,16 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   firstLog=0;
   totalTlineLength=0;
 
-  /* create message map arrays for each emulating PE*/
-  int *emPeMaxMsgs = new int[numEmPes];
-  memset(emPeMaxMsgs, 0, numEmPes*sizeof(int));
-  
   int nodeNum = penum/numWth;
   int myEmulPe = nodeNum%numEmPes;
+  pe->msgDestLogs = new map<int, int>[myEmulPe];
 
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
-  currTlineIdx = penum;               // set global variable
+  currTlineIdx = penum;   // set global variable
   int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
   assert(status!=-1);
-
- // find number of messages per PE
-  for(int j=tlinerec.length()-1; j>=0; j--)
-  {
-    BgTimeLog *bglog=tlinerec[j];
-    if(bglog->msgs.length()>0)
-    {
-      if(bglog->msgs[bglog->msgs.length()-1]->msgID > emPeMaxMsgs[myEmulPe])
-      {
-        emPeMaxMsgs[myEmulPe] = bglog->msgs[bglog->msgs.length()-1]->msgID;
-      }
-      break;
-    }
-  }
-  msgDestLogs = new int*[numEmPes];
-  for(int i=0; i<numEmPes; i++)
-  {
-    msgDestLogs[i] = new int[emPeMaxMsgs[i]+1];
-    for(int j=0; j<emPeMaxMsgs[i]+1; j++)
-      msgDestLogs[i][j] = -1;
-  }
+  
   // update fileLoc
   // call to update fileLoc
   status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
@@ -98,23 +75,30 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     }
 
     // first job's index is zero
-    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, msgDestLogs);
+    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe);
 
     int sPe = bglog->msgId.pe();
     int smsgID = bglog->msgId.msgID();
     if(sPe >= 0) {
+      map<int, int>::iterator it;
+      it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
       // some task set it before so it is a broadcast
-      if( msgDestLogs[(sPe/numWth)%numEmPes][smsgID]==-1){
-        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = logInd + firstLog;
-          } else // it may be a broadcast
-        msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
+      if (it != pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
+        if(it->first==-1){
+          it->second = logInd + firstLog;
+          //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = logInd + firstLog;
+        } else // it may be a broadcast
+          it->second = -100;
+          //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
+      }
+      else printf("Something is wrong...\n");
     }
   }
   firstLog += tlinerec.length();
 
 }
 
-void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, int**& msgDestLogs)
+void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
 {
   t->execTime=(unsigned long long)(((double)TIME_MULT * bglog->execTime));
   t->myMsgId.pe = bglog->msgId.pe() + jobPEindex;
@@ -139,7 +123,9 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     // mark broadcast
     if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
     {
-      msgDestLogs[myEmPE][bglog->msgs[i]->msgID] = -100;
+      pe->msgDestLogs[taskPE].insert(pair<int,int>(bglog->msgs[i]->msgID,-100));
+      //pe->msgDestLogs[myEmPE].insert(pair<int,int>(bglog->msgs[i]->msgID,-100));
+      //msgDestLogs[myEmPE][bglog->msgs[i]->msgID] = -100;
     }
 
     // sendTime is absolute

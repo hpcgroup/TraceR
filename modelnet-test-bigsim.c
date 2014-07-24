@@ -53,7 +53,6 @@ struct proc_state
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     TraceReader* trace_reader; /* for reading the bigsim traces */
-    int** msgDestTask;   /* mapping from msgID to destination task for faster access */
 };
 
 struct proc_msg
@@ -363,7 +362,7 @@ static void handle_kickoff_event(
     ns->trace_reader = newTraceReader();
     int tot=0, totn=0, emPes=0, nwth=0;
     long long unsigned int startTime=0;
-    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime, ns->msgDestTask);
+    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime);
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
         printf("ERROR: BigSim traces do not match the codes config file..\n");
@@ -650,9 +649,10 @@ static int find_task_from_msg(
         proc_state * ns,
         MsgID* msg_id){
 
-        int** msgDests = ns->msgDestTask;
-        int task_id = msgDests[MsgID_getPE(msg_id)][MsgID_getID(msg_id)];
-        return task_id;
+    //int** msgDests = ns->msgDestTask;
+    //int task_id = msgDests[MsgID_getPE(msg_id)][MsgID_getID(msg_id)];
+    //return task_id;
+    return PE_findTaskFromMsg(ns->my_pe, msg_id);
 }
 
 //utility function to convert pe number to tw_lpid number

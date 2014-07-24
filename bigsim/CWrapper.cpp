@@ -45,11 +45,15 @@ extern "C" {
             return id;
         }
     }
+    int PE_findTaskFromMsg(PE* p, MsgID* msgId){
+        return p->findTaskFromMsg(msgId);
+    }
 
     //TraceReader
     TraceReader* newTraceReader(){return new TraceReader();}
-    void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int** dests){
-         t->readTrace(tot, numnodes, empes, nwth, pe, penum, startTime, dests);
+    void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
+    empes, int* nwth, PE* pe, int penum, unsigned long long* startTime){
+         t->readTrace(tot, numnodes, empes, nwth, pe, penum, startTime);
     }
     int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
 

@@ -42,11 +42,12 @@ void PE_set_currentTask(PE* p, int tInd);
 int PE_get_myEmPE(PE* p);
 void PE_addToBuffer(PE* p, int task_id);
 int PE_getNextBuffedMsg(PE* p);
+int PE_findTaskFromMsg(PE* p, MsgID* msgId);
 
 //TraceReader
 typedef struct TraceReader TraceReader;
 TraceReader* newTraceReader();
-void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime, int** dests);
+void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
 
 #ifdef __cplusplus
