@@ -301,6 +301,9 @@ void PE::printState()
 }
 
 //BILGE
+void PE::invertMsgPe(int tInd){
+    myTasks[tInd].myMsgId.pe = -myTasks[tInd].myMsgId.pe;
+}
 unsigned long long PE::getTaskExecTime(int tInd){
     return myTasks[tInd].execTime;
 }

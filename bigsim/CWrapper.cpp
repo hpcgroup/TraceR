@@ -30,7 +30,13 @@ extern "C" {
     bool PE_noUnsatDep(PE* p, int tInd){return p->noUnsatDep(tInd);}
     unsigned long long PE_getTaskExecTime(PE* p, int tInd){return p->noUnsatDep(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
-    MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){return &p->myTasks[tInd].myEntries;}
+    MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
+        //printf("p->myTasks[tInd].myEntries[0]:%d\n", p->myTasks[tInd].myEntries[0].msgId.pe);
+        return &(p->myTasks[tInd].myEntries);
+    }
+    MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd){
+        return &(p->myTasks[tInd].myEntries[mInd]);
+    }
     void PE_set_taskDone(PE* p, int tInd, bool b){p->myTasks[tInd].done=b;}
     int* PE_getTaskFwdDep(PE* p, int tInd){return p->myTasks[tInd].forwardDep;}
     int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
@@ -38,7 +44,7 @@ extern "C" {
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
     int PE_getNextBuffedMsg(PE* p){
-        if(p->msgBuffer.size()<0) return -1;
+        if(p->msgBuffer.size()<=0) return -1;
         else{
             int id = p->msgBuffer.front();
             p->msgBuffer.erase(p->msgBuffer.begin());
@@ -47,6 +53,9 @@ extern "C" {
     }
     int PE_findTaskFromMsg(PE* p, MsgID* msgId){
         return p->findTaskFromMsg(msgId);
+    }
+    void PE_invertMsgPe(PE* p, int tInd){
+        p->invertMsgPe(tInd);
     }
 
     //TraceReader

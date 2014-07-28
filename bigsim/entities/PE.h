@@ -42,9 +42,11 @@ class PE {
     void printState();
 
     //BILGE
+    void invertMsgPe(int tInd);
     unsigned long long getTaskExecTime(int tInd);
     map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
+
 
 };
 

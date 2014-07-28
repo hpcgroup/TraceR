@@ -21,6 +21,7 @@
 #include "codes/lp-type-lookup.h"
 
 #include "tests/bigsim/CWrapper.h"
+#include "tests/bigsim/entities/MsgEntry.h"
 
 static int net_id = 0;
 static int num_routers = 0;
@@ -60,7 +61,7 @@ struct proc_msg
     enum proc_event proc_event_type;
     tw_lpid src;          /* source of this request or ack */
     int incremented_flag; /* helper for reverse computation */
-    MsgID* msg_id;
+    MsgID msg_id;
 };
 
 
@@ -169,7 +170,7 @@ static int exec_comp(
               
 static int find_task_from_msg(
     proc_state * ns,
-    MsgID* msg_id);
+    MsgID msg_id);
 
 static int pe_to_lpid(int pe);
 
@@ -366,12 +367,12 @@ static void handle_kickoff_event(
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
         printf("ERROR: BigSim traces do not match the codes config file..\n");
-        MPI_Finalize();
-	    return;
+        //MPI_Finalize();
+	//return;
     }
     //PE_set_busy(ns->my_pe, true);
     //execute the first task
-    exec_task(ns, startTime, lp);
+    exec_task(ns, 0, lp);
 
 }
 static void handle_local_event(
@@ -399,7 +400,7 @@ static void handle_kickoff_rev_event(
     tw_lp * lp)
 {
     ns->msg_sent_count--;
-    model_net_event_rc(net_id, lp, MsgID_getSize(m->msg_id));
+    model_net_event_rc(net_id, lp, m->msg_id.size);
     return;
 }
 
@@ -419,6 +420,7 @@ static void handle_recv_event(
 
     assert(m->src == dest_id);
     int task_id = find_task_from_msg(ns, m->msg_id);
+    PE_invertMsgPe(ns->my_pe, task_id);
     //Check if the PE is busy
     //buffer the message if it arrives when pe is busy
     if(PE_is_busy(ns->my_pe)){
@@ -440,7 +442,7 @@ static void handle_exec_event(
 {
     //Mark the task as done
     //For exec complete event msg_id contains the task_id for convenience
-    int task_id = MsgID_getID(m->msg_id); 
+    int task_id = m->msg_id.id; 
     PE_set_taskDone(ns->my_pe, task_id, true);
 
     //Increment the current task .. TODO: check of this is needed
@@ -473,7 +475,7 @@ static void handle_recv_rev_event(
     //decrease the currentTask .. TODO: check this...
     PE_set_currentTask(ns->my_pe, task_id-1);
 
-    model_net_event_rc(net_id, lp, MsgID_getSize(m->msg_id));
+    model_net_event_rc(net_id, lp, m->msg_id.size);
 }
 static void handle_exec_rev_event(
 		proc_state * ns,
@@ -482,7 +484,7 @@ static void handle_exec_rev_event(
 		tw_lp * lp)
 {
     //Mark the task as not done
-    int task_id = MsgID_getID(m->msg_id); 
+    int task_id = m->msg_id.id; 
     PE_set_taskDone(ns->my_pe, task_id, false);
     //mark it's forward dependencies as not done
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
@@ -512,14 +514,15 @@ static void exec_task(
     //for each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
-    MsgEntry** taskEntries = PE_getTaskMsgEntries(ns->my_pe, task_id);
+    printf("msgEntCount:%d, of task_id:%d\n", msgEntCount, task_id);
 
     for(int i=0; i<msgEntCount; i++){
+        MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id, i);
         int myPE = PE_get_myEmPE(ns->my_pe);
         int myNode = myPE/num_servers;
-        int node = MsgEntry_getNode(taskEntries[i]);
-        int thread = MsgEntry_getThread(taskEntries[i]);
-        unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntries[i]);
+        int node = MsgEntry_getNode(taskEntry);
+        int thread = MsgEntry_getThread(taskEntry);
+        unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
         unsigned long long copyTime = 0;
         unsigned long long delay = 0;
 
@@ -534,8 +537,8 @@ static void exec_task(
                 destPE++;
                 if(i == thread) continue;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
-                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
               }
             } else if(node != -100-myNode && node <= -100) {
@@ -544,15 +547,15 @@ static void exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
-                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
               }
             } else if(thread >= 0) {
               int destPE = myNode*num_servers + thread;
               delay += copyTime;
-              send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]),
-                  MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]),
+              send_msg(ns, task_id, MsgEntry_getSize(taskEntry),
+                  MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
                       pe_to_lpid(destPE), sendOffset+delay, lp);
             } else if(thread==-1) { // broadcast to all work cores
               int destPE = myNode*num_servers - 1;
@@ -560,16 +563,16 @@ static void exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
-                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
               }
             }
           }
           if(node != myNode)
           {
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntries[i]), 
-                    MsgEntry_getPE(taskEntries[i]), MsgEntry_getID(taskEntries[i]), 
+                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(myPE), sendOffset+delay, lp);
           }
    }
@@ -601,7 +604,9 @@ static int send_msg(
 
         m_local->proc_event_type = LOCAL;
         m_local->src = lp->gid;
-        m_local->msg_id = newMsgID(size, src_pe, id);
+        m_local->msg_id.size = size;
+        m_local->msg_id.pe = src_pe;
+        m_local->msg_id.id = id;
 
         memcpy(m_remote, m_local, sizeof(proc_msg));
         m_remote->proc_event_type = RECV_MSG;
@@ -634,7 +639,10 @@ static int exec_comp(
 
     m_local->proc_event_type = LOCAL;
     m_local->src = lp->gid;
-    m_local->msg_id = newMsgID(0, lp->gid, task_id);
+    //m_local->msg_id = newMsgID(0, lp->gid, task_id);
+    m_local->msg_id.size = 0;
+    m_local->msg_id.pe = lp->gid;
+    m_local->msg_id.id = task_id;
 
     memcpy(m_remote, m_local, sizeof(proc_msg));
     m_remote->proc_event_type = EXEC_COMP;
@@ -647,12 +655,12 @@ static int exec_comp(
 //returs the task id that the message belongs to using msgDestTask map
 static int find_task_from_msg(
         proc_state * ns,
-        MsgID* msg_id){
+        MsgID msg_id){
 
     //int** msgDests = ns->msgDestTask;
     //int task_id = msgDests[MsgID_getPE(msg_id)][MsgID_getID(msg_id)];
     //return task_id;
-    return PE_findTaskFromMsg(ns->my_pe, msg_id);
+    return PE_findTaskFromMsg(ns->my_pe, &msg_id);
 }
 
 //utility function to convert pe number to tw_lpid number
