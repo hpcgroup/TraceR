@@ -242,7 +242,7 @@ void PE::printStat()
     // assert(myTasks[i].done);
     if(!myTasks[i].done)
     {
-      //printf("not done:%d\n", i);
+      printf("PE: %d not done:%d\n", myNum, i);
       countTask++;
     }
   }

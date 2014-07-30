@@ -38,9 +38,11 @@ extern "C" {
         return &(p->myTasks[tInd].myEntries[mInd]);
     }
     void PE_set_taskDone(PE* p, int tInd, bool b){p->myTasks[tInd].done=b;}
+    bool PE_get_taskDone(PE* p, int tInd){return p->myTasks[tInd].done;}
     int* PE_getTaskFwdDep(PE* p, int tInd){return p->myTasks[tInd].forwardDep;}
     int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
     void PE_set_currentTask(PE* p, int tInd){p->currentTask=tInd;}
+    int PE_get_currentTask(PE* p){return p->currentTask;}
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
     int PE_getNextBuffedMsg(PE* p){
@@ -57,6 +59,13 @@ extern "C" {
     void PE_invertMsgPe(PE* p, int tInd){
         p->invertMsgPe(tInd);
     }
+    MsgID PE_getTaskMsgID(PE* p, int tInd){
+        return p->myTasks[tInd].myMsgId;
+    }
+    int PE_get_tasksCount(PE* p){return p->tasksCount;}
+    int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
+    //void PE_printStat(PE* p){p->printStat();}
+    void PE_printStat(PE* p){p->check();}
 
     //TraceReader
     TraceReader* newTraceReader(){return new TraceReader();}

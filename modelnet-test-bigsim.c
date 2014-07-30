@@ -319,6 +319,7 @@ static void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
 {
+    PE_printStat(ns->my_pe);
     //printf("server %llu recvd %d bytes in %f seconds, %f MiB/s sent_count %d recvd_count %d local_count %d \n", (unsigned long long)lp->gid, PAYLOAD_SZ*ns->msg_recvd_count, ns_to_s(ns->end_ts-ns->start_ts), 
    //     ((double)(PAYLOAD_SZ*NUM_REQS)/(double)(1024*1024)/ns_to_s(ns->end_ts-ns->start_ts)), ns->msg_sent_count, ns->msg_recvd_count, ns->local_recvd_count);
     return;
@@ -343,6 +344,7 @@ static void handle_kickoff_event(
     proc_msg * m,
     tw_lp* lp)
 {
+    printf("handle_kickoff_event, lp_gid: %d --", (int)lp->gid);
     /* record when transfers started on this server */
     ns->start_ts = tw_now(lp);
 
@@ -358,7 +360,15 @@ static void handle_kickoff_event(
           opt_offset = num_servers_per_rep + num_routers_per_rep; /* optional offset due to dragonfly mapping */
 
     //Each server read it's trace
-    int my_pe_num = (lp->gid/lps_per_rep)*(num_routers_per_rep+num_servers_per_rep) + (lp->gid%lps_per_rep); //TODO: check this
+    int my_pe_num = 0;
+    printf("lp->gid mod lps_per_rep=%d -- lps_per_rep: %d\n", (int)lp->gid%lps_per_rep, (int)lps_per_rep);
+    if(net_id == DRAGONFLY)
+        //servers has the first place in the group in terms of global id
+        my_pe_num = (lp->gid/lps_per_rep)*(num_servers_per_rep)+(lp->gid%lps_per_rep);
+    else
+        my_pe_num = lp->gid/offset;
+    printf("my_pe_num: %d\n", my_pe_num);
+
     ns->my_pe = newPE();
     ns->trace_reader = newTraceReader();
     int tot=0, totn=0, emPes=0, nwth=0;
@@ -367,8 +377,8 @@ static void handle_kickoff_event(
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
         printf("ERROR: BigSim traces do not match the codes config file..\n");
-        //MPI_Finalize();
-	//return;
+        MPI_Finalize();
+	return;
     }
     //PE_set_busy(ns->my_pe, true);
     //execute the first task
@@ -410,30 +420,72 @@ static void handle_recv_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    /* safety check that this request got to the right server */
-    //printf("\n m->src %d lp->gid %d ", m->src, lp->gid);
-    int opt_offset = 0;
- 
-    if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
-        opt_offset = num_servers_per_rep + num_routers_per_rep; /* optional offset due to dragonfly mapping */    	
-    tw_lpid dest_id = (lp->gid + offset + opt_offset)%(num_servers*2 + num_routers);
-
-    assert(m->src == dest_id);
     int task_id = find_task_from_msg(ns, m->msg_id);
-    PE_invertMsgPe(ns->my_pe, task_id);
-    //Check if the PE is busy
-    //buffer the message if it arrives when pe is busy
-    if(PE_is_busy(ns->my_pe)){
-        //add the task_id to the vector 
-        PE_addToBuffer(ns->my_pe, task_id);
+    //printf("handle_recv_event task_id:%d\n", task_id);
+
+    if(task_id>=0){
+        if(PE_get_taskDone(ns->my_pe,task_id))
+            assert(0);
+        assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
+        PE_invertMsgPe(ns->my_pe, task_id);
+        //Check if pe is busy
+        if(!PE_is_busy(ns->my_pe)){
+            PE_set_busy(ns->my_pe, true);
+            exec_task(ns,task_id, lp);
+        }
+        else{
+            //buffer the message if it arrives when pe is busy
+            PE_addToBuffer(ns->my_pe, task_id);
+        }
         return;
     }
-    //Set the PE as busy 
-    PE_set_busy(ns->my_pe, true);
-    //find which task the message belongs to
-    //then call exec_task
-    exec_task(ns,task_id, lp);
+    // if first not-executed needs this and not busy start sequential
+    int currentTask = PE_get_currentTask(ns->my_pe);
+    //printf("currentTask: %d -- PE_get_tasksCount(ns->my_pe):%d\n", currentTask, PE_get_tasksCount(ns->my_pe));
+    if(PE_getTaskMsgID(ns->my_pe, currentTask).pe -1 == m->msg_id.pe &&
+            PE_getTaskMsgID(ns->my_pe, currentTask).id == m->msg_id.id ){
+        if(PE_get_taskDone(ns->my_pe, currentTask))
+            assert(0);
+        PE_invertMsgPe(ns->my_pe, currentTask);
+        //Check if pe is busy
+        if(!PE_is_busy(ns->my_pe)){
+            PE_set_busy(ns->my_pe, true);
+            exec_task(ns, currentTask, lp);
+        }
+        else{
+            //buffer the message if it arrives when pe is busy
+            PE_addToBuffer(ns->my_pe, currentTask);
+        }
+        return;
+    }
+    else{
+        // search in following tasks
+        //printf("m->msg_id.pe:%d -- m->msg_id.id:%d\n", m->msg_id.pe, m->msg_id.id);
+        for(int i=currentTask+1; i<PE_get_tasksCount(ns->my_pe); i++){
+            // if task depends on this message
+            if(PE_getTaskMsgID(ns->my_pe, i).pe -1 == m->msg_id.pe &&
+                PE_getTaskMsgID(ns->my_pe, i).id == m->msg_id.id ){
+                //printf("PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
+                if(PE_get_taskDone(ns->my_pe, i))
+                    assert(0);
+            }
+            PE_invertMsgPe(ns->my_pe, i);
+            //Check if pe is busy
+            if(!PE_is_busy(ns->my_pe)){
+                PE_set_busy(ns->my_pe, true);
+                exec_task(ns, i, lp);
+            }
+            else{
+                //buffer the message if it arrives when pe is busy
+                PE_addToBuffer(ns->my_pe, currentTask);
+            }
+            return;
+        }
+        printf("Could not find the task; this is all wrong..Aborting\n");
+        assert(0);
+    }
 }
+
 static void handle_exec_event(
 		proc_state * ns,
 		tw_bf * b,
@@ -442,8 +494,16 @@ static void handle_exec_event(
 {
     //Mark the task as done
     //For exec complete event msg_id contains the task_id for convenience
+    printf("handle_exec_event, pe: %d\n", lp->gid);
     int task_id = m->msg_id.id; 
     PE_set_taskDone(ns->my_pe, task_id, true);
+
+    //task is done, execute the forward dependencies
+    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
+    int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
+    for(int i=0; i<fwd_dep_size; i++){
+        exec_task(ns, fwd_deps[i], lp);
+    }
 
     //Increment the current task .. TODO: check of this is needed
     PE_set_currentTask(ns->my_pe, task_id+1);
@@ -498,10 +558,12 @@ static void handle_exec_rev_event(
 
 //executes the task with the specified id
 static void exec_task(
-	        proc_state * ns,
-                int task_id,
-		tw_lp * lp)
+            proc_state * ns,
+            int task_id,
+            tw_lp * lp)
 {
+    printf("exec_task, lp_gid: %d.\n", (int)lp->gid);
+    
     //check if the backward dependencies are satisfied
     //if not, do nothing
     //if yes, execute the task
@@ -523,9 +585,9 @@ static void exec_task(
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
         unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
-        unsigned long long copyTime = 0;
+        unsigned long long copyTime = 1;
         unsigned long long delay = 0;
-
+        
         // if there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
         {
@@ -569,6 +631,7 @@ static void exec_task(
               }
             }
           }
+          
           if(node != myNode)
           {
                 send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
@@ -580,11 +643,12 @@ static void exec_task(
     //PE_set_taskDone(ns->my_pe, task_id, true);
 
     //execute the forward dependencies of the task with exec_task
-    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
+/*    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     for(int i=0; i<fwd_dep_size; i++){
         exec_task(ns, fwd_deps[i], lp);
     }
+*/
     //complete the task
     exec_comp(ns, task_id, execTime, lp);
 }
@@ -598,7 +662,7 @@ static int send_msg(
         int dest_id,
         unsigned long long sendOffset,
         tw_lp * lp) {
-
+        printf("sending message from %d to %d\n", (int)lp->gid, dest_id);
         proc_msg * m_local = malloc(sizeof(proc_msg));
         proc_msg * m_remote = malloc(sizeof(proc_msg));
 
@@ -634,12 +698,13 @@ static int exec_comp(
     unsigned long long sendOffset,
     tw_lp * lp)
 {
+    printf("creating an exec_comp...me: %d\n", lp->gid);
+/*
     proc_msg * m_local = malloc(sizeof(proc_msg));
     proc_msg * m_remote = malloc(sizeof(proc_msg));
 
     m_local->proc_event_type = LOCAL;
     m_local->src = lp->gid;
-    //m_local->msg_id = newMsgID(0, lp->gid, task_id);
     m_local->msg_id.size = 0;
     m_local->msg_id.pe = lp->gid;
     m_local->msg_id.id = task_id;
@@ -648,6 +713,19 @@ static int exec_comp(
     m_remote->proc_event_type = EXEC_COMP;
 
     model_net_event(net_id, "test", lp->gid, 0, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+*/
+
+    //If it's a self event use codes_event_new instead of model_net_event 
+    tw_event *e;
+    proc_msg *m;
+
+    e = codes_event_new(lp->gid, sendOffset, lp);
+    m = tw_event_data(e);
+    m->msg_id.size = 0;
+    m->msg_id.pe = lp->gid;
+    m->msg_id.id = task_id;
+    m->proc_event_type = EXEC_COMP;
+    tw_event_send(e);
 
     return 0;
 }
@@ -669,9 +747,9 @@ static int pe_to_lpid(int pe){
     int lp_id = 0;
     if(net_id == DRAGONFLY)
         //TODO: check this for correctness
-        lp_id = (pe/num_servers_per_rep)*lps_per_rep + num_servers_per_rep + num_routers_per_rep + pe%num_servers_per_rep;
+        lp_id = (pe/num_servers_per_rep)*lps_per_rep + (pe%num_servers_per_rep);
     else
-        lp_id = pe*offset+offset-1;
+        lp_id = pe*offset;
     return lp_id;
 }
 

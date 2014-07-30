@@ -38,14 +38,20 @@ int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
 void PE_set_taskDone(PE* p, int tInd, bool b);
+bool PE_get_taskDone(PE* p, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);
 void PE_set_currentTask(PE* p, int tInd);
+int PE_get_currentTask(PE* p);
 int PE_get_myEmPE(PE* p);
 void PE_addToBuffer(PE* p, int task_id);
 int PE_getNextBuffedMsg(PE* p);
 int PE_findTaskFromMsg(PE* p, MsgID* msgId);
 void PE_invertMsgPe(PE* p, int tInd);
+MsgID PE_getTaskMsgID(PE* p, int tInd);
+int PE_get_tasksCount(PE* p);
+int PE_get_totalTasksCount(PE* p);
+void PE_printStat(PE* p);
 
 //TraceReader
 typedef struct TraceReader TraceReader;
