@@ -17,7 +17,7 @@ extern "C" {
     int MsgEntry_getPE(MsgEntry* m){return m->msgId.pe;}
     int MsgEntry_getID(MsgEntry* m){return m->msgId.id;}
     int MsgEntry_getNode(MsgEntry* m){return m->node;}
-    int MsgEntry_getThread(MsgEntry* m){return m->sendOffset;}
+    int MsgEntry_getThread(MsgEntry* m){return m->thread;}
     unsigned long long MsgEntry_getSendOffset(MsgEntry* m){return m->sendOffset;}
     /*void MsgEntry_sendMsg(MsgEntry* m, unsigned long long startTime) {
         m->sendMsg(startTime);
@@ -43,7 +43,22 @@ extern "C" {
     int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
     void PE_set_currentTask(PE* p, int tInd){p->currentTask=tInd;}
     int PE_get_currentTask(PE* p){return p->currentTask;}
+    void PE_increment_currentTask(PE* p, int tInd){
+        if(PE_get_currentTask(p) == tInd){
+            PE_set_currentTask(p, tInd+1);
+            //search the following tasks until you see a not done task,
+            // and increment the current task
+            int i;
+            for(i=tInd+1; i<PE_get_tasksCount(p); i++){
+                if(PE_get_taskDone(p, i)){
+                    PE_set_currentTask(p, i+1);
+                }
+                else return;
+            }
+        }
+    }
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
+    int PE_get_myNum(PE* p){return p->myNum;}
     void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
     int PE_getNextBuffedMsg(PE* p){
         if(p->msgBuffer.size()<=0) return -1;
