@@ -310,7 +310,10 @@ unsigned long long PE::getTaskExecTime(int tInd){
 int PE::findTaskFromMsg(MsgID* msgId){
     map<int, int>::iterator it;
     int sPe = msgId->pe;
+    int sEmPe = (sPe/numWth)%numEmPes;
     int smsgID = msgId->id;
-    it = msgDestLogs[sPe].find(smsgID);
-    return it->second;
+    it = msgDestLogs[sEmPe].find(smsgID);
+    if(it!=msgDestLogs[sEmPe].end())
+        return it->second;
+    else return -1;
 }

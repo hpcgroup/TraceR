@@ -46,6 +46,7 @@ class PE {
     unsigned long long getTaskExecTime(int tInd);
     map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
+    int numWth, numEmPes;
 
 
 };

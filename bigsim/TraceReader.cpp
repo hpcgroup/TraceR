@@ -43,6 +43,8 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   int myEmulPe = nodeNum%numEmPes;
   printf("myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
   pe->msgDestLogs = new map<int, int>[numEmPes];
+  pe->numWth = numWth;
+  pe->numEmPes = numEmPes;
 
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
@@ -81,24 +83,21 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     int sPe = bglog->msgId.pe();
     int smsgID = bglog->msgId.msgID();
     if(sPe >= 0) {
-      map<int, int>::iterator it;
-      it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
-      // some task set it before so it is a broadcast
-      //printf("(sPe/numWth):%d, msgID:%d\n", (sPe/numWth)%numEmPes,smsgID);
-      if (it != pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
-        // it may be a broadcast
-        //printf("If...%d\n", it->second);
-        it->second = -100;
-        //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
-      }
-      else{
-        //printf("If...\n");
-        pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
-      }
+        map<int, int>::iterator it;
+        it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
+        // some task set it before so it is a broadcast
+        //printf("(sPe/numWth):%d, msgID:%d\n", (sPe/numWth)%numEmPes,smsgID);
+        if (it == pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
+            pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
+        } else{
+            // it may be a broadcast
+            //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
+            printf("I should never come here, please fix me\n");
+            it->second = -100;
+        }
     }
   }
   firstLog += tlinerec.length();
-
 }
 
 void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
@@ -124,12 +123,12 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     t->myEntries[i].thread = bglog->msgs[i]->tID;
 
     // mark broadcast
-    if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
+    /*if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
     { 
       //printf("taskPE:%d, myEmPE:%d, msgID:%d\n", taskPE, myEmPE, bglog->msgs[i]->msgID);
       pe->msgDestLogs[myEmPE].insert(pair<int,int>(bglog->msgs[i]->msgID,-100));
       //msgDestLogs[myEmPE][bglog->msgs[i]->msgID] = -100;
-    }
+    }*/
 
     // sendTime is absolute
     t->myEntries[i].sendOffset = (long long)(((double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime)));

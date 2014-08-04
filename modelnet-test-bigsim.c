@@ -153,7 +153,6 @@ static void exec_task(
 
 static int send_msg(
     proc_state * ns,
-    int task_id,
     int size,
     int src_pe,
     int id,
@@ -382,7 +381,7 @@ static void handle_kickoff_event(
     assert(lpid_to_pe(lp->gid) == my_pe_num);
 
     // printf("\t\tpe_to_lpid(my_pe_num):%d, lp->gid:%d .....\n", pe_to_lpid(my_pe_num), lp->gid);
-    //PE_set_busy(ns->my_pe, true);
+    PE_set_busy(ns->my_pe, true);
     //execute the first task
     exec_task(ns, 0, lp);
 
@@ -423,7 +422,7 @@ static void handle_recv_event(
     tw_lp * lp)
 {
     int task_id = find_task_from_msg(ns, m->msg_id);
-    //printf("handle_recv_event task_id:%d\n", task_id);
+    printf("PE:%d handle_recv_event task_id:%d\n", lpid_to_pe(lp->gid), task_id);
 
     if(task_id>=0){
         if(PE_get_taskDone(ns->my_pe,task_id))
@@ -441,9 +440,10 @@ static void handle_recv_event(
         }
         return;
     }
+    printf("PE%d: Going beyond hash look up on receiving a message\n", lpid_to_pe(lp->gid));
     // if first not-executed needs this and not busy start sequential
     int currentTask = PE_get_currentTask(ns->my_pe);
-    //printf("currentTask: %d -- PE_get_tasksCount(ns->my_pe):%d\n", currentTask, PE_get_tasksCount(ns->my_pe));
+    printf("currentTask: %d -- PE_get_tasksCount(ns->my_pe):%d\n", currentTask, PE_get_tasksCount(ns->my_pe));
     if(PE_getTaskMsgID(ns->my_pe, currentTask).pe -1 == m->msg_id.pe &&
             PE_getTaskMsgID(ns->my_pe, currentTask).id == m->msg_id.id ){
         if(PE_get_taskDone(ns->my_pe, currentTask))
@@ -465,26 +465,26 @@ static void handle_recv_event(
         //printf("m->msg_id.pe:%d -- m->msg_id.id:%d\n", m->msg_id.pe, m->msg_id.id);
         for(int i=currentTask+1; i<PE_get_tasksCount(ns->my_pe); i++){
             // if task depends on this message
-            if(PE_getTaskMsgID(ns->my_pe, i).pe -1 == m->msg_id.pe &&
+            if(PE_getTaskMsgID(ns->my_pe, i).pe - 1 == m->msg_id.pe &&
                 PE_getTaskMsgID(ns->my_pe, i).id == m->msg_id.id ){
-                //printf("PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
-                if(PE_get_taskDone(ns->my_pe, i))
-                    assert(0);
+                printf("PE%d: task_id:%d, PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", i, lpid_to_pe(lp->gid), PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
+                if(PE_get_taskDone(ns->my_pe, i)) //TODO: check this
+                    return; //This is wrong
+                PE_invertMsgPe(ns->my_pe, i);
+                //Check if pe is busy
+                if(!PE_is_busy(ns->my_pe)){
+                    PE_set_busy(ns->my_pe, true);
+                    exec_task(ns, i, lp);
+                }
+                else{
+                    //buffer the message if it arrives when pe is busy
+                    PE_addToBuffer(ns->my_pe, currentTask);
+                }
+                return;
             }
-            PE_invertMsgPe(ns->my_pe, i);
-            //Check if pe is busy
-            if(!PE_is_busy(ns->my_pe)){
-                PE_set_busy(ns->my_pe, true);
-                exec_task(ns, i, lp);
-            }
-            else{
-                //buffer the message if it arrives when pe is busy
-                //PE_addToBuffer(ns->my_pe, currentTask);
-            }
-            return;
         }
         printf("Could not find the task; this is all wrong..Aborting\n");
-        assert(0);
+        //assert(0); //TODO: fix this
     }
 }
 
@@ -500,10 +500,11 @@ static void handle_exec_event(
     int task_id = m->msg_id.id; 
     printf("PE:%d handle_exec_event for task:%d.\n", lpid_to_pe(lp->gid), task_id);
     PE_printStat(ns->my_pe);
-    PE_set_taskDone(ns->my_pe, task_id, true);
+    //PE_set_taskDone(ns->my_pe, task_id, true);
 
     //task is done, execute the forward dependencies
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
+    printf("Executing forward dependencies of size: %d of task %d.\n", fwd_dep_size, task_id);
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     for(int i=0; i<fwd_dep_size; i++){
         exec_task(ns, fwd_deps[i], lp);
@@ -596,7 +597,6 @@ static void exec_task(
 
     for(int i=0; i<msgEntCount; i++){
         MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id, i);
-        //int myPE = PE_get_myEmPE(ns->my_pe);
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
         unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
@@ -605,7 +605,6 @@ static void exec_task(
         // if there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
         {
-            printf("\t\t\tINTRA NODE\n");
             if(node == -100-myNode && thread != -1)
             {
               int destPE = myNode*nWth - 1;
@@ -614,38 +613,38 @@ static void exec_task(
                 destPE++;
                 if(i == thread) continue;
                 delay += copyTime;
+                printf("\t\t\t\tSending message to lp: %d\n", pe_to_lpid(destPE));
                 if(pe_to_lpid(destPE) == lp->gid){
                     exec_comp(ns, task_id, sendOffset+delay, 1, lp);
                 }else{
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
                 }
               }
             } else if(node != -100-myNode && node <= -100) {
               int destPE = myNode*nWth - 1;
-              //if(pe_to_lpid(destPE) == lp->gid) printf("\t\tEROROROROROR\n");
               for(int i=0; i<nWth; i++)
               {
                 destPE++;
-                //if(pe_to_lpid(destPE) == lp->gid) printf("\t\tEROROROROROR\n");
                 delay += copyTime;
+                printf("\t\t\t\tSending message to lp: %d\n", pe_to_lpid(destPE));
                 if(pe_to_lpid(destPE) == lp->gid){
                     exec_comp(ns, task_id, sendOffset+delay, 1, lp);
                 }else{
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
                 }
               }
             } else if(thread >= 0) {
               int destPE = myNode*nWth + thread;
-              //if(pe_to_lpid(destPE) == lp->gid) printf("\t\tEROROROROROR\n");
               delay += copyTime;
+                printf("\t\t\t\tSending message to lp: %d\n", pe_to_lpid(destPE));
               if(pe_to_lpid(destPE) == lp->gid){
                   exec_comp(ns, task_id, sendOffset+delay, 1, lp);
               }else{
-              send_msg(ns, task_id, MsgEntry_getSize(taskEntry),
+              send_msg(ns, MsgEntry_getSize(taskEntry),
                   MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
                       pe_to_lpid(destPE), sendOffset+delay, lp);
               }
@@ -654,12 +653,12 @@ static void exec_task(
               for(int i=0; i<nWth; i++)
               {
                 destPE++;
-                //if(pe_to_lpid(destPE) == lp->gid) printf("\t\tEROROROROROR\n");
                 delay += copyTime;
+                printf("\t\t\t\tSending message to lp: %d\n", pe_to_lpid(destPE));
                 if(pe_to_lpid(destPE) == lp->gid){
                     exec_comp(ns, task_id, sendOffset+delay, 1, lp);
                 }else{
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
+                send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                         pe_to_lpid(destPE), sendOffset+delay, lp);
                 }
@@ -669,10 +668,42 @@ static void exec_task(
           
           if(node != myNode)
           {
-                if(pe_to_lpid(node) == lp->gid) printf("\tNOT EOROR\n");
-                send_msg(ns, task_id, MsgEntry_getSize(taskEntry), 
-                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(node), sendOffset+delay, lp);
+                printf("\t\t\t\tnode %d != %d myNode. Sending message to lp: %d\n", node, myNode, pe_to_lpid(node));
+                if(node >= 0){
+                    send_msg(ns, MsgEntry_getSize(taskEntry), 
+                        MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
+                            pe_to_lpid(node), sendOffset+delay, lp);
+                }
+                else if(node == -1){
+                    for(int j=0; j<num_servers; j++){
+                        if(j == myNode) continue;
+                        send_msg(ns, MsgEntry_getSize(taskEntry), 
+                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
+                                pe_to_lpid(j), sendOffset+delay, lp);
+                    }
+                }
+                else if(node <= -100 && thread == -1){
+                    for(int j=0; j<num_servers; j++){
+                        if(j == -node-100 || j == myNode) continue;
+                        send_msg(ns, MsgEntry_getSize(taskEntry), 
+                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
+                                pe_to_lpid(j), sendOffset+delay, lp);
+                    }
+
+                }
+                else if(node <= -100){
+                    for(int j=0; j<num_servers; j++){
+                        if(j == myNode) continue;
+                        //if(j == -node-100) {
+                        send_msg(ns, MsgEntry_getSize(taskEntry), 
+                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
+                                pe_to_lpid(j), sendOffset+delay, lp);
+                        //}
+                    }
+                }
+                else{
+                    printf("message not supported yet! node:%d thread:%d\n",node,thread);
+                }
           }
    }
     //mark the task as done, create a complete exec event 
@@ -692,16 +723,15 @@ static void exec_task(
 //creates and sends the message
 static int send_msg(
         proc_state * ns,
-        int task_id,
         int size,
         int src_pe,
         int id,
         int dest_id,
         unsigned long long sendOffset,
         tw_lp * lp) {
-        //printf("sending message from %d to %d\n", (int)lp->gid, dest_id);
-        proc_msg * m_local = malloc(sizeof(proc_msg));
-        proc_msg * m_remote = malloc(sizeof(proc_msg));
+        printf("\t...sending message from %d to %d\n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id));
+        proc_msg* m_local = malloc(sizeof(proc_msg));
+        proc_msg* m_remote = malloc(sizeof(proc_msg));
 
         m_local->proc_event_type = LOCAL;
         m_local->src = lp->gid;
