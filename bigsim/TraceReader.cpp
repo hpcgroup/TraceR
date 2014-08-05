@@ -49,19 +49,19 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
   currTlineIdx = penum;   // set global variable
-  int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
-  assert(status!=-1);
+  //int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
+  //assert(status!=-1);
   
   // update fileLoc
   // call to update fileLoc
-  status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
-  assert(status!=-1);
+  //status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
+  //assert(status!=-1);
   
   printf("Trace read tasks\n");
 
    // read tasks
   // read the window
-  status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog, totalTlineLength);
+  int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog, totalTlineLength);
   assert(status!=-1);
   pe->myNum = penum;
   pe->myEmPE = (penum/numWth)%numEmPes;
@@ -92,7 +92,8 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
         } else{
             // it may be a broadcast
             //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
-            printf("I should never come here, please fix me\n");
+            printf(" %d I should never come here, please fix me %d\n", penum, it->second);
+            assert(0);
             it->second = -100;
         }
     }
@@ -114,14 +115,16 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   t->msgEntCount = bglog->msgs.length();
   t->myEntries = new MsgEntry[t->msgEntCount];
 
+  printf("[%d] I expect from  %d, %d\n", taskPE, t->myMsgId.pe - 1, t->myMsgId.id); 
   for(int i=0; i<bglog->msgs.length(); i++)
   {
     t->myEntries[i].msgId.id = bglog->msgs[i]->msgID;
     t->myEntries[i].msgId.pe = taskPE;
-
+    
     t->myEntries[i].node = bglog->msgs[i]->dstNode;
     t->myEntries[i].thread = bglog->msgs[i]->tID;
 
+    printf("[%d] I sent  to %d, %d\n", taskPE, bglog->msgs[i]->dstNode, t->myEntries[i].msgId.id); 
     // mark broadcast
     /*if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
     { 
