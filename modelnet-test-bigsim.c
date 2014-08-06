@@ -374,6 +374,7 @@ static void handle_kickoff_event(
         MPI_Finalize();
 	return;
     }
+    printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe));
     //printf("lpid_to_pe(my_pe_num):%d, my_pe_num:%d\n", lpid_to_pe(lp->gid), my_pe_num);
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num) == lp->gid);
@@ -422,9 +423,8 @@ static void handle_recv_event(
     tw_lp * lp)
 {
     int task_id = find_task_from_msg(ns, m->msg_id);
-    printf("PE:%d handle_recv_event task_id:%d\n", lpid_to_pe(lp->gid), task_id);
 
-    printf("[%d] Received from %d id: %d for task: %d\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id);
+    printf("PE%d: Received from %d id: %d for task: %d\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id);
     if(task_id>=0){
         if(PE_get_taskDone(ns->my_pe,task_id)) //TODO: FIX ME
             assert(0);
@@ -466,7 +466,7 @@ static void handle_recv_event(
             // if task depends on this message
             if(PE_getTaskMsgID(ns->my_pe, i).pe - 1 == m->msg_id.pe &&
                 PE_getTaskMsgID(ns->my_pe, i).id == m->msg_id.id ){
-                printf("PE%d: task_id:%d, PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", i, lpid_to_pe(lp->gid), PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
+                //printf("PE%d: task_id:%d, PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", i, lpid_to_pe(lp->gid), PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
                 if(PE_get_taskDone(ns->my_pe, i)) //TODO: check this
                     return; //This is wrong
                 PE_invertMsgPe(ns->my_pe, i);
@@ -482,7 +482,7 @@ static void handle_recv_event(
             }
         }
         printf("Could not find the task; this is all wrong..Aborting %d %d\n", m->msg_id.pe, m->msg_id.id);
-        assert(0); //TODO: fix this
+        assert(0); 
     }
 }
 
@@ -502,7 +502,7 @@ static void handle_exec_event(
 
     //task is done, execute the forward dependencies
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
-    printf("PE:%d Executing forward dependencies of size: %d of task %d. \t", lpid_to_pe(lp->gid), fwd_dep_size, task_id);
+    printf("PE:%d Executing forward dependencies of size: %d of task %d. F ", lpid_to_pe(lp->gid), fwd_dep_size, task_id);
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     for(int i=0; i<fwd_dep_size; i++){
         PE_addToBuffer(ns->my_pe, fwd_deps[i]);
@@ -511,8 +511,7 @@ static void handle_exec_event(
     }
     printf("\n");
 
-    //Increment the current task .. TODO: check this
-    //PE_set_currentTask(ns->my_pe, task_id+1);
+    //Increment the current task .. 
     PE_increment_currentTask(ns->my_pe, task_id);
     printf("PE:%d currentTask:%d\n", lpid_to_pe(lp->gid), PE_get_currentTask(ns->my_pe));
 
@@ -572,7 +571,6 @@ static void exec_task(
             int task_id,
             tw_lp * lp)
 {
-    printf("PE: %d, exec_task %d\n", lpid_to_pe(lp->gid), task_id);
     //check if the backward dependencies are satisfied
     //if not, do nothing
     //if yes, execute the task
@@ -593,13 +591,13 @@ static void exec_task(
     //for each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
-    printf("msgEntCount:%d, of task_id:%d\n", msgEntCount, task_id);
+    printf("PE: %d, exec_task: %d, num entries: %d\n", lpid_to_pe(lp->gid), task_id, msgEntCount);
 
     int myPE = PE_get_myNum(ns->my_pe);
     assert(myPE == lpid_to_pe(lp->gid)); 
-    int nWth = 1; 
+    int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
-    unsigned long long copyTime = 1;
+    unsigned long long copyTime = 5;
     unsigned long long delay = 0;
 
     for(int i=0; i<msgEntCount; i++){
@@ -607,7 +605,7 @@ static void exec_task(
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
         unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
-        printf("\tENTRY node:%d, thread:%d\n", node, thread);
+        //printf("\tENTRY node:%d, thread:%d\n", node, thread);
         
         // if there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
@@ -620,8 +618,8 @@ static void exec_task(
                 destPE++;
                 if(i == thread) continue;
                 delay += copyTime;
-                printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
                 if(pe_to_lpid(destPE) == lp->gid){
+                    printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -635,8 +633,8 @@ static void exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
                 if(pe_to_lpid(destPE) == lp->gid){
+                    printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -647,8 +645,8 @@ static void exec_task(
             } else if(thread >= 0) {
               int destPE = myNode*nWth + thread;
               delay += copyTime;
-                printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
               if(pe_to_lpid(destPE) == lp->gid){
+                  printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
                   exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
               }else{
               send_msg(ns, MsgEntry_getSize(taskEntry),
@@ -661,8 +659,8 @@ static void exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                printf("\t\t\t\t[PE:%d] Intra Sending message to lp: %d\n", myNode, destPE);
                 if(pe_to_lpid(destPE) == lp->gid){
+                    printf("\t\t\t\t[PE:%d] Intra Sending message to lp: %d\n", myNode, destPE);
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -678,7 +676,6 @@ static void exec_task(
                 printf("\t\t\t\[PE:%d] Sending message to node: %d\n", myNode, node);
                 bool bcast = (thread == -1);
                 if(node >= 0){
-                    printf("\t\t\t\[PE:%d] Sending message to pe: %d\n", myNode, node);
                     send_msg(ns, MsgEntry_getSize(taskEntry), 
                         MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                             pe_to_lpid(node), sendOffset+delay, lp);
@@ -686,7 +683,6 @@ static void exec_task(
                 else if(node == -1){
                     for(int j=0; j<num_servers; j++){
                         if(j == myNode) continue;
-                        printf("\t\t\t\[PE:%d] Sending message to pe: %d\n", myNode, j);
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                                 pe_to_lpid(j), sendOffset+delay, lp);
@@ -695,7 +691,6 @@ static void exec_task(
                 else if(node <= -100 && thread == -1){
                     for(int j=0; j<num_servers; j++){
                         if(j == -node-100 || j == myNode) continue;
-                        printf("\t\t\t\[PE:%d] Sending message to pe: %d\n", myNode, j);
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                                 pe_to_lpid(j), sendOffset+delay, lp);
@@ -703,11 +698,10 @@ static void exec_task(
 
                 }
                 else if(node <= -100){
-                    printf("OOO, thread: %d\n", thread);
+                    printf("OOO BROADCAST, thread: %d\n", thread);
                     for(int j=0; j<num_servers; j++){
                         if(j == myNode) continue;
                         //if(j == -node-100 && thread != 0) {
-                        printf("\t\t\t\[PE:%d] OOO Sending message to pe: %d\n", myNode, j);
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
                                 pe_to_lpid(j), sendOffset+delay, lp);
@@ -736,7 +730,7 @@ static int send_msg(
         int dest_id,
         unsigned long long sendOffset,
         tw_lp * lp) {
-        printf("\t...sending message from %d to %d\n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id));
+        printf("\t...sending message from %d to %d, size: %d.\n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size);
         proc_msg* m_local = malloc(sizeof(proc_msg));
         proc_msg* m_remote = malloc(sizeof(proc_msg));
 
@@ -761,7 +755,11 @@ static int send_msg(
              const void* self_event,
              tw_lp *sender
         */
-        model_net_event(net_id, "test", dest_id, size, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        int payload = pow(2, ceil(log(size)/log(2)));
+        payload = 2048;
+        //model_net_event(net_id, "test", dest_id, size, 0.0, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        model_net_event(net_id, "test", dest_id, payload, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        //model_net_event(net_id, "test", dest_id, size, sendOffset, sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
     
     return 0;
@@ -774,8 +772,8 @@ static int exec_comp(
     tw_lp * lp)
 {
     if(recv)
-        printf("\tPE:%d Sending and RECV_MSG event to myself for task %d\n", lpid_to_pe(lp->gid), task_id);
-    else printf("\tPE:%d Sending and EXEC_COMP event to myself for task %d\n", lpid_to_pe(lp->gid), task_id);
+        printf("\tPE:%d Sending and RECV_MSG event to myself for msg id: %d\n", lpid_to_pe(lp->gid), task_id);
+    else printf("\tPE:%d Sending and EXEC_COMP event to myself for task: %d\n", lpid_to_pe(lp->gid), task_id);
     //If it's a self event use codes_event_new instead of model_net_event 
     tw_event *e;
     proc_msg *m;

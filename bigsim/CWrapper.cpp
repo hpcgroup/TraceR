@@ -81,6 +81,7 @@ extern "C" {
     int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
     //void PE_printStat(PE* p){p->printStat();}
     void PE_printStat(PE* p){p->check();}
+    int PE_get_numWorkThreads(PE* p){return p->numWth;}
 
     //TraceReader
     TraceReader* newTraceReader(){return new TraceReader();}

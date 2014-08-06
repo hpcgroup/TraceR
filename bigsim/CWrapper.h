@@ -54,6 +54,7 @@ MsgID PE_getTaskMsgID(PE* p, int tInd);
 int PE_get_tasksCount(PE* p);
 int PE_get_totalTasksCount(PE* p);
 void PE_printStat(PE* p);
+int PE_get_numWorkThreads(PE* p);
 
 //TraceReader
 typedef struct TraceReader TraceReader;
