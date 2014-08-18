@@ -9,8 +9,6 @@
 #define PE_H_
 
 #include "MsgEntry.h"
-#include "../events/Event.h"
-#include "../events/ExecCompleteEvent.h"
 #include <cstring>
 #include "Task.h"
 #include <vector>
@@ -32,22 +30,17 @@ class PE {
     int tasksCount;	//total number of tasks
     int currentTask; // index of first not-executed task (helps searching messages)
 
-    long long startExec(unsigned long long newTime);
-    void completeExec(unsigned long long);	// after complete event
-    long long startRecursiveExec(int tInd, unsigned long long beforeExecutedTime);	// exec task tree
-    void receiveMsg(MsgID, unsigned long long);
     bool noUnsatDep(int tInd);	// there is no unsatisfied dependency for task
     void printStat();
     void check();
     void printState();
 
-    //BILGE
+    //functions added by Bilge for codes-tracing
     void invertMsgPe(int tInd);
     unsigned long long getTaskExecTime(int tInd);
     map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
-
 
 };
 

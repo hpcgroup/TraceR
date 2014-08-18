@@ -24,9 +24,6 @@ int MsgEntry_getThread(MsgEntry* m);
 unsigned long long MsgEntry_getSendOffset(MsgEntry* m);
 //void MsgEntry_sendMsg(MsgEntry*, unsigned long long startTime);
 
-//Event
-typedef struct Event event;
-
 //PE
 typedef struct PE PE;
 PE* newPE();

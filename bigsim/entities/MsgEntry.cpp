@@ -32,6 +32,8 @@ MsgEntry::MsgEntry() {
 // -100-N     K         Broadcast to all worker threads of all nodes
 //                      except worker K of node N
 
+//Bilge: this function is not used bu kept as a reference here
+//For codes integration, sending messages happens in modelnet-test-bigsim.c file
 void MsgEntry::sendMsg(unsigned long long startTime)
 {
 /*

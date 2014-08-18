@@ -6,8 +6,8 @@
 #ifndef TASK_H_
 #define TASK_H_
 #include "MsgEntry.h"
-#include "../events/Event.h"
-#include "../events/ReceiveMsgPeEvent.h"
+#include <cstdlib>
+#include <cstdio>
 
 class MsgEntry;
 #include <cstring>

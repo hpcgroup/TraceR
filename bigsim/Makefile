@@ -20,10 +20,6 @@ CPP_SRCS += entities/MsgEntry.cpp entities/PE.cpp entities/Task.cpp
 OBJS += entities/MsgEntry.o entities/PE.o entities/Task.o
 CPP_DEPS += entities/MsgEntry.d entities/PE.d entities/Task.d
 
-CPP_SRCS += events/ExecCompleteEvent.cpp events/ReceiveMsgPeEvent.cpp
-OBJS += events/ExecCompleteEvent.o events/ReceiveMsgPeEvent.o
-CPP_DEPS += events/ExecCompleteEvent.d events/ReceiveMsgPeEvent.d
-
 events/%.o: events/%.cpp
 	@echo 'Building file: $<'
 	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"

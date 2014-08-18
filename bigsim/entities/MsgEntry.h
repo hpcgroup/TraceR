@@ -1,7 +1,6 @@
 #ifndef MSGENTRY_H_
 #define MSGENTRY_H_
 
-//#include "../events/Event.h"
 #ifdef __cplusplus
 #include <climits>
 #endif
