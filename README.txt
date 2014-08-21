@@ -1,5 +1,5 @@
 
-Bigsim trace driven simulation for CODES. 
+Bigsim trace driven simulation for CODES.
 
 modelnet-test-bigsim.c: Contains the main function that starts the simulation.
 	Run this in the same way as the other CODES test programs.
@@ -14,3 +14,8 @@ bigsim: This folder contains the classes that are needed for reading the traces
 	TraceReader: For reading Bigsim traces.
 	entities: Contains Task and PE classes.
 	events: Contains Event classes.
+
+USAGE:
+Sequential: 		        	      modelnet-test-bigsim --sync=1 -- mapping_file_name.conf (optional --nkp)
+Parallel Conservative: 		mpirun <args> modelnet-test-bigsim --sync=2 -- mapping_file_name.conf (optional --nkp)
+Parallel Optimistic:   		mpirun <args> modelnet-test-bigsim --sync=3 -- mapping_file_name.conf (optional --nkp)

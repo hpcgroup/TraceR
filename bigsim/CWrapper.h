@@ -1,17 +1,29 @@
 #ifndef __CWRAPPER_H
 #define __CWRAPPER_H
 
+/*
+ *
+ * This file is a wrapper for the c++ functions in this folder
+ * to be called from the modelnet-test-bigsim.c file.
+ * The functions are used for trace reading and storing task dependencies.
+ * BigSim trace reading code and the entities are taken from fastSim code.
+ *
+ * Author: Bilge Acun
+ * 2014
+ *
+ */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 //MsgID
 typedef struct MsgID MsgID;
-/*MsgID* newMsgID(int size, int pe, int id);
+MsgID* newMsgID(int size, int pe, int id);
 int MsgID_getSize(MsgID* m);
 int MsgID_getID(MsgID* m);
 int MsgID_getPE(MsgID* m);
-*/
+
 
 //MsgEntry
 typedef struct MsgEntry MsgEntry;
@@ -22,7 +34,6 @@ int MsgEntry_getPE(MsgEntry* m);
 int MsgEntry_getNode(MsgEntry* m);
 int MsgEntry_getThread(MsgEntry* m);
 unsigned long long MsgEntry_getSendOffset(MsgEntry* m);
-//void MsgEntry_sendMsg(MsgEntry*, unsigned long long startTime);
 
 //PE
 typedef struct PE PE;
@@ -44,6 +55,7 @@ void PE_increment_currentTask(PE* p, int tInd);
 int PE_get_myEmPE(PE* p);
 int PE_get_myNum(PE* p);
 void PE_addToBuffer(PE* p, int task_id);
+void PE_removeFromBuffer(PE* p, int task_id);
 int PE_getNextBuffedMsg(PE* p);
 int PE_findTaskFromMsg(PE* p, MsgID* msgId);
 void PE_invertMsgPe(PE* p, int tInd);

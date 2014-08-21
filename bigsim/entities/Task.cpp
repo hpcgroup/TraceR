@@ -13,6 +13,7 @@ Task::Task() {
   forwardDep = 0;
   myEntries = 0;
   done = false;
+  execTime = -1;
 }
 
 unsigned long long Task::exec(unsigned long long startTime, int PEno)

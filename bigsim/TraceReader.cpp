@@ -41,7 +41,9 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
 
   int nodeNum = penum/numWth;
   int myEmulPe = nodeNum%numEmPes;
-  printf("myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
+
+  printf("Trace reading.. myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
+
   pe->msgDestLogs = new map<int, int>[numEmPes];
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
@@ -57,9 +59,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   //status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
   //assert(status!=-1);
   
-  printf("Trace read tasks\n");
-
-   // read tasks
+  // read tasks
   // read the window
   int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog, totalTlineLength);
   assert(status!=-1);
@@ -115,7 +115,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   t->msgEntCount = bglog->msgs.length();
   t->myEntries = new MsgEntry[t->msgEntCount];
 
-  printf("[%d] I expect from  %d, %d\n", taskPE, t->myMsgId.pe - 1, t->myMsgId.id); 
+  //printf("[%d] I expect from  %d, %d\n", taskPE, t->myMsgId.pe - 1, t->myMsgId.id); 
   for(int i=0; i<bglog->msgs.length(); i++)
   {
     t->myEntries[i].msgId.id = bglog->msgs[i]->msgID;
@@ -124,7 +124,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     t->myEntries[i].node = bglog->msgs[i]->dstNode;
     t->myEntries[i].thread = bglog->msgs[i]->tID;
 
-    printf("[%d] I sent  to %d, %d\n", taskPE, bglog->msgs[i]->dstNode, t->myEntries[i].msgId.id); 
+    //printf("[%d] I sent  to %d, %d\n", taskPE, bglog->msgs[i]->dstNode, t->myEntries[i].msgId.id); 
     // mark broadcast
     /*if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
     { 

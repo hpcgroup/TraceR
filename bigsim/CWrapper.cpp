@@ -19,9 +19,6 @@ extern "C" {
     int MsgEntry_getNode(MsgEntry* m){return m->node;}
     int MsgEntry_getThread(MsgEntry* m){return m->thread;}
     unsigned long long MsgEntry_getSendOffset(MsgEntry* m){return m->sendOffset;}
-    /*void MsgEntry_sendMsg(MsgEntry* m, unsigned long long startTime) {
-        m->sendMsg(startTime);
-    }*/
 
     //PE
     PE* newPE(){return new PE();}
@@ -46,7 +43,7 @@ extern "C" {
     void PE_increment_currentTask(PE* p, int tInd){
         if(PE_get_currentTask(p) == tInd){
             PE_set_currentTask(p, tInd+1);
-            //search the following tasks until you see a not done task,
+            // Search the following tasks until you see a not done task,
             // and increment the current task
             int i;
             for(i=tInd+1; i<PE_get_tasksCount(p); i++){
@@ -60,6 +57,15 @@ extern "C" {
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     int PE_get_myNum(PE* p){return p->myNum;}
     void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
+    void PE_removeFromBuffer(PE* p, int task_id){
+        //if the task_id is in the buffer, remove it from the buffer
+        for(int i=0; i<p->msgBuffer.size(); i++){
+            if(p->msgBuffer[i] == task_id){
+                p->msgBuffer.erase(p->msgBuffer.begin()+i);
+                break;
+            }
+        }
+    }
     int PE_getNextBuffedMsg(PE* p){
         if(p->msgBuffer.size()<=0) return -1;
         else{
