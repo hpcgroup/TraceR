@@ -14,6 +14,12 @@
 # PARTICULAR PURPOSE.
 
 
+
+
+
+
+
+
 pkgdatadir = $(datadir)/codes-net
 pkgincludedir = $(includedir)/codes-net
 pkglibdir = $(libdir)/codes-net
@@ -36,7 +42,7 @@ target_triplet = x86_64-unknown-linux-gnu
 bin_PROGRAMS =
 noinst_PROGRAMS =
 check_PROGRAMS = tests/modelnet-test-bigsim$(EXEEXT) \
-	tests/modelnet-test$(EXEEXT) tests/modelnet-p2p-bw$(EXEEXT) \
+    tests/modelnet-test$(EXEEXT) tests/modelnet-p2p-bw$(EXEEXT) \
 	tests/concurrent-msg-recv$(EXEEXT) \
 	tests/modelnet-simplewan-test$(EXEEXT) \
 	tests/modelnet-test-collective$(EXEEXT)
@@ -137,14 +143,12 @@ tests_modelnet_test_OBJECTS = $(am_tests_modelnet_test_OBJECTS)
 tests_modelnet_test_DEPENDENCIES = $(testlib) $(am__DEPENDENCIES_1)
 tests_modelnet_test_LINK = $(CCLD) $(tests_modelnet_test_CFLAGS) \
 	$(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
-am_tests_modelnet_test_bigsim_OBJECTS = tests/tests_modelnet_test_bigsim-modelnet-test-bigsim.$(OBJEXT)
+am_tests_modelnet_test_bigsim_OBJECTS = tests/bigsim/CWrapper.o tests/bigsim/TraceReader.o tests/bigsim/entities/PE.o tests/bigsim/entities/Task.o tests/bigsim/entities/MsgEntry.o tests/tests_modelnet_test_bigsim-modelnet-test-bigsim.$(OBJEXT)
 tests_modelnet_test_bigsim_OBJECTS =  \
 	$(am_tests_modelnet_test_bigsim_OBJECTS)
-tests_modelnet_test_bigsim_DEPENDENCIES = tests/bigsim/CWrapper.o \
-	tests/bigsim/TraceReader.o tests/bigsim/entities/PE.o \
-	tests/bigsim/entities/Task.o tests/bigsim/entities/MsgEntry.o \
-	$(testlib) $(am__DEPENDENCIES_1)
-tests_modelnet_test_bigsim_LINK = $(CXX) \
+tests_modelnet_test_bigsim_DEPENDENCIES = $(testlib) \
+	$(am__DEPENDENCIES_1)
+tests_modelnet_test_bigsim_LINK =  mpicxx \
 	$(tests_modelnet_test_bigsim_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) \
 	$(LDFLAGS) -o $@
 am_tests_modelnet_test_collective_OBJECTS = tests/tests_modelnet_test_collective-modelnet-test-collective.$(OBJEXT)
@@ -361,9 +365,9 @@ src_libcodes_net_a_SOURCES = \
  src/models/networks/model-net/model-net-sched-impl.c
 
 testlib = src/libcodes-net.a
-CHARMPATH = /dcsdata/home/bilgeacun/charm_bigsim/net-linux-x86_64-bigemulator
-tests_modelnet_test_bigsim_LDADD = tests/bigsim/CWrapper.o tests/bigsim/TraceReader.o tests/bigsim/entities/PE.o tests/bigsim/entities/Task.o tests/bigsim/entities/MsgEntry.o $(testlib) ${CODES_BASE_LIBS} -L$(CHARMPATH)/lib -lconv-bigsim-logs -lblue-standalone -lconv-util 
-tests_modelnet_test_bigsim_CFLAGS = ${CODES_BASE_CFLAGS}
+CHARMPATH=/dcsdata/home/bilgeacun/charm_bigsim/net-linux-x86_64-bigemulator
+tests_modelnet_test_bigsim_LDADD = $(testlib) ${CODES_BASE_LIBS}  -L$(CHARMPATH)/lib -lconv-bigsim-logs -lblue-standalone -lconv-util 
+tests_modelnet_test_bigsim_CFLAGS = ${CODES_BASE_CFLAGS} #-I$(CHARMPATH)/include 
 tests_modelnet_test_bigsim_SOURCES = tests/modelnet-test-bigsim.c
 tests_modelnet_test_LDADD = $(testlib) ${CODES_BASE_LIBS}
 tests_modelnet_test_CFLAGS = ${CODES_BASE_CFLAGS}
