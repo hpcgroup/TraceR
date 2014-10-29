@@ -1,0 +1,34 @@
+Instructions to build:
+
+1 - install codes-base
+
+2- clone the codes_trace repository and cd codes_trace
+
+3- ./prepare.sh
+
+4- ./configure --with-codes-base=/path/to/codes-base/install --prefix=/path/to/codes-net/install CC=mpicc
+
+5 - make clean && make
+
+6 - make install
+
+7 - cd tests/bigsim
+
+8 - #fix the charmc path in the Makefile and then do a make
+make
+
+9 - cd ../..
+
+10 - fix the Makefile with the following changes
+change tests_modelnet_test_bigsim_LDADD to be: (assuming you have a valid
+CHARMPATH, else set your CHARMPATH)
+
+tests_modelnet_test_bigsim_LDADD = tests/bigsim/CWrapper.o tests/bigsim/TraceReader.o tests/bigsim/entities/PE.o tests/bigsim/entities/Task.o tests/bigsim/entities/MsgEntry.o $(testlib) ${CODES_BASE_LIBS}  L$(CHARMPATH)/lib -lconv-bigsim-logs -lblue-standalone
+-lconv-util 
+
+11 - # now you can make the tests
+make tests 
+
+12 - # now you can run
+
+mpirun -np 2 tests/modelnet-test-bigsim --sync=2 -- tests/conf/modelnet-test-torus.conf 
