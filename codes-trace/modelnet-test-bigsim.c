@@ -234,10 +234,10 @@ int main(int argc, char **argv)
     
     codes_mapping_setup();
     
-    num_servers = codes_mapping_get_group_reps("MODELNET_GRP") * codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", NULL, 1);
+    num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", NULL, 1);
     if(net_id == DRAGONFLY)
     {
-        num_routers = codes_mapping_get_group_reps("MODELNET_GRP") * codes_mapping_get_lp_count("MODELNET_GRP", 0, "dragonfly_router", NULL, 1); 
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "dragonfly_router", NULL, 1); 
 	offset = 1;
     }
 
@@ -406,6 +406,7 @@ static void handle_kickoff_event(
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
         printf("ERROR: BigSim traces do not match the codes config file..\n");
+        printf("ERROR: %d != %d..\n", num_servers, TraceReader_totalWorkerProcs(ns->trace_reader));
         MPI_Finalize();
 	return;
     }
