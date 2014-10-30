@@ -88,6 +88,7 @@ static void proc_finalize(
 
 tw_lptype proc_lp = {
      (init_f) proc_init,
+     (pre_run_f) NULL,
      (event_f) proc_event,
      (revent_f) proc_rev_event,
      (final_f)  proc_finalize, 
@@ -221,6 +222,9 @@ int main(int argc, char **argv)
     }
 
     configuration_load(argv[2], MPI_COMM_WORLD, &config);
+
+    model_net_register();
+
     net_ids=model_net_configure(&num_nets);
     assert(num_nets==1);
     net_id = *net_ids;
