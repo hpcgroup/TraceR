@@ -21,9 +21,9 @@ modelnet_test_bigsim_CFLAGS = ${CODES_NET_CFLAGS} ${CODES_BASE_CFLAGS}
 all: modelnet_test_bigsim
 
 modelnet_test_bigsim: modelnet_test_bigsim.o bigsim/CWrapper.o bigsim/TraceReader.o bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o
-	$(CC) modelnet_test_bigsim.o ${modelnet_test_bigsim_LDADD} -o modelnet_test_bigsim
+	mpicxx modelnet_test_bigsim.o ${modelnet_test_bigsim_LDADD} -o modelnet_test_bigsim
 
 modelnet_test_bigsim.o: modelnet-test-bigsim.c
-	$(CC) modelnet-test-bigsim.c $(modelnet_test_bigsim_CFLAGS) $(CFLAGS) 
+	$(CC) -Ibigsim $(modelnet_test_bigsim_CFLAGS) -c modelnet-test-bigsim.c $(CFLAGS) -o $@
 clean:
 	rm -rf *.o
