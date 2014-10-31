@@ -38,7 +38,9 @@ typedef struct proc_msg proc_msg;
 typedef struct proc_state proc_state;
 
 static int sync_mode = 0;
-#define MAX_PAYLOAD 524288
+#define MAX_PAYLOAD 4196
+
+#define DEBUG_PRINT 0
 
 /* types of events that will constitute triton requests */
 enum proc_event
@@ -458,10 +460,11 @@ static void handle_recv_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    printf("handle_recv_event..\n");
     int task_id = find_task_from_msg(ns, m->msg_id);
-
+#if DEBUG_PRINT
+    printf("handle_recv_event..\n");
     printf("PE%d: Received from %d id: %d for task: %d\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id);
+#endif
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)) //TODO: check this
@@ -472,12 +475,16 @@ static void handle_recv_event(
         PE_invertMsgPe(ns->my_pe, task_id);
         //Check if pe is busy
         if(!PE_is_busy(ns->my_pe)){
+#if DEBUG_PRINT
             printf("PE is not busy, executing the task.\n");
+#endif
             exec_task(ns,task_id, 1, lp);
         }
         else{
             //Buffer the message if it arrives when pe is busy
+#if DEBUG_PRINT
             printf("PE is busy, adding to the buffer.\n");
+#endif
             PE_addToBuffer(ns->my_pe, task_id);
 
             //For optimistic mode, store copy of the message
@@ -546,8 +553,10 @@ static void handle_exec_event(
 
     //For exec complete event msg_id contains the task_id for convenience
     int task_id = m->msg_id.id; 
+#if DEBUG_PRINT
     printf("PE:%d handle_exec_event for task:%d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
     PE_printStat(ns->my_pe);
+#endif
 
     PE_set_busy(ns->my_pe, false);
     int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
@@ -697,7 +706,9 @@ static unsigned long long exec_task(
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
+#if DEBUG_PRINT
     printf("PE: %d, exec_task: %d, num entries: %d, EXEC_TIME: %llu\n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime);
+#endif
 
     int myPE = PE_get_myNum(ns->my_pe);
     assert(myPE == lpid_to_pe(lp->gid)); 
@@ -876,15 +887,16 @@ static int send_msg(
         int chunk_size = 512;
         int payload = 0;
         //calculate the message payload by rounding the size with the chunk size
-    if(size <= chunk_size )
+        if(size <= chunk_size )
             payload = chunk_size;
-    else
+        else
             payload = size + chunk_size - size%chunk_size;
 
-        //if(payload > 2048)
-        //    payload = MAX_PAYLOAD;
+        if(payload > MAX_PAYLOAD){
+            payload = MAX_PAYLOAD;
+        }
 
-        printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
+        //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
         model_net_event(net_id, "test", dest_id, payload, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
     

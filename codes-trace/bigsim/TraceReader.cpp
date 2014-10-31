@@ -21,12 +21,14 @@ TraceReader::TraceReader() {
   totalTlineLength=0;
 }
 
+TraceReader::~TraceReader() {
+   delete [] allNodeOffsets;
+}
 //void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
 void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
 {
   int numX, numY, numZ, numCth;
   BgLoadTraceSummary("bgTrace", totalWorkerProcs, numX, numY, numZ, numCth, numWth, numEmPes);
-  printf("totalRanks:%d, numWth:%d, numEmPes:%d\n",totalWorkerProcs, numWth,numEmPes);
   totalNodes= totalWorkerProcs/numWth;
   allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
 
@@ -41,8 +43,9 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
 
   int nodeNum = penum/numWth;
   int myEmulPe = nodeNum%numEmPes;
+  if(nodeNum==0) printf("totalRanks:%d, numWth:%d, numEmPes:%d\n",totalWorkerProcs, numWth,numEmPes);
 
-  printf("Trace reading.. myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
+  if(nodeNum==0) printf("Trace reading.. myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
 
   pe->msgDestLogs = new map<int, int>[numEmPes];
   pe->numWth = numWth;

@@ -20,6 +20,7 @@ class Task;
 class PE {
   public:
     PE();
+    ~PE();
     vector<int> msgBuffer;
     map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
     Task* myTasks;	// all tasks of this PE

@@ -9,6 +9,13 @@ PE::PE() {
   beforeTask = 0;
 }
 
+PE::~PE() {
+    msgBuffer.clear();
+    taskMsgBuffer.clear();
+    delete [] myTasks;
+    delete [] msgDestLogs;
+}
+
 bool PE::noUnsatDep(int tInd)
 {
   for(int i=0; i<myTasks[tInd].backwDepSize; i++)
