@@ -654,7 +654,7 @@ static void node_collective_fan_in(nodes_state * s,
            {
                 tw_lpid child_nic_id;
                 /* Do some computation and fan out immediate child nodes from the collective */
-                xfer_to_nic_time = g_tw_lookahead + COLLECTIVE_COMPUTATION_DELAY + LEVEL_DELAY + tw_rand_exponential(lp->rng, (double)LEVEL_DELAY/50);
+                xfer_to_nic_time = g_tw_lookahead + COLLECTIVE_COMPUTATION_DELAY + LEVEL_DELAY + tw_rand_exponential(lp->rng, LEVEL_DELAY/(double)50.0);
 
                 /* get global LP ID of the child node */
                 codes_mapping_get_lp_id(grp_name, LP_CONFIG_NM, NULL, 1,
@@ -705,7 +705,7 @@ static void node_collective_fan_out(nodes_state * s,
 
            for( i = 0; i < s->num_children; i++ )
            {
-                xfer_to_nic_time = g_tw_lookahead + TORUS_FAN_OUT_DELAY + tw_rand_exponential(lp->rng, (double)TORUS_FAN_OUT_DELAY/10);
+                xfer_to_nic_time = g_tw_lookahead + TORUS_FAN_OUT_DELAY + tw_rand_exponential(lp->rng, TORUS_FAN_OUT_DELAY/(double)10.0);
 
                 if(s->children[i] > 0)
                 {
@@ -852,7 +852,7 @@ static void packet_generate( nodes_state * s,
     { 
      if(s->buffer[ tmp_dir + ( tmp_dim * 2 ) ][ 0 ] < s->params->buffer_size)
       {
-       ts = j + tw_rand_exponential(lp->rng, MEAN_INTERVAL/200);
+       ts = g_tw_lookahead + j + tw_rand_exponential(lp->rng, MEAN_INTERVAL/(double)200.0);
        //s->next_flit_generate_time[(2*tmp_dim) + tmp_dir][0] = max(s->next_flit_generate_time[(2*tmp_dim) + tmp_dir][0], tw_now(lp));
        //s->next_flit_generate_time[(2*tmp_dim) + tmp_dir][0] += ts;
        //e_h = tw_event_new( lp->gid, s->next_flit_generate_time[(2*tmp_dim) + tmp_dir][0] - tw_now(lp), lp);
@@ -924,7 +924,7 @@ static void credit_send( nodes_state * s,
     msg->saved_available_time = s->next_credit_available_time[(2 * src_dim) + src_dir][0];
     s->next_credit_available_time[(2 * src_dim) + src_dir][0] = maxd(s->next_credit_available_time[(2 * src_dim) + src_dir][0], tw_now(lp));
     ts =  s->params->credit_delay + 
-        tw_rand_exponential(lp->rng, s->params->credit_delay/1000);
+        tw_rand_exponential(lp->rng, s->params->credit_delay/(double)1000.0);
     s->next_credit_available_time[(2 * src_dim) + src_dir][0] += ts;
 
     //buf_e = tw_event_new( msg->sender_lp, s->next_credit_available_time[(2 * src_dim) + src_dir][0] - tw_now(lp), lp);
@@ -959,7 +959,7 @@ static void packet_send( nodes_state * s,
        bf->c2 = 1;
        msg->saved_src_dir = tmp_dir;
        msg->saved_src_dim = tmp_dim;
-       ts = tw_rand_exponential( lp->rng, s->params->head_delay/200.0 ) + 
+       ts = tw_rand_exponential( lp->rng, s->params->head_delay/(double)200.0 ) +
            s->params->head_delay;
 
 //    For reverse computation 
@@ -1046,7 +1046,7 @@ static void packet_arrive( nodes_state * s,
   credit_send( s, bf, lp, msg); 
   
   msg->my_N_hop++;
-  ts = 0.1 + tw_rand_exponential(lp->rng, MEAN_INTERVAL/200);
+  ts = g_tw_lookahead + tw_rand_exponential(lp->rng, MEAN_INTERVAL/(double)200.0);
   if(msg->packet_ID == TRACE)
 	  printf("\n packet arrived at lp %d final dest %d ", (int)lp->gid, (int)msg->dest_lp);
   if( lp->gid == msg->dest_lp )
