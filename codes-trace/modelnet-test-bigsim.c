@@ -844,8 +844,12 @@ static unsigned long long exec_task(
     local_exec_event(ns, task_id, execTime, lp);
 
     //Complete the task
-    if(flag)
-        exec_comp(ns, task_id, *execTime, 0, lp);
+    if(flag){
+        if(*execTime == 0)
+            PE_set_busy(ns->my_pe, false);
+        else
+            exec_comp(ns, task_id, *execTime, 0, lp);
+    }
     //Return the execution time of the task
     return *execTime;
 }
