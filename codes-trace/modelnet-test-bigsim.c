@@ -38,7 +38,6 @@ typedef struct proc_msg proc_msg;
 typedef struct proc_state proc_state;
 
 static int sync_mode = 0;
-#define MAX_PAYLOAD 4196
 
 #define DEBUG_PRINT 0
 
@@ -844,8 +843,12 @@ static unsigned long long exec_task(
     local_exec_event(ns, task_id, execTime, lp);
 
     //Complete the task
-    if(flag)
-        exec_comp(ns, task_id, *execTime, 0, lp);
+    if(flag){
+        if(*execTime == 0)
+            PE_set_busy(ns->my_pe, false);
+        else
+            exec_comp(ns, task_id, *execTime, 0, lp);
+    }
     //Return the execution time of the task
     return *execTime;
 }
@@ -891,10 +894,6 @@ static int send_msg(
             payload = chunk_size;
         else
             payload = size + chunk_size - size%chunk_size;
-
-        if(payload > MAX_PAYLOAD){
-            payload = MAX_PAYLOAD;
-        }
 
         //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
         model_net_event(net_id, "test", dest_id, payload, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
