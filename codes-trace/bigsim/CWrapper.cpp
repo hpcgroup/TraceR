@@ -117,6 +117,24 @@ extern "C" {
             return id;
         }
     }
+    void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id){
+        map<int, vector<int> >::iterator it;
+        it=p->taskMsgBuffer.find(entry_task_id);
+        if(it->second.size() != 0){
+            p->msgBuffer.insert(p->msgBuffer.end(), it->second.begin(), it->second.end());
+            it->second.clear();
+        }
+    }
+    void PE_addToBusyStateBuffer(PE* p, bool state){
+        p->busyStateBuffer.push_back(state);
+    }
+    void PE_popBusyStateBuffer(PE* p){
+        p->busyStateBuffer.pop_back();
+    }
+    bool PE_isLastStateBusy(PE* p){
+        return p->busyStateBuffer.back();
+    }
+
     int PE_findTaskFromMsg(PE* p, MsgID* msgId){
         return p->findTaskFromMsg(msgId);
     }
