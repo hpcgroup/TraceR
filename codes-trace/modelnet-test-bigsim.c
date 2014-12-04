@@ -412,7 +412,8 @@ static void handle_kickoff_event(
         MPI_Finalize();
 	return;
     }
-    printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe));
+    if(my_pe_num == 0)
+        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe));
 
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num) == lp->gid);
@@ -748,8 +749,9 @@ static unsigned long long exec_task(
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
+    tw_stime now = tw_now(lp);
 #if DEBUG_PRINT
-    printf("PE: %d, exec_task: %d, num entries: %d, EXEC_TIME: %llu\n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime);
+    printf("PE%d:, exec_task: %d, num entries: %d, EXEC_TIME: %llu. TIME now:%f \n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime, now);
 #endif
 
     int myPE = PE_get_myNum(ns->my_pe);
