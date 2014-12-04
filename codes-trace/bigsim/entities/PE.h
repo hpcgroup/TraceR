@@ -22,6 +22,7 @@ class PE {
     PE();
     ~PE();
     vector<int> msgBuffer;
+    vector<bool> busyStateBuffer;
     map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
     Task* myTasks;	// all tasks of this PE
     unsigned long long currTime;

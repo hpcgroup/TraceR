@@ -59,10 +59,18 @@ int PE_get_myNum(PE* p);
 void PE_addToBuffer(PE* p, int task_id);
 void PE_removeFromBuffer(PE* p, int task_id);
 int PE_getNextBuffedMsg(PE* p);
+
+//---
+//Optimistic mode related stuff
 void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
 void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
 int PE_getCopyBufferSize(PE* p, int entry_task_id);
 int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id);
+void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id);
+void PE_addToBusyStateBuffer(PE* p, bool state);
+void PE_popBusyStateBuffer(PE* p);
+bool PE_isLastStateBusy(PE* p);
+//---
 
 int PE_findTaskFromMsg(PE* p, MsgID* msgId);
 void PE_invertMsgPe(PE* p, int tInd);

@@ -162,6 +162,7 @@ static void local_exec_event(
 static void undone_task(
     proc_state * ns,
     int task_id,
+    int remove,
     tw_lp * lp);
 
 static unsigned long long exec_task(
@@ -419,6 +420,10 @@ static void handle_kickoff_event(
     assert(lpid_to_pe(lp->gid) == my_pe_num);
 
     // printf("\t\tpe_to_lpid(my_pe_num):%d, lp->gid:%d .....\n", pe_to_lpid(my_pe_num), lp->gid);
+
+    bool isBusy = PE_is_busy(ns->my_pe);
+    PE_addToBusyStateBuffer(ns->my_pe, isBusy);
+
     //if(my_pe_num == 0){
         //Execute the first task
         exec_task(ns, 0, 1, lp);
@@ -448,6 +453,8 @@ static void handle_kickoff_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
+    PE_popBusyStateBuffer(ns->my_pe);
+    undone_task(ns, 0, 0, lp);
     ns->msg_sent_count--;
     model_net_event_rc(net_id, lp, m->msg_id.size);
     return;
@@ -459,36 +466,42 @@ static void handle_recv_event(
     proc_msg * m,
     tw_lp * lp)
 {
+    tw_stime now = tw_now(lp);
     int task_id = find_task_from_msg(ns, m->msg_id);
 #if DEBUG_PRINT
     printf("handle_recv_event..\n");
-    printf("PE%d: Received from %d id: %d for task: %d\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id);
+    printf("PE%d: Received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
 #endif
+    bool isBusy = PE_is_busy(ns->my_pe);
+    PE_addToBusyStateBuffer(ns->my_pe, isBusy);
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)) //TODO: check this
-            assert(0);
+            if(sync_mode != 3)
+                assert(0);
+            else return;
         //TODO: For optimistic mode do we have to relax this assertion?
         if(sync_mode != 3) 
             assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
         PE_invertMsgPe(ns->my_pe, task_id);
         //Check if pe is busy
-        if(!PE_is_busy(ns->my_pe)){
+        if(!isBusy){
 #if DEBUG_PRINT
-            printf("PE is not busy, executing the task.\n");
+            printf("PE%d: is not busy, executing the task.\n", lpid_to_pe(lp->gid));
 #endif
+            //For optimistic mode, store copy of the message
             exec_task(ns,task_id, 1, lp);
         }
         else{
             //Buffer the message if it arrives when pe is busy
 #if DEBUG_PRINT
-            printf("PE is busy, adding to the buffer.\n");
+            printf("PE%d: is busy, adding to the buffer.\n", lpid_to_pe(lp->gid));
 #endif
-            PE_addToBuffer(ns->my_pe, task_id);
-
-            //For optimistic mode, store copy of the message
             if(sync_mode == 3)
                 PE_addToCopyBuffer(ns->my_pe, ns->current_task, task_id);
+
+            PE_addToBuffer(ns->my_pe, task_id);
+
         }
         return;
     }
@@ -550,10 +563,13 @@ static void handle_exec_event(
 {
     tw_stime now = tw_now(lp);
 
+    bool isBusy = PE_is_busy(ns->my_pe);
+    PE_addToBusyStateBuffer(ns->my_pe, isBusy);
+
     //For exec complete event msg_id contains the task_id for convenience
     int task_id = m->msg_id.id; 
 #if DEBUG_PRINT
-    printf("PE:%d handle_exec_event for task:%d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
+    printf("PE%d: handle_exec_event for task:%d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
     PE_printStat(ns->my_pe);
 #endif
 
@@ -616,6 +632,7 @@ static void local_exec_event(
 static void undone_task(
             proc_state * ns,
             int task_id,
+            int remove,
             tw_lp * lp)
 {
     //Mark the task as not done
@@ -628,11 +645,12 @@ static void undone_task(
         //if the forward dependency of the task is done
         if(PE_get_taskDone(ns->my_pe, fwd_deps[i])){
             //Recursively mark the forward depencies as not done
-            undone_task(ns, fwd_deps[i], lp);
+            undone_task(ns, fwd_deps[i], remove, lp);
         }
         //Remove them from the buffer if they are in the buffer
         //since they will be added to the buffer again
-        PE_removeFromBuffer(ns->my_pe, fwd_deps[i]);
+        if(remove)
+            PE_removeFromBuffer(ns->my_pe, fwd_deps[i]);
     }
 
     //Update the currentTask, if this event's task_id is smaller than the currentTask
@@ -648,11 +666,27 @@ static void handle_recv_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    int task_id = find_task_from_msg(ns, m->msg_id);
-    
-    //undone the task and it's forward dependencies
-    undone_task(ns, task_id, lp);
+    tw_stime now = tw_now(lp);
 
+    PE_popBusyStateBuffer(ns->my_pe);
+    bool wasBusy = PE_isLastStateBusy(ns->my_pe);
+
+    int task_id = find_task_from_msg(ns, m->msg_id);
+#ifdef DEBUG_PRINT
+    printf("PE%d: In reverse handler of recv message with task_id: %d. TIME now:%f\n", lpid_to_pe(lp->gid), task_id, now);   
+#endif
+    if(wasBusy){
+        //undone the task and it's forward dependencies
+        undone_task(ns, task_id, 1, lp);
+        //remove from copy buffer
+        PE_removeFromCopyBuffer(ns->my_pe, ns->current_task, task_id);
+    }
+    else{
+        //undone the task and it's forward dependencies
+        undone_task(ns, task_id, 0, lp);
+        //move from copy buffer to message buffer
+        PE_moveFromCopyToMessageBuffer(ns->my_pe, ns->current_task);
+    }
     model_net_event_rc(net_id, lp, m->msg_id.size);
 }
 static void handle_exec_rev_event(
@@ -661,11 +695,20 @@ static void handle_exec_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    //Mark the task as not done
-    int task_id = m->msg_id.id; 
+    int task_id = m->msg_id.id;
 
+    //Reverse the state: set the PE as busy, task is not completed yet
+    PE_set_busy(ns->my_pe, true);
+    //set the current task
+    ns->current_task = task_id;
+
+#ifdef DEBUG_PRINT
+    printf("PE%d: In reverse handler of exec task with task_id: %d\n", lpid_to_pe(lp->gid), task_id);   
+#endif
     //undone the task and it's forward dependencies
-    undone_task(ns, task_id, lp);
+    undone_task(ns, task_id, 0, lp);
+    //move from copy buffer to message buffer
+    PE_moveFromCopyToMessageBuffer(ns->my_pe, ns->current_task);
 
 }
 

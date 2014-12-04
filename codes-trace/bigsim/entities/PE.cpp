@@ -7,6 +7,7 @@ PE::PE() {
   currentTask = 0;
   windowOffset = 0;
   beforeTask = 0;
+  busyStateBuffer.push_back(false);
 }
 
 PE::~PE() {
