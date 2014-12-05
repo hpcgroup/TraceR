@@ -24,6 +24,6 @@ modelnet_test_bigsim: modelnet_test_bigsim.o bigsim/CWrapper.o bigsim/TraceReade
 	mpicxx modelnet_test_bigsim.o ${modelnet_test_bigsim_LDADD} -o modelnet_test_bigsim
 
 modelnet_test_bigsim.o: modelnet-test-bigsim.c
-	$(CC) -Ibigsim $(modelnet_test_bigsim_CFLAGS) -c modelnet-test-bigsim.c $(CFLAGS) -o $@
+	$(CC) $(CFLAGS)-Ibigsim $(modelnet_test_bigsim_CFLAGS) -c modelnet-test-bigsim.c $(CFLAGS) -o $@
 clean:
 	rm -rf *.o modelnet-test-bigsim
