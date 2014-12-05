@@ -467,11 +467,10 @@ static void handle_recv_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    tw_stime now = tw_now(lp);
     int task_id = find_task_from_msg(ns, m->msg_id);
 #if DEBUG_PRINT
-    printf("handle_recv_event..\n");
-    printf("PE%d: Received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
+    tw_stime now = tw_now(lp);
+    printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
     PE_addToBusyStateBuffer(ns->my_pe, isBusy);
@@ -563,7 +562,6 @@ static void handle_exec_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    tw_stime now = tw_now(lp);
 
     bool isBusy = PE_is_busy(ns->my_pe);
     PE_addToBusyStateBuffer(ns->my_pe, isBusy);
@@ -571,6 +569,7 @@ static void handle_exec_event(
     //For exec complete event msg_id contains the task_id for convenience
     int task_id = m->msg_id.id; 
 #if DEBUG_PRINT
+    tw_stime now = tw_now(lp);
     printf("PE%d: handle_exec_event for task:%d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
     PE_printStat(ns->my_pe);
 #endif
@@ -668,13 +667,12 @@ static void handle_recv_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    tw_stime now = tw_now(lp);
-
     PE_popBusyStateBuffer(ns->my_pe);
     bool wasBusy = PE_isLastStateBusy(ns->my_pe);
 
     int task_id = find_task_from_msg(ns, m->msg_id);
 #ifdef DEBUG_PRINT
+    tw_stime now = tw_now(lp);
     printf("PE%d: In reverse handler of recv message with task_id: %d. TIME now:%f\n", lpid_to_pe(lp->gid), task_id, now);   
 #endif
     if(wasBusy){
@@ -750,9 +748,9 @@ static unsigned long long exec_task(
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
-    tw_stime now = tw_now(lp);
 #if DEBUG_PRINT
-    printf("PE%d:, exec_task: %d, num entries: %d, EXEC_TIME: %llu. TIME now:%f \n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime, now);
+    tw_stime now = tw_now(lp);
+    printf("PE%d: exec_task: %d, num entries: %d, EXEC_TIME: %llu. TIME now:%f \n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime, now);
 #endif
 
     int myPE = PE_get_myNum(ns->my_pe);

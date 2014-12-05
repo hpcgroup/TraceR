@@ -60,7 +60,7 @@ void PE::check()
   }
 
   if(countTask != 0) {
-    printf("PE:%d not done count:%d ",myNum, countTask);
+    printf("PE%d: not done count:%d ",myNum, countTask);
     int i = 0, count=0;
     while (i < tasksCount) {
       if (!myTasks[i].done) {
