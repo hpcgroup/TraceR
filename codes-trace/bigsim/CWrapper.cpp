@@ -93,11 +93,11 @@ extern "C" {
     void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
-        vector<int>* msgs = &(it->second);
+        if(it == p->taskMsgBuffer.end()) return;
 
-        for(int i=0; i<msgs->size(); i++){
-            if((*msgs)[i] == msg_task_id){
-                msgs->erase(p->msgBuffer.begin()+i);
+        for(int i=0; i<it->second.size(); i++){
+            if((it->second)[i] == msg_task_id){
+                (it->second).erase(p->msgBuffer.begin()+i);
                 break;
             }
         }
@@ -105,7 +105,9 @@ extern "C" {
     int PE_getCopyBufferSize(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
-        return (it->second).size(); 
+        if(it != p->taskMsgBuffer.end())
+            return (it->second).size();
+        else return 0;
     }
     int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
@@ -120,9 +122,11 @@ extern "C" {
     void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
-        if(it->second.size() != 0){
-            p->msgBuffer.insert(p->msgBuffer.end(), it->second.begin(), it->second.end());
-            it->second.clear();
+        if(it != p->taskMsgBuffer.end()){
+            if(it->second.size() != 0){
+                p->msgBuffer.insert(p->msgBuffer.end(), it->second.begin(), it->second.end());
+                it->second.clear();
+            }
         }
     }
     void PE_addToBusyStateBuffer(PE* p, bool state){

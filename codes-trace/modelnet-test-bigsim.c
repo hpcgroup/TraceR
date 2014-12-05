@@ -477,10 +477,11 @@ static void handle_recv_event(
     PE_addToBusyStateBuffer(ns->my_pe, isBusy);
     if(task_id>=0){
         //The matching task should not be already done
-        if(PE_get_taskDone(ns->my_pe,task_id)) //TODO: check this
+        if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
             if(sync_mode != 3)
                 assert(0);
             else return;
+        }
         //TODO: For optimistic mode do we have to relax this assertion?
         if(sync_mode != 3) 
             assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
