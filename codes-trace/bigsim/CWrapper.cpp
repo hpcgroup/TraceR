@@ -93,14 +93,16 @@ extern "C" {
     void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
-        if(it == p->taskMsgBuffer.end()) return;
+        if(it == p->taskMsgBuffer.end()) assert(0);
 
+        if(!it->second.size()) assert(0);
         for(int i=0; i<it->second.size(); i++){
             if((it->second)[i] == msg_task_id){
-                (it->second).erase(p->msgBuffer.begin()+i);
-                break;
+                (it->second).erase((it->second).begin()+i);
+                return;
             }
         }
+        assert(0);
     }
     int PE_getCopyBufferSize(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
