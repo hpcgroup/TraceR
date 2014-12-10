@@ -457,6 +457,7 @@ static void handle_kickoff_rev_event(
     PE_popBusyStateBuffer(ns->my_pe);
     undone_task(ns, 0, 0, lp);
     ns->msg_sent_count--;
+    ns->current_task = 0;
     model_net_event_rc(net_id, lp, m->msg_id.size);
     return;
 }
@@ -477,20 +478,20 @@ static void handle_recv_event(
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
-            if(sync_mode != 3)
+            //if(sync_mode != 3)
                 assert(0);
-            else return;
+            //else return;
         }
         //TODO: For optimistic mode do we have to relax this assertion?
-        if(sync_mode != 3) 
+        //if(sync_mode != 3) 
             assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
         PE_invertMsgPe(ns->my_pe, task_id);
-        //Check if pe is busy
+        //Check if pe is busy, if not we can just execute the task
         if(!isBusy){
 #if DEBUG_PRINT
             printf("PE%d: is not busy, executing the task.\n", lpid_to_pe(lp->gid));
 #endif
-            //For optimistic mode, store copy of the message
+            //ns->current_task = task_id;
             exec_task(ns,task_id, 1, lp);
         }
         else{
@@ -498,6 +499,7 @@ static void handle_recv_event(
 #if DEBUG_PRINT
             printf("PE%d: is busy, adding to the buffer.\n", lpid_to_pe(lp->gid));
 #endif
+            //For optimistic mode, store copy of the message
             if(sync_mode == 3)
                 PE_addToCopyBuffer(ns->my_pe, ns->current_task, task_id);
 
@@ -607,6 +609,7 @@ static void local_exec_event(
    
     //For optimistic mode: execute if there are any buffered messages in the
     //copy buffer
+    /*
     if(sync_mode==3){
         int cpBufSize = PE_getCopyBufferSize(ns->my_pe, task_id);
         for(int i=0; i<cpBufSize; i++){
@@ -615,6 +618,7 @@ static void local_exec_event(
                 PE_addToBuffer(ns->my_pe, cp_task_id); 
         }
     }
+    */
 
     //Execute the buffered messages that are recevied while the pe is busy
     int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
@@ -638,6 +642,10 @@ static void undone_task(
 {
     //Mark the task as not done
     PE_set_taskDone(ns->my_pe, task_id, false);
+    //Remove them from the buffer if they are in the buffer
+    //since they will be added to the buffer again
+    if(remove)
+        PE_removeFromBuffer(ns->my_pe, task_id);
 
     //Deal with the forward dependencies of the task
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
@@ -646,12 +654,8 @@ static void undone_task(
         //if the forward dependency of the task is done
         if(PE_get_taskDone(ns->my_pe, fwd_deps[i])){
             //Recursively mark the forward depencies as not done
-            undone_task(ns, fwd_deps[i], remove, lp);
+            undone_task(ns, fwd_deps[i], 0, lp);
         }
-        //Remove them from the buffer if they are in the buffer
-        //since they will be added to the buffer again
-        if(remove)
-            PE_removeFromBuffer(ns->my_pe, fwd_deps[i]);
     }
 
     //Update the currentTask, if this event's task_id is smaller than the currentTask
@@ -667,10 +671,12 @@ static void handle_recv_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    PE_popBusyStateBuffer(ns->my_pe);
     bool wasBusy = PE_isLastStateBusy(ns->my_pe);
+    PE_popBusyStateBuffer(ns->my_pe);
+    PE_set_busy(ns->my_pe, wasBusy);
 
     int task_id = find_task_from_msg(ns, m->msg_id);
+    PE_invertMsgPe(ns->my_pe, task_id);
 #ifdef DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: In reverse handler of recv message with task_id: %d. TIME now:%f\n", lpid_to_pe(lp->gid), task_id, now);   
@@ -696,9 +702,11 @@ static void handle_exec_rev_event(
 		tw_lp * lp)
 {
     int task_id = m->msg_id.id;
+    PE_set_busy(ns->my_pe, false);
 
     //Reverse the state: set the PE as busy, task is not completed yet
-    PE_set_busy(ns->my_pe, true);
+    PE_popBusyStateBuffer(ns->my_pe);
+    //PE_set_busy(ns->my_pe, true);
     //set the current task
     ns->current_task = task_id;
 
@@ -739,7 +747,8 @@ static unsigned long long exec_task(
 
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
-    ns->current_task = task_id;
+    if(flag)
+        ns->current_task = task_id;
 
     //Mark the execution time of the task
     unsigned long long time = PE_getTaskExecTime(ns->my_pe, task_id);
