@@ -62,6 +62,7 @@ extern "C" {
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     int PE_get_myNum(PE* p){return p->myNum;}
     void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
+    int PE_getBufferSize(PE* p){p->msgBuffer.size();}
     void PE_removeFromBuffer(PE* p, int task_id){
         //if the task_id is in the buffer, remove it from the buffer
         for(int i=0; i<p->msgBuffer.size(); i++){
@@ -96,6 +97,11 @@ extern "C" {
         if(it == p->taskMsgBuffer.end()) assert(0);
 
         if(!it->second.size()) assert(0);
+        if(it->second.back() != msg_task_id) assert(0);
+        it->second.pop_back();
+
+//No need to search the whole buffer, removes will be always from the back
+/*
         for(int i=0; i<it->second.size(); i++){
             if((it->second)[i] == msg_task_id){
                 (it->second).erase((it->second).begin()+i);
@@ -103,7 +109,8 @@ extern "C" {
             }
         }
         assert(0);
-    }
+*/
+}
     int PE_getCopyBufferSize(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
@@ -125,9 +132,15 @@ extern "C" {
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
         if(it != p->taskMsgBuffer.end()){
+            printf("PE_moveFromCopyToMessageBuffer of size: %d. entry_task_id:%d. msg_task_ids: ", it->second.size(), entry_task_id) ;
+            for(int i=0; i<it->second.size(); i++){
+                PE_set_taskDone(p, (it->second)[i], false);
+                printf("%d, ", (it->second)[i]);
+            }
+            printf("\n");
             if(it->second.size() != 0){
                 p->msgBuffer.insert(p->msgBuffer.end(), it->second.begin(), it->second.end());
-                it->second.clear();
+                //it->second.clear(); //BUG, it shoudl not clear the copy buffer
             }
         }
     }
