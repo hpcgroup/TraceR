@@ -13,4 +13,4 @@ How to run:
 2 - Run serial: ./modelnet_test_bigsim --sync=1 -- conf/modelnet-test.conf 
 2 - Run parallel: mpiexec -n 2 ./modelnet_test_bigsim --sync=2 -- conf/modelnet-test.conf 
 
-
+Add: --extramem option (i.e. --extramem=462144) if simulation hangs. 

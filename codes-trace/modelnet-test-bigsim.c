@@ -422,9 +422,6 @@ static void handle_kickoff_event(
 
     // printf("\t\tpe_to_lpid(my_pe_num):%d, lp->gid:%d .....\n", pe_to_lpid(my_pe_num), lp->gid);
 
-    bool isBusy = PE_is_busy(ns->my_pe);
-    PE_addToBusyStateBuffer(ns->my_pe, isBusy);
-
     //if(my_pe_num == 0){
         //Execute the first task
         exec_task(ns, 0, 1, lp);
@@ -454,7 +451,11 @@ static void handle_kickoff_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    PE_popBusyStateBuffer(ns->my_pe);
+#if DEBUG_PRINT
+    tw_stime now = tw_now(lp);
+    printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", lpid_to_pe(lp->gid), now);
+#endif
+    PE_set_busy(ns->my_pe, false);
     undone_task(ns, 0, 0, lp);
     ns->msg_sent_count--;
     ns->current_task = 0;
@@ -675,7 +676,7 @@ static void handle_recv_rev_event(
 #endif
     if(wasBusy){
         //Mark the task as not done
-        PE_set_taskDone(ns->my_pe, task_id, false);
+        //PE_set_taskDone(ns->my_pe, task_id, false); BUG
         //remove the task from the buffer
         PE_removeFromBuffer(ns->my_pe, task_id);
         //remove from copy buffer
@@ -710,8 +711,9 @@ static void handle_exec_rev_event(
 #endif
     //undone the task and it's forward dependencies
     //undone_task(ns, task_id, 0, lp); //BUG: do not undone the task!
+    if(PE_getBufferSize(ns->my_pe) != 0 ) assert(0);
 
-    //move from copy buffer to message buffer
+    //move(copy!) from copy buffer to message buffer
     //undone forward dependencies of the tasks in the buffer now
     PE_moveFromCopyToMessageBuffer(ns->my_pe, ns->current_task);
     

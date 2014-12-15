@@ -50,6 +50,7 @@ void PE_set_taskDone(PE* p, int tInd, bool b);
 bool PE_get_taskDone(PE* p, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);
+void PE_undone_fwd_deps(PE* p, int tInd);
 void PE_set_currentTask(PE* p, int tInd);
 int PE_get_currentTask(PE* p);
 void PE_increment_currentTask(PE* p, int tInd);
