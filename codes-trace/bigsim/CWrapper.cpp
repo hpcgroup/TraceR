@@ -43,6 +43,19 @@ extern "C" {
     bool PE_get_taskDone(PE* p, int tInd){return p->myTasks[tInd].done;}
     int* PE_getTaskFwdDep(PE* p, int tInd){return p->myTasks[tInd].forwardDep;}
     int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
+    void PE_undone_fwd_deps(PE* p, int tInd){
+        int fwd_dep_size = PE_getTaskFwdDepSize(p, tInd);
+        int* fwd_deps = PE_getTaskFwdDep(p, tInd);
+        for(int i=0; i<fwd_dep_size; i++){
+            //if the forward dependency of the task is done
+            if(PE_get_taskDone(p, fwd_deps[i])){
+                printf("Undo task_id: %d\n", fwd_deps[i]);
+                PE_set_taskDone(p, fwd_deps[i], false);
+                //Recursively mark the forward depencies as not done
+                PE_undone_fwd_deps(p, fwd_deps[i]);
+            }
+        }
+    }
     void PE_set_currentTask(PE* p, int tInd){p->currentTask=tInd;}
     int PE_get_currentTask(PE* p){return p->currentTask;}
     void PE_increment_currentTask(PE* p, int tInd){
@@ -135,6 +148,7 @@ extern "C" {
             printf("PE_moveFromCopyToMessageBuffer of size: %d. entry_task_id:%d. msg_task_ids: ", it->second.size(), entry_task_id) ;
             for(int i=0; i<it->second.size(); i++){
                 PE_set_taskDone(p, (it->second)[i], false);
+                PE_undone_fwd_deps(p, (it->second)[i]);
                 printf("%d, ", (it->second)[i]);
             }
             printf("\n");

@@ -22,7 +22,7 @@ bool PE::noUnsatDep(int tInd)
   for(int i=0; i<myTasks[tInd].backwDepSize; i++)
   {
     int bwInd = myTasks[tInd].backwardDep[i] - windowOffset;
-    if(bwInd >= currentTask && !myTasks[bwInd].done)
+    if(/*bwInd >= currentTask &&*/ !myTasks[bwInd].done)
       return false;
   }
   return true;
