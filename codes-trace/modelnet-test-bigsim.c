@@ -493,7 +493,7 @@ static void handle_recv_event(
         else{
             //Buffer the message if it arrives when pe is busy
 #if DEBUG_PRINT
-            printf("PE%d: is busy, adding to the buffer.\n", lpid_to_pe(lp->gid));
+            printf("PE%d: is busy, adding to the buffer ns->current_task:%d.\n", lpid_to_pe(lp->gid), ns->current_task);
 #endif
             //For optimistic mode, store copy of the message
             if(sync_mode == 3)
@@ -564,7 +564,7 @@ static void handle_exec_event(
     int task_id = m->msg_id.id; 
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: handle_exec_event for task:%d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
+    printf("PE%d: handle_exec_event for task_id: %d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
     PE_printStat(ns->my_pe);
 #endif
     PE_set_busy(ns->my_pe, false);
@@ -633,6 +633,9 @@ static void undone_task(
             tw_lp * lp)
 {
     //Mark the task as not done
+#if DEBUG_PRINT
+    printf("Undo task_id: %d\n", task_id);
+#endif
     PE_set_taskDone(ns->my_pe, task_id, false);
 
     //Remove them from the buffer if they are in the buffer
@@ -670,9 +673,9 @@ static void handle_recv_rev_event(
 
     int task_id = find_task_from_msg(ns, m->msg_id);
     PE_invertMsgPe(ns->my_pe, task_id);
-#ifdef DEBUG_PRINT
+#if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: In reverse handler of recv message with task_id: %d. wasBusy: %d. TIME now:%f\n", lpid_to_pe(lp->gid), task_id, wasBusy, now);   
+    printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d. wasBusy: %d. TIME now:%f\n", lpid_to_pe(lp->gid), m->msg_id.id, task_id, wasBusy, now);   
 #endif
     if(wasBusy){
         //Mark the task as not done
@@ -706,7 +709,7 @@ static void handle_exec_rev_event(
     //set the current task
     ns->current_task = task_id;
 
-#ifdef DEBUG_PRINT
+#if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n", lpid_to_pe(lp->gid), task_id);   
 #endif
     //undone the task and it's forward dependencies
@@ -759,7 +762,7 @@ static unsigned long long exec_task(
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: exec_task: %d, num entries: %d, EXEC_TIME: %llu. TIME now:%f \n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime, now);
+    printf("PE%d: exec_task task_id: %d, num entries: %d, EXEC_TIME: %llu. TIME now:%f \n", lpid_to_pe(lp->gid), task_id, msgEntCount, *execTime, now);
 #endif
 
     int myPE = PE_get_myNum(ns->my_pe);
@@ -969,13 +972,19 @@ static int exec_comp(
     //If it's a self event use codes_event_new instead of model_net_event 
     tw_event *e;
     proc_msg *m;
+    
     e = codes_event_new(lp->gid, sendOffset + g_tw_lookahead, lp);
-    m = tw_event_data(e);
+    m = (proc_msg*)tw_event_data(e);
     m->msg_id.size = 0;
     m->msg_id.pe = lpid_to_pe(lp->gid);
     m->msg_id.id = task_id;
-    if(recv)
+    if(recv) {
+#if DEBUG_PRINT
+        printf("PE%d: Send to PE: %d id: %d at time %f for time %f\n", lpid_to_pe(lp->gid), 
+        lpid_to_pe(lp->gid), task_id, tw_now(lp), tw_now(lp) + sendOffset + g_tw_lookahead);
+#endif
         m->proc_event_type = RECV_MSG;
+    }
     else 
         m->proc_event_type = EXEC_COMP;
     tw_event_send(e);
