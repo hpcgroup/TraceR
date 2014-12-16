@@ -49,7 +49,7 @@ extern "C" {
         for(int i=0; i<fwd_dep_size; i++){
             //if the forward dependency of the task is done
             if(PE_get_taskDone(p, fwd_deps[i])){
-                printf("Undo task_id: %d\n", fwd_deps[i]);
+                //printf("Undo task_id: %d\n", fwd_deps[i]);
                 PE_set_taskDone(p, fwd_deps[i], false);
                 //Recursively mark the forward depencies as not done
                 PE_undone_fwd_deps(p, fwd_deps[i]);
@@ -94,6 +94,7 @@ extern "C" {
         }
     }
     void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id){
+        //printf("Adding to copy buffer entry_task_id: %d, msg_task_id: %d\n", entry_task_id, msg_task_id);
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
         if(it != p->taskMsgBuffer.end()){
@@ -145,13 +146,13 @@ extern "C" {
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
         if(it != p->taskMsgBuffer.end()){
-            printf("PE_moveFromCopyToMessageBuffer of size: %d. entry_task_id:%d. msg_task_ids: ", it->second.size(), entry_task_id) ;
+            //printf("PE_moveFromCopyToMessageBuffer of size: %d. entry_task_id:%d. msg_task_ids: ", it->second.size(), entry_task_id) ;
             for(int i=0; i<it->second.size(); i++){
                 PE_set_taskDone(p, (it->second)[i], false);
                 PE_undone_fwd_deps(p, (it->second)[i]);
-                printf("%d, ", (it->second)[i]);
+                //printf("%d, ", (it->second)[i]);
             }
-            printf("\n");
+            //printf("\n");
             if(it->second.size() != 0){
                 p->msgBuffer.insert(p->msgBuffer.end(), it->second.begin(), it->second.end());
                 //it->second.clear(); //BUG, it shoudl not clear the copy buffer
