@@ -943,13 +943,16 @@ static int send_msg(
              const void* self_event,
              tw_lp *sender
         */
-        int chunk_size = 512;
-        int payload = 0;
+        int payload = size;
+
+        /*
+        int chunk_size = 0;
         //calculate the message payload by rounding the size with the chunk size
         if(size <= chunk_size )
             payload = chunk_size;
         else
             payload = size + chunk_size - size%chunk_size;
+        */
 
         //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
         model_net_event(net_id, "test", dest_id, payload, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
