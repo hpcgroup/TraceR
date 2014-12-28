@@ -78,18 +78,25 @@ extern "C" {
     int PE_getBufferSize(PE* p){p->msgBuffer.size();}
     void PE_removeFromBuffer(PE* p, int task_id){
         //if the task_id is in the buffer, remove it from the buffer
+        if(!p->msgBuffer.size()) assert(0);
+        if(p->msgBuffer.back() != task_id) assert(0);
+         p->msgBuffer.pop_back();
+
+//No need to search the whole buffer, removes will be always from the back
+/*
         for(int i=0; i<p->msgBuffer.size(); i++){
             if(p->msgBuffer[i] == task_id){
                 p->msgBuffer.erase(p->msgBuffer.begin()+i);
                 break;
             }
         }
+*/
     }
     int PE_getNextBuffedMsg(PE* p){
         if(p->msgBuffer.size()<=0) return -1;
         else{
             int id = p->msgBuffer.front();
-            p->msgBuffer.erase(p->msgBuffer.begin());
+            p->msgBuffer.pop_front();
             return id;
         }
     }
