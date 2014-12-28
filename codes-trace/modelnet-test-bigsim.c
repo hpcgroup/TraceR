@@ -584,7 +584,7 @@ static void local_exec_event(
             tw_lp * lp)
 {
     //Increment the current task .. 
-    PE_increment_currentTask(ns->my_pe, task_id);
+    //PE_increment_currentTask(ns->my_pe, task_id);
     //printf("PE:%d currentTask:%d\n", lpid_to_pe(lp->gid), PE_get_currentTask(ns->my_pe));
 
     //task is done, execute the forward dependencies
@@ -656,10 +656,11 @@ static void undone_task(
 
     //Update the currentTask, if this event's task_id is smaller than the currentTask
     //else there is no need to update, currentTask is already behind
+    /*
     int currentTask = PE_get_currentTask(ns->my_pe);
     if(currentTask > task_id)
         PE_set_currentTask(ns->my_pe, task_id);
-
+    */
 }
 static void handle_recv_rev_event(
 		proc_state * ns,
