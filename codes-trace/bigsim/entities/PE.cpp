@@ -87,10 +87,12 @@ void PE::printState()
 {
   printf("PE:%d, busy:%d, currentTask:%d totalTasks:%d\n", myNum, busy, currentTask, totalTasksCount);
   printf("msgBuffer: ");
+/*
   for(int i=0; i<msgBuffer.size(); i++)
   {
     printf("%d, ",msgBuffer[i]);
   }
+*/
   printf("\n tasks from curr: ");
   for(int i=currentTask; i<tasksCount; i++)
   {
