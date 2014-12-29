@@ -67,6 +67,8 @@ struct proc_msg
     enum proc_event proc_event_type;
     tw_lpid src;          /* source of this request or ack */
     int incremented_flag; /* helper for reverse computation */
+    int executed_task;
+    int fwd_dep_count;
     MsgID msg_id;
 };
 
@@ -483,24 +485,29 @@ static void handle_recv_event(
         }
         assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
         PE_invertMsgPe(ns->my_pe, task_id);
-        //Check if pe is busy, if not we can just execute the task
+        if(!PE_noUnsatDep(ns->my_pe, task_id)){
+            assert(0);
+        }   
+        //Add task to the task buffer
+        PE_addToBuffer(ns->my_pe, task_id);
+
+        //Check if pe is busy, if not we can execute the next available task in the buffer
+        //else do nothing
+        m->executed_task = -1;
+
         if(!isBusy){
 #if DEBUG_PRINT
-            printf("PE%d: is not busy, executing the task.\n", lpid_to_pe(lp->gid));
+            printf("PE%d: is not busy, executing the next task.\n", lpid_to_pe(lp->gid));
 #endif
-            exec_task(ns,task_id, 1, lp);
-        }
-        else{
-            //Buffer the message if it arrives when pe is busy
-#if DEBUG_PRINT
-            printf("PE%d: is busy, adding to the buffer ns->current_task:%d.\n", lpid_to_pe(lp->gid), ns->current_task);
-#endif
-            //For optimistic mode, store copy of the message
-            if(sync_mode == 3)
-                PE_addToCopyBuffer(ns->my_pe, ns->current_task, task_id);
-
-            PE_addToBuffer(ns->my_pe, task_id);
-
+            int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
+            //Store the executed_task id for reverse handler msg
+            if(sync_mode == 3){
+                m->executed_task = buffd_task;
+                m->fwd_dep_count = 0;
+            }
+            if(buffd_task != -1){
+                exec_task(ns, buffd_task, 1, lp);
+            }
         }
         return;
     }
@@ -568,10 +575,27 @@ static void handle_exec_event(
     PE_printStat(ns->my_pe);
 #endif
     PE_set_busy(ns->my_pe, false);
+    //Mark the task as done
+    PE_set_taskDone(ns->my_pe, task_id, true);
 
+    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
+    int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
+    int counter = 0;
+
+    for(int i=0; i<fwd_dep_size; i++){
+        if(PE_noUnsatDep(ns->my_pe, fwd_deps[i]) && PE_noMsgDep(ns->my_pe, fwd_deps[i])){
+            //printf("PE%d: handle_exec_event for task_id: %d  adding FWD: %d \n", lpid_to_pe(lp->gid), task_id, fwd_deps[i]);
+            PE_addToBuffer(ns->my_pe, fwd_deps[i]);
+            counter++;
+        }
+    }
+    //printf("\n")
     int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
-    //printf("PE:%d buffd_task:%d...\n", lpid_to_pe(lp->gid), buffd_task);
-
+    //Store the executed_task id for reverse handler msg
+    if(sync_mode == 3){
+        m->fwd_dep_count = counter;
+        m->executed_task = buffd_task;
+    }
     if(buffd_task != -1){
         exec_task(ns, buffd_task, 1, lp); //we don't care about the return value?
     }
@@ -678,22 +702,19 @@ static void handle_recv_rev_event(
     tw_stime now = tw_now(lp);
     printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d. wasBusy: %d. TIME now:%f\n", lpid_to_pe(lp->gid), m->msg_id.id, task_id, wasBusy, now);   
 #endif
-    if(wasBusy){
-        //Mark the task as not done
-        //PE_set_taskDone(ns->my_pe, task_id, false); BUG
-        //remove the task from the buffer
-        PE_removeFromBuffer(ns->my_pe, task_id);
-        //remove from copy buffer
-        PE_removeFromCopyBuffer(ns->my_pe, ns->current_task, task_id);
-        //we do not need to undo the forward dependencies here
-        //since we did not execute the task, we just stored it
+
+    if(!wasBusy){
+        //if the task that I executed was not me
+        if(m->executed_task != task_id && m->executed_task != -1){
+            PE_addToFrontBuffer(ns->my_pe, m->executed_task);    
+            PE_removeFromBuffer(ns->my_pe, task_id);
+        }
     }
     else{
-        //undone the task and it's forward dependencies
-        undone_task(ns, task_id, 0, lp);
-        //move from copy buffer to message buffer //there is no need for this since recv events does not consume any other messages
-        //PE_moveFromCopyToMessageBuffer(ns->my_pe, ns->current_task);
+        assert(m->executed_task == -1);
+        PE_removeFromBuffer(ns->my_pe, task_id);
     }
+
     model_net_event_rc(net_id, lp, m->msg_id.size);
 }
 static void handle_exec_rev_event(
@@ -708,19 +729,22 @@ static void handle_exec_rev_event(
     PE_set_busy(ns->my_pe, true);
 
     //set the current task
-    ns->current_task = task_id;
+    //ns->current_task = task_id;
 
 #if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n", lpid_to_pe(lp->gid), task_id);   
 #endif
-    //undone the task and it's forward dependencies
-    //undone_task(ns, task_id, 0, lp); //BUG: do not undone the task!
-    if(PE_getBufferSize(ns->my_pe) != 0 ) assert(0);
-
-    //move(copy!) from copy buffer to message buffer
-    //undone forward dependencies of the tasks in the buffer now
-    PE_moveFromCopyToMessageBuffer(ns->my_pe, ns->current_task);
     
+    //mark the task as not done
+    PE_set_taskDone(ns->my_pe, task_id, false);
+    
+    if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe))
+        PE_clearMsgBuffer(ns->my_pe);
+    else{
+        PE_resizeBuffer(ns->my_pe, m->fwd_dep_count);
+        if(m->executed_task != -1)
+            PE_addToFrontBuffer(ns->my_pe, m->executed_task);
+    }
 }
 
 //executes the task with the specified id
@@ -735,15 +759,18 @@ static unsigned long long exec_task(
     //If yes, execute the task
     if(!PE_noUnsatDep(ns->my_pe, task_id)){
         //printf("RETURNING ZERO\n");
+        assert(0);
         return 0;
     }
     //Check if the task is already done -- safety check?
     if(PE_get_taskDone(ns->my_pe, task_id)){
         //printf("PE:%d WARNING: TASK IS ALREADY DONE: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
+        assert(0);
         return 0; //TODO: ?
     }
     //Check the task does not have any message dependency
     if(!PE_noMsgDep(ns->my_pe, task_id)){
+        assert(0);
         //printf("PE:%d Task msg dep is not satisfied: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
         return 0;
     }
@@ -751,8 +778,8 @@ static unsigned long long exec_task(
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
 
-    if(flag)
-        ns->current_task = task_id;
+    //if(flag)
+    //    ns->current_task = task_id;
 
     //Mark the execution time of the task
     unsigned long long time = PE_getTaskExecTime(ns->my_pe, task_id);
@@ -891,21 +918,22 @@ static unsigned long long exec_task(
    }
 
     //Mark the task as done
-    PE_set_taskDone(ns->my_pe, task_id, true);
+    //PE_set_taskDone(ns->my_pe, task_id, true);
 /*
     //Complete the task, create a complete exec event
     exec_comp(ns, task_id, execTime, 0, lp);
 */
     //create a local complete exec event
-    local_exec_event(ns, task_id, execTime, lp);
+    //local_exec_event(ns, task_id, execTime, lp);
 
     //Complete the task
-    if(flag){
+    //if(flag){
         if(*execTime == 0)
-            PE_set_busy(ns->my_pe, false);
+            exec_comp(ns, task_id, codes_local_latency(lp), 0, lp);
+            //PE_set_busy(ns->my_pe, false);
         else
             exec_comp(ns, task_id, *execTime, 0, lp);
-    }
+    //}
     //Return the execution time of the task
     return *execTime;
 }

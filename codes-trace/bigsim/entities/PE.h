@@ -12,6 +12,7 @@
 #include <cstring>
 #include "Task.h"
 #include <vector>
+#include <algorithm>
 #include <list>
 #include <map>
 

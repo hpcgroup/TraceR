@@ -58,8 +58,11 @@ int PE_get_myEmPE(PE* p);
 int PE_get_myNum(PE* p);
 
 int PE_getBufferSize(PE* p);
+void PE_clearMsgBuffer(PE* p);
 void PE_addToBuffer(PE* p, int task_id);
+void PE_addToFrontBuffer(PE* p, int task_id);
 void PE_removeFromBuffer(PE* p, int task_id);
+void PE_resizeBuffer(PE* p, int num_elems_to_remove);
 int PE_getNextBuffedMsg(PE* p);
 
 //---

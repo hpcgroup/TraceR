@@ -74,8 +74,22 @@ extern "C" {
     }
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     int PE_get_myNum(PE* p){return p->myNum;}
-    void PE_addToBuffer(PE* p, int task_id){p->msgBuffer.push_back(task_id);}
+    void PE_clearMsgBuffer(PE* p){p->msgBuffer.clear();}
+    void PE_addToBuffer(PE* p, int task_id){
+        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), task_id) != p->msgBuffer.end());
+        if(found) assert(0);
+        p->msgBuffer.push_back(task_id);
+    }
+    void PE_addToFrontBuffer(PE* p, int task_id){
+        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), task_id) != p->msgBuffer.end());
+        if(found) assert(0);
+        p->msgBuffer.push_front(task_id);
+    }
     int PE_getBufferSize(PE* p){p->msgBuffer.size();}
+    void PE_resizeBuffer(PE* p, int num_elems_to_remove){
+        int cur_size = p->msgBuffer.size();
+        p->msgBuffer.resize(cur_size - num_elems_to_remove);
+    }
     void PE_removeFromBuffer(PE* p, int task_id){
         //if the task_id is in the buffer, remove it from the buffer
         if(!p->msgBuffer.size()) assert(0);
