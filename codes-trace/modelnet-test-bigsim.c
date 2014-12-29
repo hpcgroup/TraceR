@@ -191,8 +191,8 @@ static int find_task_from_msg(
     proc_state * ns,
     MsgID msg_id);
 
-static int pe_to_lpid(int pe);
-static int lpid_to_pe(int pe);
+static inline int pe_to_lpid(int pe);
+static inline int lpid_to_pe(int pe);
 
 int main(int argc, char **argv)
 {
@@ -1006,7 +1006,7 @@ static int find_task_from_msg(
 
 //Utility function to convert pe number to tw_lpid number
 //Assuming the servers come last in lp registration in terms of global id
-static int pe_to_lpid(int pe){
+static inline int pe_to_lpid(int pe){
     int lp_id = 0;
     if(net_id == DRAGONFLY)
         lp_id = (pe/num_servers_per_rep)*lps_per_rep + (pe%num_servers_per_rep);
@@ -1017,7 +1017,7 @@ static int pe_to_lpid(int pe){
 
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come last in lp registration in terms of global id
-static int lpid_to_pe(int lp_gid){
+static inline int lpid_to_pe(int lp_gid){
     int my_pe_num = 0;
     if(net_id == DRAGONFLY){
         my_pe_num = ((int)(lp_gid/lps_per_rep))*(num_servers_per_rep)+(lp_gid%lps_per_rep);
