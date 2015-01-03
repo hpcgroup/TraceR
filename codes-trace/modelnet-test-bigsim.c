@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <ross.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "codes/codes/model-net.h"
 #include "codes/lp-io.h"
@@ -60,6 +61,7 @@ struct proc_state
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     TraceReader* trace_reader; /* for reading the bigsim traces */
     int current_task;
+    clock_t sim_start;
 };
 
 struct proc_msg
@@ -282,9 +284,22 @@ static void proc_init(
     
     memset(ns, 0, sizeof(*ns));
 
-    /* each server sends a dummy event to itself that will kick off the real
-     * simulation
-     */
+    //Each server read it's trace
+    ns->sim_start = clock();
+    int my_pe_num = lpid_to_pe(lp->gid);
+    //printf("my_pe_num:%d, lp->gid:%d\n", my_pe_num, (int)lp->gid);
+    ns->my_pe = newPE();
+    ns->trace_reader = newTraceReader();
+    int tot=0, totn=0, emPes=0, nwth=0;
+    long long unsigned int startTime=0;
+    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime);
+    //Check if codes config file does not match the traces
+    if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
+        printf("ERROR: BigSim traces do not match the codes config file..\n");
+        printf("ERROR: %d != %d..\n", num_servers, TraceReader_totalWorkerProcs(ns->trace_reader));
+        MPI_Finalize();
+	return;
+    }
 
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = g_tw_lookahead + tw_rand_unif(lp->rng); 
@@ -398,24 +413,10 @@ static void handle_kickoff_event(
     if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
         opt_offset = num_servers_per_rep + num_routers_per_rep; //optional offset due to dragonfly mapping
 
-    //Each server read it's trace
     int my_pe_num = lpid_to_pe(lp->gid);
-    //printf("my_pe_num:%d, lp->gid:%d\n", my_pe_num, (int)lp->gid);
-
-    ns->my_pe = newPE();
-    ns->trace_reader = newTraceReader();
-    int tot=0, totn=0, emPes=0, nwth=0;
-    long long unsigned int startTime=0;
-    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime);
-    //Check if codes config file does not match the traces
-    if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
-        printf("ERROR: BigSim traces do not match the codes config file..\n");
-        printf("ERROR: %d != %d..\n", num_servers, TraceReader_totalWorkerProcs(ns->trace_reader));
-        MPI_Finalize();
-	return;
-    }
+    clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
     if(my_pe_num == 0)
-        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe));
+        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d TIME TILL NOW=%f s\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe), (double)time_till_now);
 
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num) == lp->gid);
