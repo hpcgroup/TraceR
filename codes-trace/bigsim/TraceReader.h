@@ -24,6 +24,8 @@ class TraceReader {
 public:
     TraceReader();
     ~TraceReader();
+    void loadOffsets();
+    void loadTraceSummary();
     //void readTrace(int &tot, int& numnodes, int& empes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& dests*/);
     void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime);
     void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe);

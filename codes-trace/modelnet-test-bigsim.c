@@ -40,6 +40,8 @@ typedef struct proc_state proc_state;
 
 static int sync_mode = 0;
 
+int* offsets;
+
 #define DEBUG_PRINT 0
 
 /* types of events that will constitute triton requests */
@@ -251,6 +253,18 @@ int main(int argc, char **argv)
     {
         return(-1);
     }
+    //Trace reading hack..
+    TraceReader* t = newTraceReader();
+    TraceReader_loadTraceSummary(t);
+    int num_workers = TraceReader_totalWorkerProcs(t);
+    if(rank == 0){ //only rank 0 loads the offsets and broadcasts
+       TraceReader_loadOffsets(t);
+       offsets = TraceReader_getOffsets(t);
+    }
+    else{
+        offsets = malloc(sizeof(int)*num_workers);
+    }
+    MPI_Bcast(offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
 
     tw_run();
     model_net_report_stats(net_id);
@@ -292,6 +306,9 @@ static void proc_init(
     ns->trace_reader = newTraceReader();
     int tot=0, totn=0, emPes=0, nwth=0;
     long long unsigned int startTime=0;
+    TraceReader_loadTraceSummary(ns->trace_reader);
+    TraceReader_setOffsets(ns->trace_reader, &offsets);
+
     TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime);
     //Check if codes config file does not match the traces
     if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
