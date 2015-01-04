@@ -85,6 +85,10 @@ int PE_get_numWorkThreads(PE* p);
 //TraceReader
 typedef struct TraceReader TraceReader;
 TraceReader* newTraceReader();
+void TraceReader_loadTraceSummary(TraceReader* t);
+void TraceReader_loadOffsets(TraceReader* t);
+int* TraceReader_getOffsets(TraceReader* t);
+void TraceReader_setOffsets(TraceReader* t, int** offsets);
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
 

@@ -193,6 +193,10 @@ extern "C" {
 
     //TraceReader
     TraceReader* newTraceReader(){return new TraceReader();}
+    void TraceReader_loadTraceSummary(TraceReader* t){t->loadTraceSummary();}
+    void TraceReader_loadOffsets(TraceReader* t){t->loadOffsets();}
+    int* TraceReader_getOffsets(TraceReader* t){return t->allNodeOffsets;}
+    void TraceReader_setOffsets(TraceReader* t, int** offsets){t->allNodeOffsets = *offsets;}
     void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
     empes, int* nwth, PE* pe, int penum, unsigned long long* startTime){
          t->readTrace(tot, numnodes, empes, nwth, pe, penum, startTime);

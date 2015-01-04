@@ -24,14 +24,21 @@ TraceReader::TraceReader() {
 TraceReader::~TraceReader() {
    delete [] allNodeOffsets;
 }
-//void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
-void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
-{
+
+void TraceReader::loadTraceSummary(){
   int numX, numY, numZ, numCth;
   BgLoadTraceSummary("bgTrace", totalWorkerProcs, numX, numY, numZ, numCth, numWth, numEmPes);
   totalNodes= totalWorkerProcs/numWth;
-  allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
+}
 
+void TraceReader::loadOffsets(){
+  totalNodes= totalWorkerProcs/numWth;
+  allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
+}
+
+//void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
+void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
+{
   *nwth = numWth;
   *tot = totalWorkerProcs;
   *totn= totalNodes;
