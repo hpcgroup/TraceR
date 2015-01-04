@@ -255,7 +255,6 @@ int main(int argc, char **argv)
     TraceReader* t = newTraceReader();
     TraceReader_loadTraceSummary(t);
     int num_workers = TraceReader_totalWorkerProcs(t);
-    printf("num_workers:%d\n", num_workers);
     if(rank == 0){ //only rank 0 loads the offsets and broadcasts
        TraceReader_loadOffsets(t);
        offsets = TraceReader_getOffsets(t);
@@ -263,11 +262,7 @@ int main(int argc, char **argv)
     else{
         offsets = malloc(sizeof(int)*num_workers);
     }
-    printf("BCAST\n");
     MPI_Bcast(offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
-    for(int i=0; i<num_workers; i++)
-        printf("%d-", offsets[i]);
-    printf("\n");
 
     tw_run();
     model_net_report_stats(net_id);
