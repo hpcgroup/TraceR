@@ -72,6 +72,7 @@ struct proc_msg
     tw_lpid src;          /* source of this request or ack */
     int incremented_flag; /* helper for reverse computation */
     MsgID msg_id;
+    int executed_task;
 };
 
 static void proc_init(
@@ -488,6 +489,11 @@ static void handle_recv_event(
     tw_lp * lp)
 {
     int task_id = find_task_from_msg(ns, m->msg_id);
+    if(task_id >= 0 && PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
+        m->executed_task = -2;
+        return;
+    }
+    m->executed_task = 1;
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
@@ -686,6 +692,10 @@ static void handle_recv_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+    if(m->executed_task == -2) {
+        model_net_event_rc(net_id, lp, m->msg_id.size);
+        return;
+    }
     bool wasBusy = PE_isLastStateBusy(ns->my_pe);
     PE_popBusyStateBuffer(ns->my_pe);
     PE_set_busy(ns->my_pe, wasBusy);
