@@ -1,12 +1,6 @@
-CHARMPATH=/dcsdata/home/bilgeacun/charm_bigsim/net-linux-x86_64-bigemulator
-CXX=g++
-LXX=g++
-OPTS=-g
-WARNING =
+include ../Makefile.common
 
 RM := rm -rf
-
-all: fastSim
 
 USER_OBJS :=
 LIBS := -lconv-bigsim-logs -lblue-standalone -lconv-util
@@ -22,19 +16,19 @@ CPP_DEPS += entities/MsgEntry.d entities/PE.d entities/Task.d
 
 events/%.o: events/%.cpp
 	@echo 'Building file: $<'
-	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
 entities/%.o: entities/%.cpp
 	@echo 'Building file: $<'
-	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
 %.o: %.cpp
 	@echo 'Building file: $<'
-	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 
