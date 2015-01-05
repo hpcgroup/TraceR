@@ -1,12 +1,18 @@
-CC = mpixlcxx_r
+ifeq ($(ARCH),bgq)
+CC = mpixlc_r
 CXX = mpixlcxx_r
+else
+CC = mpicc -std=gnu99
+CXX = mpicxx
+endif
+
 CFLAGS = -g -O2
 CXXFLAGS = -g -O2
 
-ROSS = /g/g92/jain6/bilge/ROSS
-CODES_BASE = /g/g92/jain6/bilge/codes_trace/codes-base
-CODES_NET = /g/g92/jain6/bilge/codes_trace/codes-net
-CHARMPATH = /g/g92/jain6/bilge/charm_bigsim/pami-bluegeneq-bigemulator
+ROSS = /dcsdata/home/bilgeacun/sim/ROSS
+CODES_BASE = /dcsdata/home/bilgeacun/sim/codes_trace/codes-base
+CODES_NET = /dcsdata/home/bilgeacun/sim/codes_trace/codes-net
+CHARMPATH = /dcsdata/home/bilgeacun/charm_bigsim/net-linux-x86_64-bigemulator
 
 CODES_BASE_LIBS = -L${CODES_NET}/install/lib -L${CODES_BASE}/install/lib -L${ROSS}/install/lib -lcodes-base -lROSS -lm
 
