@@ -168,7 +168,6 @@ static void local_exec_event(
 static void undone_task(
     proc_state * ns,
     int task_id,
-    int remove,
     tw_lp * lp);
 
 static unsigned long long exec_task(
@@ -477,7 +476,7 @@ static void handle_kickoff_rev_event(
     printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", lpid_to_pe(lp->gid), now);
 #endif
     PE_set_busy(ns->my_pe, false);
-    undone_task(ns, 0, 0, lp);
+    undone_task(ns, 0, lp);
     ns->msg_sent_count--;
     ns->current_task = 0;
     model_net_event_rc(net_id, lp, m->msg_id.size);
@@ -630,7 +629,6 @@ static void local_exec_event(
 static void undone_task(
             proc_state * ns,
             int task_id,
-            int remove,
             tw_lp * lp)
 {
     //Mark the task as not done
@@ -639,11 +637,6 @@ static void undone_task(
 #endif
     PE_set_taskDone(ns->my_pe, task_id, false);
 
-    //Remove them from the buffer if they are in the buffer
-    //since they will be added to the buffer again
-    if(remove)
-        PE_removeFromBuffer(ns->my_pe, task_id);
-
     //Deal with the forward dependencies of the task
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
@@ -651,7 +644,7 @@ static void undone_task(
         //if the forward dependency of the task is done
         if(PE_get_taskDone(ns->my_pe, fwd_deps[i])){
             //Recursively mark the forward depencies as not done
-            undone_task(ns, fwd_deps[i], 0, lp);
+            undone_task(ns, fwd_deps[i], lp);
         }
     }
 
