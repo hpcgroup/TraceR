@@ -79,8 +79,7 @@ void PE::check()
     }
     printf("\n");
   }
-  else printf("PE:%d ALL TASKS ARE DONE\n", myNum);
-
+  //else printf("PE:%d ALL TASKS ARE DONE\n", myNum);
 }
 
 void PE::printState()
