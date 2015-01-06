@@ -529,54 +529,8 @@ static void handle_recv_event(
         }
         return;
     }
-
-    printf("PE%d: Going beyond hash look up on receiving a message\n", lpid_to_pe(lp->gid));
+    //printf("PE%d: Going beyond hash look up on receiving a message\n", lpid_to_pe(lp->gid));
     assert(0);
-    //--------------------------------!
-
-    //If first not-executed needs this and not busy start sequential
-    int currentTask = PE_get_currentTask(ns->my_pe);
-    //printf("currentTask: %d -- PE_get_tasksCount(ns->my_pe):%d\n", currentTask, PE_get_tasksCount(ns->my_pe));
-    if(PE_getTaskMsgID(ns->my_pe, currentTask).pe -1 == m->msg_id.pe &&
-            PE_getTaskMsgID(ns->my_pe, currentTask).id == m->msg_id.id ){
-        if(PE_get_taskDone(ns->my_pe, currentTask))
-            assert(0);
-        PE_invertMsgPe(ns->my_pe, currentTask);
-        //Check if pe is busy
-        if(!PE_is_busy(ns->my_pe)){
-            exec_task(ns, currentTask, 1, lp);
-        }
-        else{
-            //Buffer the message if it arrives when pe is busy
-            PE_addToBuffer(ns->my_pe, currentTask);
-        }
-        return;
-    }
-    else{
-        // search in following tasks
-        //printf("m->msg_id.pe:%d -- m->msg_id.id:%d\n", m->msg_id.pe, m->msg_id.id);
-        for(int i=currentTask+1; i<PE_get_tasksCount(ns->my_pe); i++){
-            // if task depends on this message
-            if(PE_getTaskMsgID(ns->my_pe, i).pe - 1 == m->msg_id.pe &&
-                PE_getTaskMsgID(ns->my_pe, i).id == m->msg_id.id ){
-                //printf("PE%d: task_id:%d, PE_getTaskMsgID(ns->my_pe, i).pe: %d -- PE_getTaskMsgID(ns->my_pe, i).id: %d\n", i, lpid_to_pe(lp->gid), PE_getTaskMsgID(ns->my_pe, i).pe, PE_getTaskMsgID(ns->my_pe, i).id );
-                if(PE_get_taskDone(ns->my_pe, i))
-                    assert(0);
-                PE_invertMsgPe(ns->my_pe, i);
-                //Check if pe is busy
-                if(!PE_is_busy(ns->my_pe)){
-                    exec_task(ns, i, 1, lp);
-                }
-                else{
-                    //Buffer the message if it arrives when pe is busy
-                    PE_addToBuffer(ns->my_pe, currentTask);
-                }
-                return;
-            }
-        }
-        printf("Could not find the task; this is all wrong..Aborting %d %d\n", m->msg_id.pe, m->msg_id.id);
-        assert(0); 
-    }
 }
 
 static void handle_exec_event(
