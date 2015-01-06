@@ -297,6 +297,17 @@ static void proc_init(
     
     memset(ns, 0, sizeof(*ns));
 
+    num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
+    num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "dragonfly_router", NULL, 1);
+
+    lps_per_rep = num_servers_per_rep * 2 + num_routers_per_rep;
+
+    int opt_offset = 0;
+    total_lps = num_servers * 2 + num_routers;
+
+    if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
+        opt_offset = num_servers_per_rep + num_routers_per_rep; //optional offset due to dragonfly mapping
+
     //Each server read it's trace
     ns->sim_start = clock();
     int my_pe_num = lpid_to_pe(lp->gid);
@@ -417,17 +428,6 @@ static void handle_kickoff_event(
     //printf("handle_kickoff_event, lp_gid: %d -- ", (int)lp->gid);
     //record when transfers started on this server
     ns->start_ts = tw_now(lp);
-
-    num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
-    num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "dragonfly_router", NULL, 1);
-
-    lps_per_rep = num_servers_per_rep * 2 + num_routers_per_rep;
-
-    int opt_offset = 0;
-    total_lps = num_servers * 2 + num_routers;
-
-    if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
-        opt_offset = num_servers_per_rep + num_routers_per_rep; //optional offset due to dragonfly mapping
 
     int my_pe_num = lpid_to_pe(lp->gid);
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
