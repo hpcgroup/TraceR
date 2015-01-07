@@ -57,7 +57,7 @@ struct proc_state
 {
     int msg_sent_count;   /* requests sent */
     int msg_recvd_count;  /* requests recvd */
-    int local_recvd_count; /* number of local messages received */
+    //int local_recvd_count; /* number of local messages received */
     tw_stime start_ts;    /* time that we started sending requests */
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
@@ -452,7 +452,7 @@ static void handle_local_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    ns->local_recvd_count++;
+    //ns->local_recvd_count++;
 }
 static void handle_local_rev_event(
 	       proc_state * ns,
@@ -460,7 +460,7 @@ static void handle_local_rev_event(
 	       proc_msg * m,
 	       tw_lp * lp)
 {
-   ns->local_recvd_count--;
+   //ns->local_recvd_count--;
 }
 
 /* reverse handler for kickoff */
