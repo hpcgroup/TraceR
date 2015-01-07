@@ -484,19 +484,19 @@ static void handle_recv_event(
     tw_lp * lp)
 {
     int task_id = find_task_from_msg(ns, m->msg_id);
-    if(task_id >= 0 && PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
-        m->executed_task = -2;
-        return;
-    }
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
 
-    if(sync_mode == 3)
+    if(sync_mode == 3){
+        if(task_id >= 0 && PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
+            m->executed_task = -2;
+            return;
+        }
         PE_addToBusyStateBuffer(ns->my_pe, isBusy);
-
+    }
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
