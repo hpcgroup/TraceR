@@ -159,12 +159,6 @@ const tw_optdef app_opt [] =
 };
 
 //helper function declarations
-static void local_exec_event(
-            proc_state * ns,
-            int task_id,
-            unsigned long long* exec_time,
-            tw_lp * lp);
-
 static void undone_task(
     proc_state * ns,
     int task_id,
@@ -453,7 +447,7 @@ static void handle_local_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    ns->local_recvd_count++;
+    //ns->local_recvd_count++;
 }
 static void handle_local_rev_event(
 	       proc_state * ns,
@@ -461,7 +455,7 @@ static void handle_local_rev_event(
 	       proc_msg * m,
 	       tw_lp * lp)
 {
-   ns->local_recvd_count--;
+   //ns->local_recvd_count--;
 }
 
 /* reverse handler for kickoff */
@@ -560,12 +554,10 @@ static void handle_exec_event(
 
     for(int i=0; i<fwd_dep_size; i++){
         if(PE_noUnsatDep(ns->my_pe, fwd_deps[i]) && PE_noMsgDep(ns->my_pe, fwd_deps[i])){
-            //printf("PE%d: handle_exec_event for task_id: %d  adding FWD: %d \n", lpid_to_pe(lp->gid), task_id, fwd_deps[i]);
             PE_addToBuffer(ns->my_pe, fwd_deps[i]);
             counter++;
         }
     }
-    //printf("\n")
     int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
     //Store the executed_task id for reverse handler msg
     if(sync_mode == 3){
@@ -682,19 +674,16 @@ static unsigned long long exec_task(
     if(!PE_noUnsatDep(ns->my_pe, task_id)){
         //printf("RETURNING ZERO\n");
         assert(0);
-        return 0;
     }
     //Check if the task is already done -- safety check?
     if(PE_get_taskDone(ns->my_pe, task_id)){
         //printf("PE:%d WARNING: TASK IS ALREADY DONE: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
         assert(0);
-        return 0; //TODO: ?
     }
     //Check the task does not have any message dependency
     if(!PE_noMsgDep(ns->my_pe, task_id)){
         assert(0);
         //printf("PE:%d Task msg dep is not satisfied: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
-        return 0;
     }
 
     //Executing the task, set the pe as busy
@@ -879,9 +868,9 @@ static int send_msg(
              const void* self_event,
              tw_lp *sender
         */
-        int payload = size;
 
         /*
+        int payload = size;
         int chunk_size = 0;
         //calculate the message payload by rounding the size with the chunk size
         if(size <= chunk_size )
@@ -891,7 +880,7 @@ static int send_msg(
         */
 
         //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
-        model_net_event(net_id, "test", dest_id, payload, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        model_net_event(net_id, "test", dest_id, size, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
     
     return 0;
