@@ -489,20 +489,20 @@ static void handle_recv_event(
     tw_lp * lp)
 {
     int task_id = find_task_from_msg(ns, m->msg_id);
-    if(task_id >= 0 && PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
-        m->executed_task = -2;
-        return;
-    }
-    m->executed_task = 1;
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
 
-    if(sync_mode == 3)
+    if(sync_mode == 3){
+        if(task_id >= 0 && PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
+            m->executed_task = -2;
+            return;
+        }
+        m->executed_task = 1;
         PE_addToBusyStateBuffer(ns->my_pe, isBusy);
-
+    }
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
@@ -676,7 +676,7 @@ static void handle_exec_rev_event(
 #if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n", lpid_to_pe(lp->gid), task_id);   
 #endif
-    if(PE_getBufferSize(ns->my_pe) != 0 ) assert(0);
+    assert(PE_getBufferSize(ns->my_pe) == 0);
 
     //move(copy!) from copy buffer to message buffer
     //undone forward dependencies of the tasks in the buffer now
