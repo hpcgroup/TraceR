@@ -493,7 +493,10 @@ static void handle_recv_event(
     printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
-    PE_addToBusyStateBuffer(ns->my_pe, isBusy);
+
+    if(sync_mode == 3)
+        PE_addToBusyStateBuffer(ns->my_pe, isBusy);
+
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
@@ -609,8 +612,7 @@ static void handle_recv_rev_event(
         model_net_event_rc(net_id, lp, m->msg_id.size);
         return;
     }
-    bool wasBusy = PE_isLastStateBusy(ns->my_pe);
-    PE_popBusyStateBuffer(ns->my_pe);
+    bool wasBusy = PE_popBusyStateBuffer(ns->my_pe);
     PE_set_busy(ns->my_pe, wasBusy);
 
     int task_id = find_task_from_msg(ns, m->msg_id);

@@ -183,8 +183,10 @@ extern "C" {
     void PE_addToBusyStateBuffer(PE* p, bool state){
         p->busyStateBuffer.push_back(state);
     }
-    void PE_popBusyStateBuffer(PE* p){
+    bool PE_popBusyStateBuffer(PE* p){
+        bool last_state = p->busyStateBuffer.back();
         p->busyStateBuffer.pop_back();
+        return last_state;
     }
     bool PE_isLastStateBusy(PE* p){
         return p->busyStateBuffer.back();
