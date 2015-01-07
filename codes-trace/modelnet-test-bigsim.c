@@ -577,55 +577,6 @@ static void handle_exec_event(
     }
 }
 
-static void local_exec_event(
-            proc_state * ns,
-            int task_id,
-            unsigned long long* exec_time,
-            tw_lp * lp)
-{
-    //Increment the current task .. 
-    //PE_increment_currentTask(ns->my_pe, task_id);
-    //printf("PE:%d currentTask:%d\n", lpid_to_pe(lp->gid), PE_get_currentTask(ns->my_pe));
-
-    //task is done, execute the forward dependencies
-    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
-    //printf("PE:%d Executing forward dependencies of size: %d of task %d. F ", lpid_to_pe(lp->gid), fwd_dep_size, task_id);
-
-    //Add the forward dependencies of the next task to the buffer
-    int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
-    for(int i=0; i<fwd_dep_size; i++){
-        PE_addToBuffer(ns->my_pe, fwd_deps[i]);
-        //printf("%d ", fwd_deps[i]);
-    }
-    //printf("\n");
-   
-    //For optimistic mode: execute if there are any buffered messages in the
-    //copy buffer
-    /*
-    if(sync_mode==3){
-        int cpBufSize = PE_getCopyBufferSize(ns->my_pe, task_id);
-        for(int i=0; i<cpBufSize; i++){
-            int cp_task_id = PE_getNextCopyBuffedMsg(ns->my_pe, task_id);
-            if(cp_task_id != -1)
-                PE_addToBuffer(ns->my_pe, cp_task_id); 
-        }
-    }
-    */
-
-    //Execute the buffered messages that are recevied while the pe is busy
-    int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
-    //printf("PE:%d buffd_task:%d...\n", lpid_to_pe(lp->gid), buffd_task);
-
-    //Accumulate the execution time of a message and it's forward dependencies
-    //This will be used to send when sending EXEC_COMP message
-    while(buffd_task != -1){
-        *exec_time += exec_task(ns, buffd_task, 0, lp);
-        buffd_task = PE_getNextBuffedMsg(ns->my_pe);
-    }
-
-
-}
-
 static void undone_task(
             proc_state * ns,
             int task_id,
@@ -702,9 +653,6 @@ static void handle_exec_rev_event(
     //Reverse the state: set the PE as busy, task is not completed yet
     PE_set_busy(ns->my_pe, true);
 
-    //set the current task
-    //ns->current_task = task_id;
-
 #if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n", lpid_to_pe(lp->gid), task_id);   
 #endif
@@ -751,9 +699,6 @@ static unsigned long long exec_task(
 
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
-
-    //if(flag)
-    //    ns->current_task = task_id;
 
     //Mark the execution time of the task
     unsigned long long time = PE_getTaskExecTime(ns->my_pe, task_id);
@@ -891,23 +836,11 @@ static unsigned long long exec_task(
           }
    }
 
-    //Mark the task as done
-    //PE_set_taskDone(ns->my_pe, task_id, true);
-/*
-    //Complete the task, create a complete exec event
-    exec_comp(ns, task_id, execTime, 0, lp);
-*/
-    //create a local complete exec event
-    //local_exec_event(ns, task_id, execTime, lp);
-
     //Complete the task
-    //if(flag){
-        if(*execTime == 0)
-            exec_comp(ns, task_id, codes_local_latency(lp), 0, lp);
-            //PE_set_busy(ns->my_pe, false);
-        else
-            exec_comp(ns, task_id, *execTime, 0, lp);
-    //}
+    if(*execTime == 0)
+        exec_comp(ns, task_id, codes_local_latency(lp), 0, lp);
+    else
+        exec_comp(ns, task_id, *execTime, 0, lp);
     //Return the execution time of the task
     return *execTime;
 }
