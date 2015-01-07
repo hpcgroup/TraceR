@@ -186,10 +186,6 @@ static int exec_comp(
     int recv,
     tw_lp * lp);
               
-static int find_task_from_msg(
-    proc_state * ns,
-    MsgID msg_id);
-
 static inline int pe_to_lpid(int pe);
 static inline int lpid_to_pe(int pe);
 
@@ -483,7 +479,7 @@ static void handle_recv_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    int task_id = find_task_from_msg(ns, m->msg_id);
+    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
@@ -615,7 +611,7 @@ static void handle_recv_rev_event(
     bool wasBusy = PE_popBusyStateBuffer(ns->my_pe);
     PE_set_busy(ns->my_pe, wasBusy);
 
-    int task_id = find_task_from_msg(ns, m->msg_id);
+    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
     PE_invertMsgPe(ns->my_pe, task_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
@@ -920,14 +916,6 @@ static int exec_comp(
     tw_event_send(e);
 
     return 0;
-}
-
-//Returs the task id that the message belongs to using msgDestTask map
-static int find_task_from_msg(
-        proc_state * ns,
-        MsgID msg_id){
-
-    return PE_findTaskFromMsg(ns->my_pe, &msg_id);
 }
 
 //Utility function to convert pe number to tw_lpid number
