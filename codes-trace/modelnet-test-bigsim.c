@@ -539,8 +539,8 @@ static void handle_exec_event(
 		tw_lp * lp)
 {
     //For exec complete event msg_id contains the task_id for convenience
-    int task_id = m->msg_id.id; 
 #if DEBUG_PRINT
+    int task_id = m->msg_id.id;
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_exec_event for task_id: %d TIME now:%f.\n", lpid_to_pe(lp->gid), task_id, now);
     PE_printStat(ns->my_pe);
@@ -573,23 +573,8 @@ static void local_exec_event(
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     for(int i=0; i<fwd_dep_size; i++){
         PE_addToBuffer(ns->my_pe, fwd_deps[i]);
-        //printf("%d ", fwd_deps[i]);
     }
-    //printf("\n");
    
-    //For optimistic mode: execute if there are any buffered messages in the
-    //copy buffer
-    /*
-    if(sync_mode==3){
-        int cpBufSize = PE_getCopyBufferSize(ns->my_pe, task_id);
-        for(int i=0; i<cpBufSize; i++){
-            int cp_task_id = PE_getNextCopyBuffedMsg(ns->my_pe, task_id);
-            if(cp_task_id != -1)
-                PE_addToBuffer(ns->my_pe, cp_task_id); 
-        }
-    }
-    */
-
     //Execute the buffered messages that are recevied while the pe is busy
     int buffd_task = PE_getNextBuffedMsg(ns->my_pe);
     //printf("PE:%d buffd_task:%d...\n", lpid_to_pe(lp->gid), buffd_task);
@@ -609,10 +594,10 @@ static void undone_task(
             int task_id,
             tw_lp * lp)
 {
-    //Mark the task as not done
 #if DEBUG_PRINT
     printf("Undo task_id: %d\n", task_id);
 #endif
+    //Mark the task as not done
     PE_set_taskDone(ns->my_pe, task_id, false);
 
     //Deal with the forward dependencies of the task
@@ -866,10 +851,7 @@ static unsigned long long exec_task(
 
     //Mark the task as done
     PE_set_taskDone(ns->my_pe, task_id, true);
-/*
-    //Complete the task, create a complete exec event
-    exec_comp(ns, task_id, execTime, 0, lp);
-*/
+
     //create a local complete exec event
     local_exec_event(ns, task_id, execTime, lp);
 
