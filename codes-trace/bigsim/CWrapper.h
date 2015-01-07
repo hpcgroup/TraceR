@@ -70,7 +70,7 @@ int PE_getCopyBufferSize(PE* p, int entry_task_id);
 int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id);
 void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id);
 void PE_addToBusyStateBuffer(PE* p, bool state);
-void PE_popBusyStateBuffer(PE* p);
+bool PE_popBusyStateBuffer(PE* p);
 bool PE_isLastStateBusy(PE* p);
 //---
 
