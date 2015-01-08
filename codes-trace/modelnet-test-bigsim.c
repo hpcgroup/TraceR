@@ -206,7 +206,7 @@ int main(int argc, char **argv)
 
     //Parse the sync mode
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
-    printf("Running in sync mode: %d\n", sync_mode);
+    //printf("Running in sync mode: %d\n", sync_mode);
 
     tw_opt_add(app_opt);
     tw_init(&argc, &argv);
