@@ -28,6 +28,7 @@ class PE {
     Task* myTasks;	// all tasks of this PE
     unsigned long long currTime;
     bool busy;
+    int firstTask;
     int windowOffset;
     int beforeTask, totalTasksCount;
     int myNum, myEmPE;

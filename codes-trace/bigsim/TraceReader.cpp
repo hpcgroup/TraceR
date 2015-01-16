@@ -36,6 +36,8 @@ void TraceReader::loadOffsets(){
   allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
 }
 
+int skipMsgId = 0;
+
 //void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
 void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
 {
@@ -58,6 +60,20 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
 
+  if(skipMsgId == 0) {
+    BgTimeLineRec tlinerec2;
+    currTline = &tlinerec2;
+    currTlineIdx = 0;
+    BgReadProc( 0, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec2);
+    for(int j=0; j<tlinerec2.length(); j++) {
+      BgTimeLog *bglog=tlinerec2[j];
+      if(bglog->isStartEvent()) {
+        skipMsgId = bglog->msgs[0]->msgID;
+        break;
+      }
+    }
+  }
+
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
   currTlineIdx = penum;   // set global variable
@@ -78,34 +94,47 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   pe->myTasks= new Task[tlinerec.length()];
   pe->tasksCount = tlinerec.length();
   pe->totalTasksCount = totalTlineLength;
+  pe->firstTask = -1;
 
   for(int logInd=0; logInd<tlinerec.length(); logInd++)
   {
     BgTimeLog *bglog=tlinerec[logInd];
-    if(penum==0 && logInd==0)
-    {
-      *startTime = (unsigned long long)(((double)TIME_MULT) * bglog->startTime);
+    if(pe->firstTask == -1) {
+      if(bglog->msgId.pe()==0 && bglog->msgId.msgID()==skipMsgId) {
+        pe->firstTask = logInd;
+        if(penum==0)
+        {
+          *startTime = (unsigned long long)(((double)TIME_MULT) * bglog->startTime);
+        }
+      } else {
+        pe->myTasks[logInd].done = true;
+        continue;
+      }
     }
 
     // first job's index is zero
     setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe);
 
-    int sPe = bglog->msgId.pe();
-    int smsgID = bglog->msgId.msgID();
-    if(sPe >= 0) {
+    if(logInd == pe->firstTask) { 
+      pe->myTasks[logInd].myMsgId.pe = -1;
+    } else {
+      int sPe = bglog->msgId.pe();
+      int smsgID = bglog->msgId.msgID();
+      if(sPe >= 0) {
         map<int, int>::iterator it;
         it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
         // some task set it before so it is a broadcast
         //printf("(sPe/numWth):%d, msgID:%d\n", (sPe/numWth)%numEmPes,smsgID);
         if (it == pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
-            pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
+          pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
         } else{
-            // it may be a broadcast
-            //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
-            printf(" %d I should never come here, please fix me %d\n", penum, it->second);
-            assert(0);
-            it->second = -100;
+          // it may be a broadcast
+          //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
+          printf(" %d I should never come here, please fix me %d\n", penum, it->second);
+          assert(0);
+          it->second = -100;
         }
+      }
     }
   }
   firstLog += tlinerec.length();
