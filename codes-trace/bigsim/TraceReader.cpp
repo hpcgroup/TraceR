@@ -37,6 +37,7 @@ void TraceReader::loadOffsets(){
 }
 
 int skipMsgId = 0;
+int startTimeGlobal = 0;
 
 //void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
 void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
@@ -69,6 +70,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
       BgTimeLog *bglog=tlinerec2[j];
       if(bglog->isStartEvent()) {
         skipMsgId = bglog->msgs[0]->msgID;
+        startTimeGlobal = (unsigned long long)(((double)TIME_MULT) * bglog->startTime);
         break;
       }
     }
@@ -102,10 +104,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     if(pe->firstTask == -1) {
       if(bglog->msgId.pe()==0 && bglog->msgId.msgID()==skipMsgId) {
         pe->firstTask = logInd;
-        if(penum==0)
-        {
-          *startTime = (unsigned long long)(((double)TIME_MULT) * bglog->startTime);
-        }
+        *startTime = startTimeGlobal;
       } else {
         pe->myTasks[logInd].done = true;
         continue;
