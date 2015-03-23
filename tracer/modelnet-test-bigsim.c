@@ -434,7 +434,7 @@ static void handle_kickoff_event(
 
     //if(my_pe_num == 0){
         //Execute the first task
-        exec_task(ns, 0, 1, lp);
+        exec_task(ns, PE_getFirstTask(ns->my_pe), 1, lp);
     //}
 }
 static void handle_local_event(

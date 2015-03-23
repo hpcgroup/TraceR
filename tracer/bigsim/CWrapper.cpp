@@ -39,6 +39,7 @@ extern "C" {
     MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd){
         return &(p->myTasks[tInd].myEntries[mInd]);
     }
+    int PE_getFirstTask(PE* p){ return p->firstTask;}
     void PE_set_taskDone(PE* p, int tInd, bool b){p->myTasks[tInd].done=b;}
     bool PE_get_taskDone(PE* p, int tInd){return p->myTasks[tInd].done;}
     int* PE_getTaskFwdDep(PE* p, int tInd){return p->myTasks[tInd].forwardDep;}

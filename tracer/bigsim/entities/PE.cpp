@@ -50,7 +50,7 @@ void PE::printStat()
 void PE::check()
 {
   int countTask=0;
-  for(int i=0; i<tasksCount; i++)
+  for(int i=firstTask; i<tasksCount; i++)
   {
     // assert(myTasks[i].done);
     if(!myTasks[i].done)

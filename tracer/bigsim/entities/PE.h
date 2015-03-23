@@ -34,6 +34,7 @@ class PE {
     int myNum, myEmPE;
     int tasksCount;	//total number of tasks
     int currentTask; // index of first not-executed task (helps searching messages)
+    int firstTask;
 
     bool noUnsatDep(int tInd);	// there is no unsatisfied dependency for task
     unsigned long long taskExecTime(int tInd);

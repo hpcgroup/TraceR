@@ -84,6 +84,7 @@ int main(int argc, char **argv) {
   int myRow = myRank / num_blocks_y;
   int myCol = myRank % num_blocks_y;
 
+  AMPI_Set_startevent(MPI_COMM_WORLD);
   for(; iterations < 5; iterations++) {
 #if DO_COMM
     /* Receive my right, left, bottom and top edge */

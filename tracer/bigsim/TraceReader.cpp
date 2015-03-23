@@ -17,6 +17,8 @@
 extern BgTimeLineRec* currTline;
 extern int currTlineIdx;
 
+int skipMsgId = -1;
+
 TraceReader::TraceReader() {
   totalTlineLength=0;
 }
@@ -58,6 +60,23 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
 
+  if(skipMsgId == -1) {
+    BgTimeLineRec tlinerec2;
+    currTline = &tlinerec2;
+    currTlineIdx = 0;
+    BgReadProc( 0, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec2);
+    for(int j = 0; j < tlinerec2.length(); j++) {
+      BgTimeLog *bglog = tlinerec2[j];
+      if(bglog->isStartEvent()) {
+        skipMsgId = bglog->msgs[0]->msgID;
+        break;
+      }
+    }
+    if(skipMsgId == -1) {
+      skipMsgId = -2;
+    }
+  }
+
   BgTimeLineRec tlinerec; // Time line (list of logs)
   currTline = &tlinerec;  // set global variable
   currTlineIdx = penum;   // set global variable
@@ -78,15 +97,30 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   pe->myTasks= new Task[tlinerec.length()];
   pe->tasksCount = tlinerec.length();
   pe->totalTasksCount = totalTlineLength;
+  pe->firstTask = -1;
+
+  if(skipMsgId == -2) {
+     pe->firstTask = 0;
+  }
+
+  *startTime = 0;
 
   for(int logInd=0; logInd<tlinerec.length(); logInd++)
   {
     BgTimeLog *bglog=tlinerec[logInd];
-    if(penum==0 && logInd==0)
-    {
-      *startTime = (unsigned long long)(((double)TIME_MULT) * bglog->startTime);
+
+    if(pe->firstTask == -1) {
+      if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == skipMsgId) {
+        pe->firstTask = logInd;
+      } else {
+        pe->myTasks[logInd].done = true;
+        continue;
+      }
     }
 
+    if(logInd < pe->firstTask) {
+      return;
+    }
     // first job's index is zero
     setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe);
 
@@ -106,6 +140,9 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
             assert(0);
             it->second = -100;
         }
+    }
+    if(logInd == pe->firstTask) {
+      pe->myTasks[logInd].myMsgId.pe = -1;
     }
   }
   firstLog += tlinerec.length();
