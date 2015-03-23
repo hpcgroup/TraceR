@@ -319,7 +319,7 @@ static void proc_init(
     }
 
     /* skew each kickoff event slightly to help avoid event ties later on */
-    kickoff_time = g_tw_lookahead + tw_rand_unif(lp->rng); 
+    kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
     //printf("\n Initializing servers %d. kickoff_time: %f \n", (int)lp->gid, kickoff_time);
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
