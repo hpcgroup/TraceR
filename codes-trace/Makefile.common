@@ -6,13 +6,23 @@ CC = mpicc -std=gnu99
 CXX = mpicxx
 endif
 
+CHARMPATH = /scratch/nikhil/charm-tmp/netlrts-linux-x86_64-bigemulator
+
 CFLAGS = -g -O2
 CXXFLAGS = -g -O2
+LDFLAGS = -g
 
-ROSS = /dcsdata/home/bilgeacun/sim/ROSS
-CODES_BASE = /dcsdata/home/bilgeacun/sim/codes_trace/codes-base
-CODES_NET = /dcsdata/home/bilgeacun/sim/codes_trace/codes-net
-CHARMPATH = /dcsdata/home/bilgeacun/charm_bigsim/net-linux-x86_64-bigemulator
+#ross install directory
+ROSS = /scratch/nikhil/ROSS/install
+#base directory of this code
+BASE_DIR = /scratch/nikhil/tracer
+CODES_BASE = ${BASE_DIR}/codes-base
+CODES_NET = ${BASE_DIR}/codes-net
+CODES_BASE_LIBS = -L${CODES_NET}/install/lib
+CODES_BASE_LIBS += -L${CODES_BASE}/install/lib
+CODES_BASE_LIBS += -L${ROSS}/lib
+CODES_BASE_LIBS += -lcodes-net
+CODES_BASE_LIBS += -lcodes-base -lROSS -lm
 
-CODES_BASE_LIBS = -L${CODES_NET}/install/lib -L${CODES_BASE}/install/lib -L${ROSS}/install/lib -lcodes-base -lROSS -lm
-
+CHARM_LIBS = -L$(CHARMPATH)/lib
+CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util

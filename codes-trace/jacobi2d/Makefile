@@ -1,4 +1,4 @@
-CC	= /scratch/nikhil/charm/netlrts-linux-x86_64-bigemulator/bin/ampiCC
+CC	= /scratch/nikhil/charm-tmp/netlrts-linux-x86_64-bigemulator/bin/ampiCC
 
 all: jacobi2d 
 
