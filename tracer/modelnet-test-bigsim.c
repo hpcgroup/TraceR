@@ -70,10 +70,10 @@ struct proc_msg
 {
     enum proc_event proc_event_type;
     tw_lpid src;          /* source of this request or ack */
-    int incremented_flag; /* helper for reverse computation */
     int executed_task;
     int fwd_dep_count;
     MsgID msg_id;
+    bool incremented_flag; /* helper for reverse computation */
 };
 
 static void proc_init(
@@ -491,7 +491,7 @@ static void handle_recv_event(
             m->executed_task = -2;
             return;
         }
-        PE_addToBusyStateBuffer(ns->my_pe, isBusy);
+        m->incremented_flag = isBusy;
     }
     if(task_id>=0){
         //The matching task should not be already done
@@ -608,7 +608,7 @@ static void handle_recv_rev_event(
         model_net_event_rc(net_id, lp, m->msg_id.size);
         return;
     }
-    bool wasBusy = PE_popBusyStateBuffer(ns->my_pe);
+    bool wasBusy = m->incremented_flag;
     PE_set_busy(ns->my_pe, wasBusy);
 
     int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
