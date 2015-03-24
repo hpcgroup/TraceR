@@ -15,6 +15,7 @@
 #include "codes/model-net-method.h"
 #include "codes/model-net-lp.h"
 #include "codes/net/torus.h"
+#include "sys/file.h"
 
 #define CHUNK_SIZE 32
 #define DEBUG 1
@@ -93,6 +94,8 @@ struct nodes_state
   tw_stime** next_credit_available_time;
   /* next flit generate time */
   tw_stime** next_flit_generate_time;
+  /* traffic through each torus link */
+  int *link_traffic;
   /* buffer size for each torus virtual channel */
   int** buffer;
   /* coordinates of the current torus node */
@@ -395,6 +398,7 @@ static void torus_init( nodes_state * s,
         (tw_stime**)malloc(2*p->n_dims * sizeof(tw_stime*));
     s->next_flit_generate_time = 
         (tw_stime**)malloc(2*p->n_dims*sizeof(tw_stime*));
+    s->link_traffic = (int *)malloc(2*p->n_dims*sizeof(int));
 
     for(i=0; i < 2*p->n_dims; i++)
     {
@@ -460,6 +464,7 @@ static void torus_init( nodes_state * s,
   //printf("\n");
   for( j=0; j < 2 * p->n_dims; j++ )
    {
+    s->link_traffic[j] = 0;
     for( i = 0; i < p->num_vc; i++ )
      {
        s->buffer[ j ][ i ] = 0; 
@@ -994,6 +999,7 @@ static void packet_send( nodes_state * s,
       tw_event_send( e );
 
       s->buffer[ tmp_dir + ( tmp_dim * 2 ) ][ 0 ]++;
+      s->link_traffic[ tmp_dir + ( tmp_dim * 2 ) ] += s->params->chunk_size;
     
       uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
 
@@ -1132,7 +1138,24 @@ static void torus_report_stats()
 void
 final( nodes_state * s, tw_lp * lp )
 {
-  model_net_print_stats(lp->gid, &s->torus_stats_array[0]); 
+  model_net_print_stats(lp->gid, &s->torus_stats_array[0]);
+
+  char *stats_file = getenv("TRACER_LINK_FILE");
+  if(stats_file != NULL) {
+      FILE *fout = fopen(stats_file, "a");
+      const torus_param *p = s->params;
+      int result = flock(fileno(fout), LOCK_EX);
+      for(int d = 0; d < p->n_dims; d++) {
+          fprintf(fout, "%d ", s->dim_position[d]);
+      }
+      for(int d = 0; d < 2*p->n_dims; d++) {
+          fprintf(fout, "%d ", s->link_traffic[d]);
+      }
+      fprintf(fout, "\n");
+      result = flock(fileno(fout), LOCK_UN);
+      fclose(fout);
+  }
+
   free(s->next_link_available_time);
   free(s->next_credit_available_time);
   free(s->next_flit_generate_time);
@@ -1217,6 +1240,7 @@ static void node_rc_handler(nodes_state * s, tw_bf * bf, nodes_message * msg, tw
 			int next_dir = msg->saved_src_dir;
 			s->next_link_available_time[next_dir + ( next_dim * 2 )][0] = msg->saved_available_time;
 			s->buffer[ next_dir + ( next_dim * 2 ) ][ 0 ] --;
+                        s->link_traffic[ next_dir + ( next_dim * 2 ) ] -= s->params->chunk_size;
 	                tw_rand_reverse_unif(lp->rng);
 		    }
 		 }
