@@ -844,7 +844,7 @@ static void packet_generate( nodes_state * s,
     msg->packet_ID = lp->gid + g_tw_nlp * s->packet_counter;
     msg->my_N_hop = 0;
 
-    uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+    int num_chunks = msg->packet_size/s->params->chunk_size;
     if(msg->packet_size % s->params->chunk_size)
         num_chunks++;
 
@@ -1000,7 +1000,7 @@ static void packet_send( nodes_state * s,
       s->buffer[ tmp_dir + ( tmp_dim * 2 ) ][ 0 ]++;
       s->link_traffic[ tmp_dir + ( tmp_dim * 2 ) ] += s->params->chunk_size;
     
-      uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+      int num_chunks = msg->packet_size/s->params->chunk_size;
 
       if(msg->packet_size % s->params->chunk_size)
           num_chunks++;
@@ -1055,7 +1055,7 @@ static void packet_arrive( nodes_state * s,
 	  printf("\n packet arrived at lp %d final dest %d ", (int)lp->gid, (int)msg->dest_lp);
   if( lp->gid == msg->dest_lp )
     {   
-        uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+        int num_chunks = msg->packet_size/s->params->chunk_size;
         if(msg->packet_size % s->params->chunk_size)
             num_chunks++;
 
@@ -1183,7 +1183,7 @@ static void node_rc_handler(nodes_state * s, tw_bf * bf, nodes_message * msg, tw
 	 	     //saved_dim = msg->saved_src_dim;
 		     //saved_dir = msg->saved_src_dir;
 
-                     uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+                     int num_chunks = msg->packet_size/s->params->chunk_size;
                      if(msg->packet_size % s->params->chunk_size)
                          num_chunks++;
 
@@ -1204,7 +1204,7 @@ static void node_rc_handler(nodes_state * s, tw_bf * bf, nodes_message * msg, tw
 		    tw_rand_reverse_unif(lp->rng);
 		    int next_dim = msg->source_dim;
 		    int next_dir = msg->source_direction;
-                    uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+                    int num_chunks = msg->packet_size/s->params->chunk_size;
                     if(msg->packet_size % s->params->chunk_size)
                         num_chunks++;
 
