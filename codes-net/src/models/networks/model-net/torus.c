@@ -894,8 +894,7 @@ static void packet_generate( nodes_state * s,
       else 
        {
    printf("\n %d Packet queued in line increase buffer space, dir %d dim %d buffer space %d dest LP %d ", (int)lp->gid, tmp_dir, tmp_dim, s->buffer[ tmp_dir + ( tmp_dim * 2 ) ][ 0 ], (int)msg->dest_lp);
-       MPI_Finalize();
-       exit(-1); 
+       MPI_Abort(MPI_COMM_WORLD, 1);
        }
    }
 
@@ -1030,8 +1029,7 @@ static void packet_send( nodes_state * s,
     else
     {
 	    printf("\n buffer overflown ");
-	    MPI_Finalize();
-	    exit(-1);
+	    MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
 

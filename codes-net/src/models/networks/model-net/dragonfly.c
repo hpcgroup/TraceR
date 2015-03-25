@@ -16,6 +16,7 @@
 #include "codes/model-net-method.h"
 #include "codes/model-net-lp.h"
 #include "codes/net/dragonfly.h"
+#include "sys/file.h"
 
 #define CREDIT_SIZE 8
 #define MEAN_PROCESS 1.0
@@ -182,6 +183,7 @@ struct router_state
    tw_stime* next_output_available_time;
    tw_stime* next_credit_available_time;
    int* vc_occupancy;
+   int* link_traffic;
    int* output_vc_state;
 
    const char * anno;
@@ -605,8 +607,7 @@ void packet_generate(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_
       else
          {
 	  printf("\n Exceeded queue size, exitting %d", s->vc_occupancy[0]);
-	  MPI_Finalize();
-	  exit(-1);
+	  MPI_Abort(MPI_COMM_WORLD, 1);
         } //else
   } // for
   total_event_size = model_net_get_msg_sz(DRAGONFLY) + 
@@ -1167,6 +1168,20 @@ dragonfly_terminal_final( terminal_state * s,
 void dragonfly_router_final(router_state * s,
 		tw_lp * lp)
 {
+    char *stats_file = getenv("TRACER_LINK_FILE");
+    if(stats_file != NULL) {
+        FILE *fout = fopen(stats_file, "a");
+        const dragonfly_param *p = s->params;
+        int result = flock(fileno(fout), LOCK_EX);
+        fprintf(fout, "%d %d ", s->router_id / p->num_routers,
+                                s->router_id % p->num_routers);
+        for(int d = 0; d < p->num_routers + p->num_global_channels; d++) {
+            fprintf(fout, "%d ", s->link_traffic[d]);
+        }
+        fprintf(fout, "\n");
+        result = flock(fileno(fout), LOCK_UN);
+        fclose(fout);
+    }
    free(s->global_channel);
 }
 /* get the next stop for the current packet
@@ -1402,9 +1417,8 @@ router_packet_send( router_state * s,
     {
 	    printf("\n %lf Router %ld buffers overflowed from incoming terminals channel %d occupancy %d radix %d next_stop %d ", tw_now(lp),(long int) lp->gid, output_chan, s->vc_occupancy[output_chan], s->params->radix, next_stop);
 	    bf->c3 = 1;
+            MPI_Abort(MPI_COMM_WORLD, 1);
 	    return;
-	    //MPI_Finalize();
-	    //exit(-1);
     }
 
 #if DEBUG
@@ -1447,6 +1461,7 @@ if( msg->packet_ID == TRACK && next_stop != msg->dest_terminal_id && msg->chunk_
   msg->old_vc = output_chan;
   m->intm_lp_id = lp->gid;
   s->vc_occupancy[output_chan]++;
+  s->link_traffic[output_chan] += s->params->chunk_size;
 
   /* Determine the event type. If the packet has arrived at the final destination
      router then it should arrive at the destination terminal next. */
@@ -1539,6 +1554,7 @@ void router_setup(router_state * r, tw_lp * lp)
    r->next_output_available_time = (tw_stime*)malloc(p->radix * sizeof(tw_stime));
    r->next_credit_available_time = (tw_stime*)malloc(p->radix * sizeof(tw_stime));
    r->vc_occupancy = (int*)malloc(p->radix * sizeof(int));
+   r->link_traffic = (int*)malloc(p->radix * sizeof(int));
    r->output_vc_state = (int*)malloc(p->radix * sizeof(int));
   
    for(i=0; i < p->radix; i++)
@@ -1547,6 +1563,7 @@ void router_setup(router_state * r, tw_lp * lp)
 	r->next_output_available_time[i]=0;
         r->next_credit_available_time[i]=0;
         r->vc_occupancy[i]=0;
+        r->link_traffic[i]=0;
         r->output_vc_state[i]= VC_IDLE;
     }
 
@@ -1734,6 +1751,7 @@ void router_rc_event_handler(router_state * s, tw_bf * bf, terminal_message * ms
 
 			s->next_output_available_time[output_port] = msg->saved_available_time;
 			s->vc_occupancy[output_chan]--;
+                        s->link_traffic[output_chan] -= s->params->chunk_size;
 			s->output_vc_state[output_chan]=VC_IDLE;
 
 		    }

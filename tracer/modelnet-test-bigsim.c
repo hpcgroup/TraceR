@@ -288,7 +288,9 @@ static void proc_init(
     memset(ns, 0, sizeof(*ns));
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
-    num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "dragonfly_router", NULL, 1);
+    if(net_id == DRAGONFLY) {
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "dragonfly_router", NULL, 1);
+    }
 
     lps_per_rep = num_servers_per_rep * 2 + num_routers_per_rep;
 
@@ -422,8 +424,12 @@ static void handle_kickoff_event(
 
     int my_pe_num = lpid_to_pe(lp->gid);
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
-    if(my_pe_num == 0)
-        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d TIME TILL NOW=%f s\n", lpid_to_pe(lp->gid), (int)lp->gid, PE_get_tasksCount(ns->my_pe), (double)time_till_now);
+    if(my_pe_num == 0) {
+        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
+        "TASK: %d, TIME TILL NOW=%f s\n", lpid_to_pe(lp->gid), (int)lp->gid,
+        PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
+        (double)time_till_now);
+    }
 
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num) == lp->gid);
@@ -919,26 +925,15 @@ static int exec_comp(
 }
 
 //Utility function to convert pe number to tw_lpid number
-//Assuming the servers come last in lp registration in terms of global id
+//Assuming the servers come first in lp registration in terms of global id
 static inline int pe_to_lpid(int pe){
-    int lp_id = 0;
-    if(net_id == DRAGONFLY)
-        lp_id = (pe/num_servers_per_rep)*lps_per_rep + (pe%num_servers_per_rep);
-    else
-        lp_id = pe*offset;
-    return lp_id;
+    return (pe / num_servers_per_rep) * lps_per_rep + (pe % num_servers_per_rep);
 }
 
 //Utility function to convert tw_lpid to simulated pe number
-//Assuming the servers come last in lp registration in terms of global id
+//Assuming the servers come first in lp registration in terms of global id
 static inline int lpid_to_pe(int lp_gid){
-    int my_pe_num = 0;
-    if(net_id == DRAGONFLY){
-        my_pe_num = ((int)(lp_gid/lps_per_rep))*(num_servers_per_rep)+(lp_gid%lps_per_rep);
-    }
-    else
-        my_pe_num = lp_gid/offset;
-    return my_pe_num;
+    return ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) + (lp_gid % lps_per_rep);
 }
 
 /*
