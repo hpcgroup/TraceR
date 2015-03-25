@@ -551,7 +551,7 @@ void packet_generate(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_
   tw_event *e;
   terminal_message *m;
   int i, total_event_size;
-  uint64_t num_chunks = msg->packet_size / p->chunk_size;
+  int num_chunks = msg->packet_size / p->chunk_size;
   if (msg->packet_size % s->params->chunk_size)
       num_chunks++;
   msg->packet_ID = lp->gid + g_tw_nlp * s->packet_counter + tw_rand_integer(lp->rng, 0, lp->gid + g_tw_nlp * s->packet_counter);
@@ -591,7 +591,7 @@ void packet_generate(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_
                     msg->local_event_size_bytes);
        }
        m->intm_group_id = -1;
-       m->saved_vc=0;
+       m->saved_vc=chan;
        m->chunk_id = i;
        
        if(msg->packet_ID == TRACK && msg->chunk_id == num_chunks-1)
@@ -648,7 +648,7 @@ void packet_send(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_lp *
    // we are sending an event to the router, so no method_event here
    e = tw_event_new(router_id, s->terminal_available_time - tw_now(lp), lp);
 
-   uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+   int num_chunks = msg->packet_size/s->params->chunk_size;
    if(msg->packet_size % s->params->chunk_size)
        num_chunks++;
 
@@ -703,7 +703,7 @@ void packet_send(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_lp *
 /* packet arrives at the destination terminal */
 void packet_arrive(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_lp * lp)
 {
-    uint64_t num_chunks = msg->packet_size / s->params->chunk_size;
+    int num_chunks = msg->packet_size / s->params->chunk_size;
     if (msg->packet_size % s->params->chunk_size)
         num_chunks++;
 #if DEBUG
@@ -1333,7 +1333,7 @@ router_packet_send( router_state * s,
    int minimal_out_port = -1, nonmin_out_port = -1;
    bf->c3 = 0;
 
-   uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+   int num_chunks = msg->packet_size/s->params->chunk_size;
    if(msg->packet_size % s->params->chunk_size)
        num_chunks++;
     
@@ -1507,7 +1507,7 @@ router_packet_receive( router_state * s,
 
     msg->my_N_hop++;
     ts = g_tw_lookahead + 0.1 + tw_rand_exponential(lp->rng, (double)MEAN_INTERVAL/200);
-    uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+    int num_chunks = msg->packet_size/s->params->chunk_size;
     if(msg->packet_size % s->params->chunk_size)
         num_chunks++;
 
@@ -1622,7 +1622,7 @@ void router_event(router_state * s, tw_bf * bf, terminal_message * msg, tw_lp * 
 /* Reverse computation handler for a terminal event */
 void terminal_rc_event_handler(terminal_state * s, tw_bf * bf, terminal_message * msg, tw_lp * lp)
 {
-    uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+    int num_chunks = msg->packet_size/s->params->chunk_size;
     if(msg->packet_size % s->params->chunk_size)
         num_chunks++;
    switch(msg->type)
@@ -1651,7 +1651,7 @@ void terminal_rc_event_handler(terminal_state * s, tw_bf * bf, terminal_message 
 		   s->packet_counter--;
 		   s->output_vc_state[vc] = VC_IDLE;
 
-                   uint64_t num_chunks = msg->packet_size / s->params->chunk_size;
+                   int num_chunks = msg->packet_size / s->params->chunk_size;
                    if (msg->chunk_id == num_chunks-1){
                      codes_local_latency_reverse(lp);
                    }
@@ -1727,7 +1727,7 @@ void terminal_rc_event_handler(terminal_state * s, tw_bf * bf, terminal_message 
 /* Reverse computation handler for a router event */
 void router_rc_event_handler(router_state * s, tw_bf * bf, terminal_message * msg, tw_lp * lp)
 {
-    uint64_t num_chunks = msg->packet_size/s->params->chunk_size;
+    int num_chunks = msg->packet_size/s->params->chunk_size;
     if(msg->packet_size % s->params->chunk_size)
         num_chunks++;
   switch(msg->type)
