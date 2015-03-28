@@ -28,10 +28,11 @@
 static int net_id = 0;
 static int num_routers = 0;
 static int num_servers = 0;
-static int offset = 2;
+static int num_nics = 0;
 
 static int num_routers_per_rep = 0;
 static int num_servers_per_rep = 0;
+static int num_nics_per_rep = 0;
 static int lps_per_rep = 0;
 static int total_lps = 0;
 
@@ -231,11 +232,14 @@ int main(int argc, char **argv)
     
     codes_mapping_setup();
     
-    num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", NULL, 1);
+    num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
+            NULL, 1);
+    num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0, "modelnet_torus", 
+            NULL, 1);
     if(net_id == DRAGONFLY)
     {
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "dragonfly_router", NULL, 1); 
-	offset = 1;
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, 
+            "dragonfly_router", NULL, 1); 
     }
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
@@ -288,17 +292,16 @@ static void proc_init(
     memset(ns, 0, sizeof(*ns));
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
+    num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+            "modelnet_torus", NULL, 1);
     if(net_id == DRAGONFLY) {
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "dragonfly_router", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, 
+            "dragonfly_router", NULL, 1);
     }
 
-    lps_per_rep = num_servers_per_rep * 2 + num_routers_per_rep;
+    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
 
-    int opt_offset = 0;
-    total_lps = num_servers * 2 + num_routers;
-
-    if(net_id == DRAGONFLY && (lp->gid % lps_per_rep == num_servers_per_rep - 1))
-        opt_offset = num_servers_per_rep + num_routers_per_rep; //optional offset due to dragonfly mapping
+    total_lps = num_servers + num_nics + num_routers;
 
     //Each server read it's trace
     ns->sim_start = clock();
@@ -936,11 +939,3 @@ static inline int lpid_to_pe(int lp_gid){
     return ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) + (lp_gid % lps_per_rep);
 }
 
-/*
- * Local variables:
- *  c-indent-level: 4
- *  c-basic-offset: 4
- * End:
- *
- * vim: ft=c ts=8 sts=4 sw=4 expandtab
- */

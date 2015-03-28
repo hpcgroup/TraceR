@@ -937,6 +937,32 @@ static void packet_generate( nodes_state * s,
     // set here
     msg->dest_lp = dst_lp;
 
+    //message to a server on the same LP
+    if( lp->gid == msg->dest_lp )
+    {
+        bf->c2 = 1;
+        // Trigger an event on receiving server
+        if(msg->remote_event_size_bytes)
+        {
+            void *tmp_ptr = model_net_method_get_edata(TORUS, msg);
+            if (msg->is_pull){
+                int net_id = model_net_get_id(LP_METHOD_NM);
+                model_net_event(net_id, msg->category, msg->sender_svr,
+                        msg->pull_size, 0.0, msg->remote_event_size_bytes,
+                        tmp_ptr, 0, NULL, lp);
+            }
+            else{
+                ts = g_tw_lookahead + tw_rand_exponential(lp->rng,
+                        MEAN_INTERVAL/(double)200.0);
+                tw_event *e = tw_event_new(msg->final_dest_gid, ts, lp);
+                m = tw_event_data(e);
+                memcpy(m, tmp_ptr, msg->remote_event_size_bytes);
+                tw_event_send(e);
+            }
+        }
+        return;
+    }
+
     next_hop( s, &dst_lp, &tmp_dim, &tmp_dir );
 
     msg->saved_src_dim = tmp_dim;
@@ -1281,6 +1307,7 @@ static void node_rc_handler(nodes_state * s, tw_bf * bf, nodes_message * msg, tw
     {
        case GENERATE:
 		   {
+                     if( bf->c2 == 1 ) break;
 		     s->packet_counter--;
 		     int i;//, saved_dim, saved_dir;
 	 	     //saved_dim = msg->saved_src_dim;

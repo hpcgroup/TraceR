@@ -56,6 +56,7 @@ int PE_get_currentTask(PE* p);
 void PE_increment_currentTask(PE* p, int tInd);
 int PE_get_myEmPE(PE* p);
 int PE_get_myNum(PE* p);
+int PE_getFirstTask(PE* p);
 
 int PE_getBufferSize(PE* p);
 void PE_clearMsgBuffer(PE* p);
