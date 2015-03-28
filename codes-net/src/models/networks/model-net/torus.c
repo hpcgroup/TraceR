@@ -48,6 +48,7 @@ struct torus_param
     int num_vc; /* number of virtual channels for each torus link */
     float mean_process;/* mean process time for each flit  */
     int chunk_size; /* chunk is the smallest unit--default set to 32 */
+    int routing; /* what type of routing to use */
 
     /* "derived" torus parameters */
 
@@ -82,6 +83,12 @@ static torus_param             * all_params = NULL;
 static const config_anno_map_t * anno_map   = NULL;
 
 typedef struct nodes_state nodes_state;
+
+enum ROUTING_ALGO
+{
+    STATIC = 0,
+    ADAPTIVE
+};
 
 /* state of a torus node */
 struct nodes_state
@@ -186,6 +193,27 @@ static void torus_read_config(
         fprintf(stderr, "Warning: num_vc not specified, setting to %d\n",
                 p->num_vc);
     }
+
+    char routing[MAX_NAME_LENGTH];
+    configuration_get_value(&config, "PARAMS", "routing", anno, routing,
+            MAX_NAME_LENGTH);
+    if(strcmp(routing, "static") == 0)
+        p->routing = STATIC;
+    else if (strcmp(routing, "adaptive") == 0) {
+        p->routing = ADAPTIVE;
+        int packet_size = 0;
+        configuration_get_value_int(&config, "PARAMS", "packet_size", anno, &packet_size);
+        if(packet_size != p->chunk_size) {
+            printf("Packet size %d is not same as chunk size %d...Needed for "
+            "adaptive routing...Aborting\n", packet_size, p->chunk_size);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    } else {
+        fprintf(stderr,
+                "No routing protocol specified, setting to static\n");
+        p->routing = STATIC; //default
+    }
+
 
     int rc = configuration_get_value(&config, "PARAMS", "dim_length", anno,
             dim_length_str, MAX_NAME_LENGTH);
@@ -747,7 +775,7 @@ static void node_collective_fan_out(nodes_state * s,
               max_collective = tw_now(lp) - s->collective_init_time;
           }
 }
-    
+
 /*Returns the next neighbor to which the packet should be routed by using DOR (Taken from Ning's code of the torus model)*/
 static void dimension_order_routing( nodes_state * s,
 			     tw_lpid * dst_lp, 
@@ -806,6 +834,81 @@ static void dimension_order_routing( nodes_state * s,
   codes_mapping_get_lp_id(grp_name, LP_CONFIG_NM, NULL, 1, dest_id, 0, dst_lp);
 }
 
+static void next_hop(nodes_state *s, tw_lpid *dst_lp, int *dim, int *dir) {
+    if(s->params->routing == STATIC) {
+        dimension_order_routing(s, dst_lp, dim, dir);
+    } else {
+        int dim_N[s->params->n_dims], dest[s->params->n_dims], i, dest_id=0;
+
+        //TODO: be annotation-aware
+        codes_mapping_get_lp_info(*dst_lp, grp_name, &mapping_grp_id, NULL,
+                &mapping_type_id, NULL, &mapping_rep_id, &mapping_offset);
+        dim_N[ 0 ] = mapping_rep_id + mapping_offset;
+
+        // find destination dimensions using destination LP ID
+        for ( i = 0; i < s->params->n_dims; i++ )
+        {
+            dest[ i ] = dim_N[ i ] % s->params->dim_length[ i ];
+            dim_N[ i + 1 ] = ( dim_N[ i ] - dest[ i ] ) / s->params->dim_length[ i ];
+        }
+
+        int max_buffer = s->params->buffer_size + 1;
+        int found = 0;
+
+        for( i = 0; i < s->params->n_dims; i++ )
+        {
+            if ( s->dim_position[ i ] - dest[ i ] > s->params->half_length[ i ] )
+            {
+                if(max_buffer > s->buffer[ 1 + ( i * 2 ) ][ 0 ]) {
+                    dest_id = s->neighbour_plus_lpID[ i ];
+                    *dim = i;
+                    *dir = 1;
+                    max_buffer = s->buffer[ 1 + ( i * 2 ) ][ 0 ];
+                    found = 1;
+                }
+            }
+            if ( s->dim_position[ i ] - dest[ i ] < -s->params->half_length[ i ] )
+            {
+                if(max_buffer > s->buffer[ ( i * 2 ) ][ 0 ]) {
+                    dest_id = s->neighbour_minus_lpID[ i ];
+                    *dim = i;
+                    *dir = 0;
+                    max_buffer = s->buffer[ ( i * 2 ) ][ 0 ];
+                    found = 1;
+                }
+            }
+            if ( ( s->dim_position[i] - dest[i] <= s->params->half_length[i] ) &&
+                    ( s->dim_position[ i ] - dest[ i ] > 0 ) )
+            {
+                if(max_buffer > s->buffer[ ( i * 2 ) ][ 0 ]) {
+                    dest_id = s->neighbour_minus_lpID[ i ];
+                    *dim = i;
+                    *dir = 0;
+                    max_buffer = s->buffer[ ( i * 2 ) ][ 0 ];
+                    found = 1;
+                 }
+            }
+            if (( s->dim_position[i] - dest[i] >= -s->params->half_length[i] ) &&
+                    ( s->dim_position[ i ] - dest[ i ] < 0) )
+            {
+                if(max_buffer > s->buffer[ 1 + ( i * 2 ) ][ 0 ]) {
+                    dest_id = s->neighbour_plus_lpID[ i ];
+                    *dim = i;
+                    *dir = 1;
+                    max_buffer = s->buffer[ 1 + ( i * 2 ) ][ 0 ];
+                    found = 1;
+                }
+            }
+        }
+        if(found) {
+            codes_mapping_get_lp_id(grp_name, LP_CONFIG_NM, NULL, 1, dest_id, 0, dst_lp);
+        } else {
+            dimension_order_routing(s, dst_lp, dim, dir);
+        }
+    }
+}
+
+
 /*Generates a packet. If there is a buffer slot available, then the packet is 
 injected in the network. Else, a buffer overflow exception is thrown.
 TODO: We might want to modify this so that if the buffer is full, the packet
@@ -834,7 +937,7 @@ static void packet_generate( nodes_state * s,
     // set here
     msg->dest_lp = dst_lp;
 
-    dimension_order_routing( s, &dst_lp, &tmp_dim, &tmp_dir );
+    next_hop( s, &dst_lp, &tmp_dim, &tmp_dir );
 
     msg->saved_src_dim = tmp_dim;
     msg->saved_src_dir = tmp_dir;
@@ -956,7 +1059,7 @@ static void packet_send( nodes_state * s,
     tw_event *e;
     nodes_message *m;
     tw_lpid dst_lp = msg->dest_lp;
-    dimension_order_routing( s, &dst_lp, &tmp_dim, &tmp_dir );     
+    next_hop( s, &dst_lp, &tmp_dim, &tmp_dir );
 
     if(s->buffer[ tmp_dir + ( tmp_dim * 2 ) ][ 0 ] < s->params->buffer_size)
     {
