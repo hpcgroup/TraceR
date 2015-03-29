@@ -62,8 +62,6 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
 
   if(skipMsgId == -1) {
     BgTimeLineRec tlinerec2;
-    currTline = &tlinerec2;
-    currTlineIdx = 0;
     BgReadProc( 0, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec2);
     for(int j = 0; j < tlinerec2.length(); j++) {
       BgTimeLog *bglog = tlinerec2[j];
@@ -78,25 +76,18 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
   }
 
   BgTimeLineRec tlinerec; // Time line (list of logs)
-  currTline = &tlinerec;  // set global variable
-  currTlineIdx = penum;   // set global variable
-  //int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec);
-  //assert(status!=-1);
-  
-  // update fileLoc
-  // call to update fileLoc
-  //status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, 0, firstLog);
-  //assert(status!=-1);
-  
   // read tasks
-  // read the window
-  int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog, totalTlineLength);
+  int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs,
+      allNodeOffsets, tlinerec);
+  //int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs,
+  //            allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog,
+  //            totalTlineLength);
   assert(status!=-1);
   pe->myNum = penum;
   pe->myEmPE = (penum/numWth)%numEmPes;
   pe->myTasks= new Task[tlinerec.length()];
   pe->tasksCount = tlinerec.length();
-  pe->totalTasksCount = totalTlineLength;
+  pe->totalTasksCount = tlinerec.length();
   pe->firstTask = -1;
 
   if(skipMsgId == -2) {
