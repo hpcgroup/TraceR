@@ -204,19 +204,18 @@ extern "C" {
     }
     int PE_get_tasksCount(PE* p){return p->tasksCount;}
     int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
-    //void PE_printStat(PE* p){p->printStat();}
     void PE_printStat(PE* p){p->check();}
     int PE_get_numWorkThreads(PE* p){return p->numWth;}
 
     //TraceReader
-    TraceReader* newTraceReader(){return new TraceReader();}
+    TraceReader* newTraceReader(char* s){return new TraceReader(s);}
     void TraceReader_loadTraceSummary(TraceReader* t){t->loadTraceSummary();}
     void TraceReader_loadOffsets(TraceReader* t){t->loadOffsets();}
     int* TraceReader_getOffsets(TraceReader* t){return t->allNodeOffsets;}
     void TraceReader_setOffsets(TraceReader* t, int** offsets){t->allNodeOffsets = *offsets;}
     void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
-    empes, int* nwth, PE* pe, int penum, unsigned long long* startTime){
-         t->readTrace(tot, numnodes, empes, nwth, pe, penum, startTime);
+    empes, int* nwth, PE* pe, int penum, int jobnum, unsigned long long* startTime){
+         t->readTrace(tot, numnodes, empes, nwth, pe, penum, jobnum, startTime);
     }
     int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
 

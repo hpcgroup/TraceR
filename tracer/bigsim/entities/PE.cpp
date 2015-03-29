@@ -52,7 +52,6 @@ void PE::check()
   int countTask=0;
   for(int i=firstTask; i<tasksCount; i++)
   {
-    // assert(myTasks[i].done);
     if(!myTasks[i].done)
     {
       countTask++;

@@ -22,12 +22,12 @@ class Task;
 
 class TraceReader {
 public:
-    TraceReader();
+    TraceReader(char *);
     ~TraceReader();
     void loadOffsets();
     void loadTraceSummary();
-    //void readTrace(int &tot, int& numnodes, int& empes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& dests*/);
-    void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe, int penum, unsigned long long* startTime);
+    void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe,
+        int penum, int jobnum, unsigned long long* startTime);
     void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe);
 
     int numEmPes;	// number of emulation PEs, there is a trace file for each of them
@@ -35,6 +35,7 @@ public:
     int totalNodes;
     int numWth;	//Working PEs per node
     int* allNodeOffsets;
+    char tracePath[256];
 
     int fileLoc; // each worker needs separate file offset
     int firstLog; // first log of window to read for each worker

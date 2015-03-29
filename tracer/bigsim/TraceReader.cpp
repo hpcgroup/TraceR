@@ -11,15 +11,15 @@
 
 #include "blue.h"
 #include "blue_impl.h"
+#include "datatypes.h"
 #include <cmath>
 
 // global variables of bigsim
-extern BgTimeLineRec* currTline;
-extern int currTlineIdx;
+extern char* traceFileName;
+extern JobInf *jobs;
 
-int skipMsgId = -1;
-
-TraceReader::TraceReader() {
+TraceReader::TraceReader(char *s) {
+  strncpy(tracePath, s, strlen(s) + 1);
   totalTlineLength=0;
 }
 
@@ -29,17 +29,19 @@ TraceReader::~TraceReader() {
 
 void TraceReader::loadTraceSummary(){
   int numX, numY, numZ, numCth;
-  BgLoadTraceSummary("bgTrace", totalWorkerProcs, numX, numY, numZ, numCth, numWth, numEmPes);
-  totalNodes= totalWorkerProcs/numWth;
+  BgLoadTraceSummary(tracePath, totalWorkerProcs, numX, numY, numZ, numCth,
+      numWth, numEmPes);
+  totalNodes = totalWorkerProcs/numWth;
 }
 
 void TraceReader::loadOffsets(){
   totalNodes= totalWorkerProcs/numWth;
+  traceFileName = tracePath;
   allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
 }
 
-//void TraceReader::readTrace(int &tot, int& totn, int& emPes, int& nwth, PE* pe, int penum, unsigned long long& startTime/*, int**& msgDestLogs*/)
-void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, int penum, unsigned long long* startTime)
+void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
+    int penum, int jobnum, unsigned long long* startTime)
 {
   *nwth = numWth;
   *tot = totalWorkerProcs;
@@ -52,47 +54,47 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
 
   int nodeNum = penum/numWth;
   int myEmulPe = nodeNum%numEmPes;
-  if(nodeNum==0) printf("totalRanks:%d, numWth:%d, numEmPes:%d\n",totalWorkerProcs, numWth,numEmPes);
 
-  if(nodeNum==0) printf("Trace reading.. myEmulPe:%d, nodeNum:%d\n", myEmulPe, nodeNum);
+  traceFileName = tracePath;
 
   pe->msgDestLogs = new map<int, int>[numEmPes];
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
 
-  if(skipMsgId == -1) {
+  if(jobs[jobnum].skipMsgId == -1) {
     BgTimeLineRec tlinerec2;
     BgReadProc( 0, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec2);
     for(int j = 0; j < tlinerec2.length(); j++) {
       BgTimeLog *bglog = tlinerec2[j];
       if(bglog->isStartEvent()) {
-        skipMsgId = bglog->msgs[0]->msgID;
+        jobs[jobnum].skipMsgId = bglog->msgs[0]->msgID;
         break;
       }
     }
-    if(skipMsgId == -1) {
-      skipMsgId = -2;
+    if(jobs[jobnum].skipMsgId == -1) {
+      jobs[jobnum].skipMsgId = -2;
     }
   }
 
   BgTimeLineRec tlinerec; // Time line (list of logs)
-  // read tasks
   int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs,
       allNodeOffsets, tlinerec);
-  //int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs,
-  //            allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog,
-  //            totalTlineLength);
   assert(status!=-1);
   pe->myNum = penum;
+  pe->jobNum = jobnum;
   pe->myEmPE = (penum/numWth)%numEmPes;
   pe->myTasks= new Task[tlinerec.length()];
   pe->tasksCount = tlinerec.length();
   pe->totalTasksCount = tlinerec.length();
   pe->firstTask = -1;
 
-  if(skipMsgId == -2) {
+  if(jobs[jobnum].skipMsgId == -2) {
      pe->firstTask = 0;
   }
+
+  //int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs,
+  //            allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog,
+  //            totalTlineLength);
 
   *startTime = 0;
 
@@ -101,7 +103,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     BgTimeLog *bglog=tlinerec[logInd];
 
     if(pe->firstTask == -1) {
-      if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == skipMsgId) {
+      if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == jobs[jobnum].skipMsgId) {
         pe->firstTask = logInd;
       } else {
         pe->myTasks[logInd].done = true;
@@ -112,6 +114,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
     if(logInd < pe->firstTask) {
       return;
     }
+
     // first job's index is zero
     setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe);
 
@@ -121,12 +124,10 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, 
         map<int, int>::iterator it;
         it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
         // some task set it before so it is a broadcast
-        //printf("(sPe/numWth):%d, msgID:%d\n", (sPe/numWth)%numEmPes,smsgID);
         if (it == pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
             pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
         } else{
             // it may be a broadcast
-            //msgDestLogs[(sPe/numWth)%numEmPes][smsgID] = -100;
             printf(" %d I should never come here, please fix me %d\n", penum, it->second);
             assert(0);
             it->second = -100;
@@ -153,7 +154,6 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   t->msgEntCount = bglog->msgs.length();
   t->myEntries = new MsgEntry[t->msgEntCount];
 
-  //printf("[%d] I expect from  %d, %d\n", taskPE, t->myMsgId.pe - 1, t->myMsgId.id); 
   for(int i=0; i<bglog->msgs.length(); i++)
   {
     t->myEntries[i].msgId.id = bglog->msgs[i]->msgID;
@@ -161,15 +161,6 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     
     t->myEntries[i].node = bglog->msgs[i]->dstNode;
     t->myEntries[i].thread = bglog->msgs[i]->tID;
-
-    //printf("[%d] I sent  to %d, %d\n", taskPE, bglog->msgs[i]->dstNode, t->myEntries[i].msgId.id); 
-    // mark broadcast
-    /*if(bglog->msgs[i]->dstNode < 0 || bglog->msgs[i]->tID < 0)
-    { 
-      //printf("taskPE:%d, myEmPE:%d, msgID:%d\n", taskPE, myEmPE, bglog->msgs[i]->msgID);
-      pe->msgDestLogs[myEmPE].insert(pair<int,int>(bglog->msgs[i]->msgID,-100));
-      //msgDestLogs[myEmPE][bglog->msgs[i]->msgID] = -100;
-    }*/
 
     // sendTime is absolute
     t->myEntries[i].sendOffset = (long long)(((double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime)));

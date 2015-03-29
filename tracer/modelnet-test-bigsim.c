@@ -22,6 +22,7 @@
 #include "codes/configuration.h"
 #include "codes/lp-type-lookup.h"
 
+#include "bigsim/datatypes.h"
 #include "bigsim/CWrapper.h"
 #include "bigsim/entities/MsgEntry.h"
 
@@ -41,7 +42,15 @@ typedef struct proc_state proc_state;
 
 static int sync_mode = 0;
 
-int* offsets;
+char tracer_input[256];
+
+typedef struct CoreInf {
+    int mapsTo, jobID;
+} CoreInf;
+
+CoreInf *global_rank;
+JobInf *jobs;
+int num_jobs = 0;
 
 #define DEBUG_PRINT 0
 
@@ -65,6 +74,7 @@ struct proc_state
     TraceReader* trace_reader; /* for reading the bigsim traces */
     int current_task;
     clock_t sim_start;
+    int my_pe_num, my_job;
 };
 
 struct proc_msg
@@ -187,8 +197,10 @@ static int exec_comp(
     int recv,
     tw_lp * lp);
               
-static inline int pe_to_lpid(int pe);
-static inline int lpid_to_pe(int pe);
+static inline int pe_to_lpid(int pe, int job);
+static inline int pe_to_job(int pe);
+static inline int lpid_to_pe(int lp_gid);
+static inline int lpid_to_job(int lp_gid);
 
 int main(int argc, char **argv)
 {
@@ -200,9 +212,7 @@ int main(int argc, char **argv)
     g_tw_ts_end = s_to_ns(60*60*24*365); /* one year, in nsecs */
     lp_io_handle handle;
 
-    //Parse the sync mode
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
-    //printf("Running in sync mode: %d\n", sync_mode);
 
     tw_opt_add(app_opt);
     tw_init(&argc, &argv);
@@ -210,6 +220,9 @@ int main(int argc, char **argv)
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
 
+    if(!rank) {
+        printf("Running in sync mode: %d\n", sync_mode);
+    }
     if(argc < 2 && rank == 0)
     {
 	printf("\nUSAGE: \n");
@@ -219,7 +232,14 @@ int main(int argc, char **argv)
         assert(0);
     }
 
-    configuration_load(argv[2], MPI_COMM_WORLD, &config);
+    strncpy(tracer_input, argv[2], strlen(argv[2]) + 1);
+
+    if(!rank) {
+        printf("Config file is %s\n", argv[1]);
+        printf("Trace input file is %s\n", tracer_input);
+    }
+
+    configuration_load(argv[1], MPI_COMM_WORLD, &config);
 
     model_net_register();
 
@@ -238,6 +258,7 @@ int main(int argc, char **argv)
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0, "modelnet_torus",
                 NULL, 1);
     }
+
     if(net_id == DRAGONFLY)
     {
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
@@ -246,22 +267,107 @@ int main(int argc, char **argv)
                 "dragonfly_router", NULL, 1);
     }
 
+    num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
+    if(net_id == TORUS) {
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_torus", NULL, 1);
+    }
+    if(net_id == DRAGONFLY) {
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "dragonfly_router", NULL, 1);
+    }
+
+    total_lps = num_servers + num_nics + num_routers;
+    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
+
+
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
     {
         return(-1);
     }
-    //Trace reading hack..
-    TraceReader* t = newTraceReader();
-    TraceReader_loadTraceSummary(t);
-    int num_workers = TraceReader_totalWorkerProcs(t);
-    if(rank == 0){ //only rank 0 loads the offsets and broadcasts
-       TraceReader_loadOffsets(t);
-       offsets = TraceReader_getOffsets(t);
+
+
+    if(!rank) printf("Begin reading %s\n", tracer_input);
+
+    FILE *jobIn = fopen(tracer_input, "r");
+    char globalIn[256];
+    fscanf(jobIn, "%s", globalIn);
+
+    global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
+
+    for(int i = 0; i < num_servers; i++) {
+        global_rank[i].mapsTo = -1;
+        global_rank[i].jobID = -1;
     }
-    else{
-        offsets = malloc(sizeof(int)*num_workers);
+
+    if(!rank) printf("Reading %s\n", globalIn);
+
+    if(rank == 0) {
+        int line_data[3], localCount = 0;;
+        FILE *gfile = fopen(globalIn, "rb");
+        while(fread(line_data, sizeof(int), 3, gfile) != 0) {
+            global_rank[line_data[0]].mapsTo = line_data[1];
+            global_rank[line_data[0]].jobID = line_data[2];
+#if DEBUG_PRINT
+            printf("Read %d/%d %d %d\n", line_data[0], num_servers,
+            global_rank[line_data[0]].mapsTo, global_rank[line_data[0]].jobID);
+#endif
+            localCount++;
+        }
+        fclose(gfile);
+        printf("Read %d ranks\n", localCount);
     }
-    MPI_Bcast(offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
+
+
+    fscanf(jobIn, "%d", &num_jobs);
+    jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
+
+    for(int i = 0; i < num_jobs; i++) {
+        char tempTrace[200];
+        fscanf(jobIn, "%s", tempTrace);
+        sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
+        fscanf(jobIn, "%s", jobs[i].map_file);
+        fscanf(jobIn, "%d", &jobs[i].numRanks);
+        jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
+        jobs[i].skipMsgId = -1;
+    }
+
+    //Load all summaries on proc 0 and bcast
+    for(int i = 0; i < num_jobs; i++) {
+        if(!rank) printf("Loading trace summary for job %d from %s\n", i,
+                jobs[i].traceDir);
+        TraceReader* t = newTraceReader(jobs[i].traceDir);
+        TraceReader_loadTraceSummary(t);
+        int num_workers = TraceReader_totalWorkerProcs(t);
+        assert(num_workers == jobs[i].numRanks);
+        if(rank == 0){ //only rank 0 loads the offsets and broadcasts
+            TraceReader_loadOffsets(t);
+            jobs[i].offsets = TraceReader_getOffsets(t);
+        } else {
+            jobs[i].offsets = (int*) malloc(sizeof(int) * num_workers);
+        }
+        MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+
+        if(!rank) printf("Loading map file for job %d from %s\n", i,
+                jobs[i].map_file);
+        jobs[i].rankMap = (int *) malloc(sizeof(int) * num_workers);
+        if(rank == 0){ //only rank 0 loads the ranks and broadcasts
+            FILE *rfile = fopen(jobs[i].map_file, "rb");
+            fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+            fclose(rfile);
+        }
+        MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+#if DEBUG_PRINT
+        if(rank == 0) {
+            for(int j = 0; j < num_workers; j++) {
+                printf("Job %d %d to %d\n", i, j, jobs[i].rankMap[j]);
+            }
+        }
+#endif
+    }
 
     tw_run();
     model_net_report_stats(net_id);
@@ -287,53 +393,34 @@ static void proc_add_lp_type()
 
 static void proc_init(
     proc_state * ns,
-    tw_lp * lp)
-{
+    tw_lp * lp) {
     tw_event *e;
     proc_msg *m;
     tw_stime kickoff_time;
     
     memset(ns, 0, sizeof(*ns));
 
-    num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
-    if(net_id == TORUS) {
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_torus", NULL, 1);
-    }
-    if(net_id == DRAGONFLY) {
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_dragonfly", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, 
-                "dragonfly_router", NULL, 1);
-    }
-
-    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
-
-    total_lps = num_servers + num_nics + num_routers;
-
     //Each server read it's trace
     ns->sim_start = clock();
-    int my_pe_num = lpid_to_pe(lp->gid);
-    //printf("my_pe_num:%d, lp->gid:%d\n", my_pe_num, (int)lp->gid);
+    ns->my_pe_num = lpid_to_pe(lp->gid);
+    ns->my_job = lpid_to_job(lp->gid);
+
+    if(ns->my_pe_num == -1) {
+        return;
+    }
+
     ns->my_pe = newPE();
-    ns->trace_reader = newTraceReader();
+    ns->trace_reader = newTraceReader(jobs[ns->my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
     long long unsigned int startTime=0;
     TraceReader_loadTraceSummary(ns->trace_reader);
-    TraceReader_setOffsets(ns->trace_reader, &offsets);
+    TraceReader_setOffsets(ns->trace_reader, &(jobs[ns->my_job].offsets));
 
-    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth, ns->my_pe, my_pe_num, &startTime);
-    //Check if codes config file does not match the traces
-    if(num_servers != TraceReader_totalWorkerProcs(ns->trace_reader)){
-        printf("ERROR: BigSim traces do not match the codes config file..\n");
-        printf("ERROR: %d != %d..\n", num_servers, TraceReader_totalWorkerProcs(ns->trace_reader));
-        MPI_Finalize();
-	return;
-    }
+    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth,
+                         ns->my_pe, ns->my_pe_num,  ns->my_job, &startTime);
 
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
-    //printf("\n Initializing servers %d. kickoff_time: %f \n", (int)lp->gid, kickoff_time);
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
     m = tw_event_data(e);
@@ -401,12 +488,13 @@ static void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
 {
+    if(ns->my_pe_num == -1) return;
+
     ns->end_ts = tw_now(lp);
     if(lpid_to_pe(lp->gid) == 0)
-        printf("PE%d: FINALIZE in %f seconds.\n", lpid_to_pe(lp->gid), ns_to_s(ns->end_ts-ns->start_ts));
+        printf("PE%d: FINALIZE in %f seconds.\n", lpid_to_pe(lp->gid),
+            ns_to_s(ns->end_ts-ns->start_ts));
     PE_printStat(ns->my_pe);
-    //printf("server %llu recvd %d bytes in %f seconds, %f MiB/s sent_count %d recvd_count %d local_count %d \n", (unsigned long long)lp->gid, PAYLOAD_SZ*ns->msg_recvd_count, ns_to_s(ns->end_ts-ns->start_ts), 
-   //     ((double)(PAYLOAD_SZ*NUM_REQS)/(double)(1024*1024)/ns_to_s(ns->end_ts-ns->start_ts)), ns->msg_sent_count, ns->msg_recvd_count, ns->local_recvd_count);
     return;
 }
 
@@ -434,42 +522,34 @@ static void handle_kickoff_event(
     ns->start_ts = tw_now(lp);
 
     int my_pe_num = lpid_to_pe(lp->gid);
+    int my_job = lpid_to_job(lp->gid);
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
-    if(my_pe_num == 0) {
+    if(my_pe_num == 0 && my_job == 0) {
         printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
-        "TASK: %d, TIME TILL NOW=%f s\n", lpid_to_pe(lp->gid), (int)lp->gid,
+        "TASK: %d, TIME TILL NOW=%f s\n", my_pe_num, (int)lp->gid,
         PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
         (double)time_till_now);
     }
 
     //Safety check if the pe_to_lpid converter is correct
-    assert(pe_to_lpid(my_pe_num) == lp->gid);
-    //Safety check if the lpid_to_pe converter is correct
-    assert(lpid_to_pe(lp->gid) == my_pe_num);
+    assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
 
-    // printf("\t\tpe_to_lpid(my_pe_num):%d, lp->gid:%d .....\n", pe_to_lpid(my_pe_num), lp->gid);
-
-    //if(my_pe_num == 0){
-        //Execute the first task
-        exec_task(ns, PE_getFirstTask(ns->my_pe), 1, lp);
-    //}
+    exec_task(ns, PE_getFirstTask(ns->my_pe), 1, lp);
 }
+
 static void handle_local_event(
 		proc_state * ns,
 		tw_bf * b,
 		proc_msg * m,
 		tw_lp * lp)
-{
-    //ns->local_recvd_count++;
-}
+{ }
+
 static void handle_local_rev_event(
 	       proc_state * ns,
 	       tw_bf * b,
 	       proc_msg * m,
 	       tw_lp * lp)
-{
-   //ns->local_recvd_count--;
-}
+{ }
 
 /* reverse handler for kickoff */
 static void handle_kickoff_rev_event(
@@ -483,9 +563,9 @@ static void handle_kickoff_rev_event(
     printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", lpid_to_pe(lp->gid), now);
 #endif
     PE_set_busy(ns->my_pe, false);
-    undone_task(ns, 0, lp);
+    undone_task(ns, PE_getFirstTask(ns->my_pe), lp);
     ns->msg_sent_count--;
-    ns->current_task = 0;
+    ns->current_task = PE_getFirstTask(ns->my_pe);
     model_net_event_rc(net_id, lp, m->msg_id.size);
     return;
 }
@@ -499,7 +579,9 @@ static void handle_recv_event(
     int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: handle_recv_event - received from %d id: %d for task: %d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id, task_id, now);
+    printf("PE%d: handle_recv_event - received from %d id: %d for task: "
+        "%d. TIME now:%f.\n", lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id,
+        task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
 
@@ -741,13 +823,12 @@ static unsigned long long exec_task(
                 destPE++;
                 if(i == thread) continue;
                 delay += copyTime;
-                if(pe_to_lpid(destPE) == lp->gid){
-                    //printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
+                if(destPE == ns->my_pe_num) {
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE), sendOffset+delay, lp);
+                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
                 }
               }
             } else if(node != -100-myNode && node <= -100) {
@@ -756,25 +837,23 @@ static unsigned long long exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                if(pe_to_lpid(destPE) == lp->gid){
-                    //printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
+                if(destPE == ns->my_pe_num){
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE), sendOffset+delay, lp);
+                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
                 }
               }
             } else if(thread >= 0) {
               int destPE = myNode*nWth + thread;
               delay += copyTime;
-              if(pe_to_lpid(destPE) == lp->gid){
-                  //printf("\t\t\t\t[PE:%d] Intra Sending message to pe: %d\n", myNode, destPE);
+              if(destPE == ns->my_pe_num){
                   exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
               }else{
               send_msg(ns, MsgEntry_getSize(taskEntry),
                   MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
-                      pe_to_lpid(destPE), sendOffset+delay, lp);
+                      pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
               }
             } else if(thread==-1) { // broadcast to all work cores
               int destPE = myNode*nWth - 1;
@@ -782,13 +861,12 @@ static unsigned long long exec_task(
               {
                 destPE++;
                 delay += copyTime;
-                if(pe_to_lpid(destPE) == lp->gid){
-                    //printf("\t\t\t\t[PE:%d] Intra Sending message to lp: %d\n", myNode, destPE);
+                if(destPE == ns->my_pe_num){
                     exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
                 }else{
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE), sendOffset+delay, lp);
+                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
                 }
               }
             }
@@ -796,42 +874,37 @@ static unsigned long long exec_task(
           
           if(node != myNode)
           {
-                //printf("\t\t\t\[PE:%d] Sending message to node: %d\n", myNode, node);
-                //bool bcast = (thread == -1);
                 if(node >= 0){
                     send_msg(ns, MsgEntry_getSize(taskEntry), 
                         MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                            pe_to_lpid(node), sendOffset+delay, lp);
+                            pe_to_lpid(node, ns->my_job), sendOffset+delay, lp);
                 }
                 else if(node == -1){
-                    for(int j=0; j<num_servers; j++){
+                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
                         if(j == myNode) continue;
                         delay += copyTime;
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j), sendOffset+delay, lp);
+                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
                     }
                 }
                 else if(node <= -100 && thread == -1){
-                    for(int j=0; j<num_servers; j++){
+                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
                         if(j == -node-100 || j == myNode) continue;
                         delay += copyTime;
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j), sendOffset+delay, lp);
+                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
                     }
 
                 }
                 else if(node <= -100){
-                    //printf("\t\t\t\[PE:%d] BROADCAST, thread: %d\n", myNode, thread);
-                    for(int j=0; j<num_servers; j++){
+                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
                         if(j == myNode) continue;
                         delay += copyTime;
-                        //if(j == -node-100 && thread != 0) {
                         send_msg(ns, MsgEntry_getSize(taskEntry), 
                              MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j), sendOffset+delay, lp);
-                        //}
+                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
                     }
                 }
                 else{
@@ -919,7 +992,7 @@ static int exec_comp(
     e = codes_event_new(lp->gid, sendOffset + g_tw_lookahead, lp);
     m = (proc_msg*)tw_event_data(e);
     m->msg_id.size = 0;
-    m->msg_id.pe = lpid_to_pe(lp->gid);
+    m->msg_id.pe = ns->my_pe_num;
     m->msg_id.id = task_id;
     if(recv) {
 #if DEBUG_PRINT
@@ -937,13 +1010,25 @@ static int exec_comp(
 
 //Utility function to convert pe number to tw_lpid number
 //Assuming the servers come first in lp registration in terms of global id
-static inline int pe_to_lpid(int pe){
-    return (pe / num_servers_per_rep) * lps_per_rep + (pe % num_servers_per_rep);
+static inline int pe_to_lpid(int pe, int job){
+    int server_num = jobs[job].rankMap[pe];
+    return (server_num / num_servers_per_rep) * lps_per_rep +
+            (server_num % num_servers_per_rep);
 }
 
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come first in lp registration in terms of global id
 static inline int lpid_to_pe(int lp_gid){
-    return ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) + (lp_gid % lps_per_rep);
+    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
+                      (lp_gid % lps_per_rep);
+    return global_rank[server_num].mapsTo;
+}
+static inline int lpid_to_job(int lp_gid){
+    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
+                      (lp_gid % lps_per_rep);
+    return global_rank[server_num].jobID;;
+}
+static inline int pe_to_job(int pe){
+    return global_rank[pe].jobID;;
 }
 
