@@ -234,12 +234,16 @@ int main(int argc, char **argv)
     
     num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
             NULL, 1);
-    num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0, "modelnet_torus", 
-            NULL, 1);
+    if(net_id == TORUS) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0, "modelnet_torus",
+                NULL, 1);
+    }
     if(net_id == DRAGONFLY)
     {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_dragonfly", NULL, 1);
         num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, 
-            "dragonfly_router", NULL, 1); 
+                "dragonfly_router", NULL, 1);
     }
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
@@ -292,11 +296,15 @@ static void proc_init(
     memset(ns, 0, sizeof(*ns));
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, "server", NULL, 1);
-    num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-            "modelnet_torus", NULL, 1);
+    if(net_id == TORUS) {
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_torus", NULL, 1);
+    }
     if(net_id == DRAGONFLY) {
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly", NULL, 1);
         num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1, 
-            "dragonfly_router", NULL, 1);
+                "dragonfly_router", NULL, 1);
     }
 
     lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
