@@ -18,6 +18,7 @@
 #include "model-net.h"
 #include "model-net-sched.h"
 #include "net/dragonfly.h"
+#include "net/fattree.h"
 #include "net/loggp.h"
 #include "net/simplenet-upd.h"
 #include "net/simplewan.h"
@@ -113,6 +114,7 @@ typedef struct model_net_wrap_msg {
     union {
         model_net_base_msg m_base;  // base lp
         terminal_message   m_dfly;  // dragonfly
+        fattree_message    m_fattree;  // fattree
         loggp_message      m_loggp; // loggp
         sn_message         m_snet;  // simplenet
         sw_message         m_swan;  // simplewan

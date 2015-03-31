@@ -22,6 +22,7 @@ extern struct model_net_method simplewan_method;
 extern struct model_net_method torus_method;
 extern struct model_net_method dragonfly_method;
 extern struct model_net_method loggp_method;
+extern struct model_net_method fattree_method;
 
 #define X(a,b,c,d) b,
 char * model_net_lp_config_names[] = {

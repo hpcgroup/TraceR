@@ -48,6 +48,7 @@ typedef struct mn_stats mn_stats;
     X(TORUS,     "modelnet_torus",     "torus",     &torus_method)\
     X(DRAGONFLY, "modelnet_dragonfly", "dragonfly", &dragonfly_method)\
     X(LOGGP,     "modelnet_loggp",     "loggp",     &loggp_method)\
+    X(FATTREE,   "modelnet_fattree",   "fattree",   &fattree_method)\
     X(MAX_NETS,  NULL,                 NULL,        NULL)
 
 #define X(a,b,c,d) a,

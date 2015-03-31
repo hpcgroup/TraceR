@@ -125,6 +125,10 @@ void model_net_base_register(int *do_config_nets){
                 lp_type_register("dragonfly_router",
                         &method_array[DRAGONFLY]->mn_get_lp_type()[1]);
             }
+            if (i==FATTREE){
+                lp_type_register("fattree_switch",
+                        &method_array[FATTREE]->mn_get_lp_type()[1]);
+            }
         }
     }
 }
@@ -231,6 +235,8 @@ void model_net_base_configure(){
         offsetof(model_net_wrap_msg, msg.m_dfly);
     msg_offsets[LOGGP] =
         offsetof(model_net_wrap_msg, msg.m_loggp);
+    msg_offsets[FATTREE] =
+        offsetof(model_net_wrap_msg, msg.m_fattree);
 
     // perform the configuration(s)
     // This part is tricky, as we basically have to look up all annotations that

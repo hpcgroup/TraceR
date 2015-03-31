@@ -8,9 +8,10 @@ endif
 
 CHARMPATH = /scratch/nikhil/charm-tmp/netlrts-linux-x86_64-bigemulator
 
-CFLAGS = -g -O2
-CXXFLAGS = -g -O2
+CFLAGS = -g
+CXXFLAGS = -g
 LDFLAGS = -g
+OPTS = ${CXXFLAGS}
 
 #ross install directory
 ROSS = /scratch/nikhil/ROSS/install
