@@ -6,9 +6,8 @@
 using namespace std;
 
 int main(int argc, char**argv) {
-  int numRanks = atoi(argv[1]);
-  FILE *binout = fopen(argv[2], "wb");
-  int numJobs = argc - 3;
+  FILE *binout = fopen(argv[1], "wb");
+  int numJobs = argc - 2;
   vector<int> jobSizes;
   vector<FILE*> out_files;
   int numAllocCores = 0;
@@ -16,7 +15,7 @@ int main(int argc, char**argv) {
   jobSizes.resize(numJobs);
   out_files.resize(numJobs);
   for(int i = 0; i < numJobs; i++) { 
-    jobSizes[i] = atoi(argv[i+3]);
+    jobSizes[i] = atoi(argv[i+2]);
     numAllocCores += jobSizes[i];
     char dFILE[256];
     sprintf(dFILE, "%s%d", "job", i);

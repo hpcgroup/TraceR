@@ -1,0 +1,16 @@
+To compile - make
+
+To run - 
+./genMapping <global_map_file> <ranks in each job>
+
+Output - 
+<global_map_file> in binary format
+job{0,1..} files in binary format
+
+Example:
+./genMapping global.bin 32 32 64
+
+generates global.bin with 128 ranks, where first 32 are mapped to job0, next 32
+to job1, and last 64 to job2.
+Also generates job0, job1, job2 that maps ranks from these jobs to global ranks.
+
