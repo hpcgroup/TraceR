@@ -15,7 +15,7 @@
 #include <stdbool.h>
 #include <time.h>
 
-#include "codes/codes/model-net.h"
+#include "codes/model-net.h"
 #include "codes/lp-io.h"
 #include "codes/codes.h"
 #include "codes/codes_mapping.h"

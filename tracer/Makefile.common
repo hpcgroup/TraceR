@@ -6,7 +6,7 @@ CC = mpicc -std=gnu99
 CXX = mpicxx
 endif
 
-CHARMPATH = /scratch/nikhil/charm-tmp/netlrts-linux-x86_64-bigemulator
+CHARMPATH = /scratch/nikhil/charm-master/netlrts-linux-x86_64-bigemulator
 
 CFLAGS = -g
 CXXFLAGS = -g
@@ -16,7 +16,7 @@ OPTS = ${CXXFLAGS}
 #ross install directory
 ROSS = /scratch/nikhil/ROSS/install
 #base directory of this code
-BASE_DIR = /scratch/nikhil/tracer
+BASE_DIR = /scratch/nikhil
 CODES_BASE = ${BASE_DIR}/codes-base
 CODES_NET = ${BASE_DIR}/codes-net
 CODES_BASE_LIBS = -L${CODES_NET}/install/lib
