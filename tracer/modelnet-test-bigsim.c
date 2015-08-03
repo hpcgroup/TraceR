@@ -50,6 +50,7 @@ typedef struct CoreInf {
 
 CoreInf *global_rank;
 JobInf *jobs;
+tw_stime *jobTimes;
 int num_jobs = 0;
 
 #define DEBUG_PRINT 0
@@ -85,6 +86,7 @@ struct proc_msg
     int fwd_dep_count;
     MsgID msg_id;
     bool incremented_flag; /* helper for reverse computation */
+    tw_stime saved_ts;
 };
 
 static void proc_init(
@@ -332,6 +334,7 @@ int main(int argc, char **argv)
 
     fscanf(jobIn, "%d", &num_jobs);
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
+    jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
 
     for(int i = 0; i < num_jobs; i++) {
         char tempTrace[200];
@@ -341,6 +344,7 @@ int main(int argc, char **argv)
         fscanf(jobIn, "%d", &jobs[i].numRanks);
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
+        jobTimes[i] = 0;
     }
 
     //Load all summaries on proc 0 and bcast
@@ -385,7 +389,17 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    tw_stime* jobTimesMax = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    MPI_Reduce(jobTimes, jobTimesMax, num_jobs, MPI_DOUBLE, MPI_MAX, 0,
+    MPI_COMM_WORLD);
+
+    if(rank == 0) {
+        for(int i = 0; i < num_jobs; i++) {
+            printf("Job %d Time %f s\n", i, ns_to_s(jobTimesMax[i]));
+        }
+    }
     tw_end();
+
     return 0;
 }
 
@@ -429,6 +443,7 @@ static void proc_init(
 
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
+    ns->end_ts = 0;
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
     m = tw_event_data(e);
@@ -444,7 +459,9 @@ static void proc_event(
     proc_msg * m,
     tw_lp * lp)
 {
-   switch (m->proc_event_type)
+    m->saved_ts = ns->end_ts;
+    ns->end_ts = tw_now(lp);
+    switch (m->proc_event_type)
     {
         case KICKOFF:
             handle_kickoff_event(ns, b, m, lp);
@@ -471,6 +488,7 @@ static void proc_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
+    ns->end_ts = m->saved_ts;
     switch (m->proc_event_type)
     {
         case KICKOFF:
@@ -498,11 +516,18 @@ static void proc_finalize(
 {
     if(ns->my_pe_num == -1) return;
 
-    ns->end_ts = tw_now(lp);
+    tw_stime jobTime = ns->end_ts-ns->start_ts;
+
     if(lpid_to_pe(lp->gid) == 0)
-        printf("PE%d: FINALIZE in %f seconds.\n", lpid_to_pe(lp->gid),
-            ns_to_s(ns->end_ts-ns->start_ts));
+        printf("Job[%d]PE[%d]: FINALIZE in %f (tw_now %f) seconds.\n", ns->my_job,
+          ns->my_pe_num, ns_to_s(jobTime), ns_to_s(tw_now(lp)-ns->start_ts));
+
     PE_printStat(ns->my_pe);
+
+    if(jobTime > jobTimes[ns->my_job]) {
+        jobTimes[ns->my_job] = jobTime;
+    }
+
     return;
 }
 
