@@ -16,21 +16,21 @@ CODES_BASE_CFLAGS = -D_GNU_SOURCE -g $(ARCH_FLAGS) -DROSS_OPTION_LIST= \
 
 CODES_NET_CFLAGS = -I${CODES_NET}/install/include
 
-modelnet_test_bigsim_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o \
+TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o
 
-modelnet_test_bigsim_LDADD += ${CODES_BASE_LIBS} ${CHARM_LIBS}
+TRACER_LDADD += ${CODES_BASE_LIBS} ${CHARM_LIBS}
 
-modelnet_test_bigsim_CFLAGS = ${CODES_NET_CFLAGS} ${CODES_BASE_CFLAGS}
+TRACER_CFLAGS = ${CODES_NET_CFLAGS} ${CODES_BASE_CFLAGS}
 
 all: traceR
 .PHONY: components
 
-traceR: modelnet_test_bigsim.o components
-	$(CXX) ${LDFLAGS} $< -o $@ ${modelnet_test_bigsim_LDADD}
+traceR: bigsim-driver.o components
+	$(CXX) ${LDFLAGS} $< -o $@ ${TRACER_LDADD}
 
-modelnet_test_bigsim.o: modelnet-test-bigsim.c
-	$(CC) $(CFLAGS) -Ibigsim $(modelnet_test_bigsim_CFLAGS) -c $< -o $@
+bigsim-driver.o: bigsim-driver.c
+	$(CC) $(CFLAGS) -Ibigsim $(TRACER_CFLAGS) -c $< -o $@
 
 components:
 	cd bigsim; make;

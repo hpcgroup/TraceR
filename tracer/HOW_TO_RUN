@@ -13,4 +13,4 @@ For generating simple global and job map file, use the code in utils.
 
 Example files are in jacobi2d. Sample run command:
 
-mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/modelnet-test-torus.conf tracer_config
+mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/tracer-torus.conf tracer_config
