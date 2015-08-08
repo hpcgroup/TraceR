@@ -382,7 +382,7 @@ int main(int argc, char **argv)
     }
 
     tw_run();
-    model_net_report_stats(net_id);
+    //model_net_report_stats(net_id);
 
     if(lp_io_flush(handle, MPI_COMM_WORLD) < 0)
     {
@@ -659,7 +659,8 @@ static void handle_recv_event(
         }
         return;
     }
-    //printf("PE%d: Going beyond hash look up on receiving a message\n", lpid_to_pe(lp->gid));
+    printf("PE%d: Going beyond hash look up on receiving a message %d:%d\n",
+      lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id);
     assert(0);
 }
 
@@ -749,8 +750,9 @@ static void handle_recv_rev_event(
     PE_invertMsgPe(ns->my_pe, task_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d.
-    wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msg_id.id, task_id, wasBusy, now);
+    printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d."
+    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msg_id.id, task_id,
+    wasBusy, now);
 #endif
 
     if(!wasBusy){
@@ -832,8 +834,8 @@ static unsigned long long exec_task(
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: exec_task task_id: %d, num entries: %d, EXEC_TIME: %llu. TIME
-    now:%f \n", ns->my_pe_num, task_id, msgEntCount, *execTime, now);
+    printf("PE%d: exec_task task_id: %d, num entries: %d, EXEC_TIME: %llu. TIME"
+    " now:%f \n", ns->my_pe_num, task_id, msgEntCount, *execTime, now);
 #endif
 
     int myPE = ns->my_pe_num;
@@ -948,7 +950,9 @@ static unsigned long long exec_task(
                     printf("message not supported yet! node:%d thread:%d\n",node,thread);
                 }
           }
-   }
+    }
+
+    PE_execPrintEvt(lp, ns->my_pe, task_id, tw_now(lp));
 
     //Complete the task
     if(*execTime == 0)

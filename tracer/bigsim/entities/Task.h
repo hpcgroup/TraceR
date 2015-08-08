@@ -8,6 +8,7 @@
 #include "MsgEntry.h"
 #include <cstdlib>
 #include <cstdio>
+#include <ross.h>
 
 class MsgEntry;
 #include <cstring>
@@ -15,23 +16,12 @@ class MsgEntry;
 
 class BgPrint{
   public:
-    void print(unsigned long long startTime, int PEno)
+    void print(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo)
     {
-      printf("[%d, %s] ",PEno, taskName);
-      int i=0;
-      while(msg[i])
-      {
-        if(msg[i]=='%' && msg[i+1]=='f')
-        {
-          printf("%f", startTime/((double)TIME_MULT)+time);
-          i+=2;
-        }
-        else
-        {
-          printf("%c",msg[i]);
-          i++;
-        }
-      }
+      char str[1000];
+      strcpy(str, "[%d %d : %s] ");
+      strcat(str, msg);
+      tw_output(lp, str, jobNo, PEno, taskName, startTime/((double)TIME_MULT)+time);
     }
     char* msg;
     double time;
@@ -50,7 +40,7 @@ class Task {
   public:
     Task();
     ~Task();
-    unsigned long long exec(unsigned long long startTime, int PEno);
+    void printEvt(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo);
     MsgID myMsgId;
     bool done;
     short charmEP;

@@ -16,19 +16,11 @@ Task::Task() {
   execTime = -1;
 }
 
-unsigned long long Task::exec(unsigned long long startTime, int PEno)
+void Task::printEvt(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo)
 {
-  if(msgEntCount != 0 && bgPrintCount != 0) {
-    printf("BgPrint and sendMsg");
+  for(int i = 0; i < bgPrintCount; i++) {
+    myBgPrints[i].print(lp, startTime, PEno, jobNo);
   }
-  for(int i = 0; i < msgEntCount; i++)
-  {
-    myEntries[i].sendMsg(startTime);
-  }
-  for(int i = 0; i < bgPrintCount; i++){
-    myBgPrints[i].print(startTime, PEno);
-  }
-  return execTime;
 }
 
 Task::~Task()

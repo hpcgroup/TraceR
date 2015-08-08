@@ -13,6 +13,8 @@
  *
  */
 
+ #include <ross.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -46,6 +48,7 @@ unsigned long long PE_getTaskExecTime(PE* p, int tInd);
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
+void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, unsigned long long stime);
 void PE_set_taskDone(PE* p, int tInd, bool b);
 bool PE_get_taskDone(PE* p, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);

@@ -33,12 +33,16 @@ extern "C" {
     unsigned long long PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
     MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
-        //printf("p->myTasks[tInd].myEntries[0]:%d\n", p->myTasks[tInd].myEntries[0].msgId.pe);
         return &(p->myTasks[tInd].myEntries);
     }
     MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd){
         return &(p->myTasks[tInd].myEntries[mInd]);
     }
+
+    void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, unsigned long long stime) {
+        p->myTasks[tInd].printEvt(lp, stime, p->myNum, p->jobNum);
+    }
+
     int PE_getFirstTask(PE* p){ return p->firstTask;}
     void PE_set_taskDone(PE* p, int tInd, bool b){p->myTasks[tInd].done=b;}
     bool PE_get_taskDone(PE* p, int tInd){return p->myTasks[tInd].done;}
