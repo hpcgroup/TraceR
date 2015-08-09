@@ -37,6 +37,8 @@ CODES_BASE_CFLAGS = -D_GNU_SOURCE -g $(ARCH_FLAGS) -DROSS_OPTION_LIST= \
 -DROSS_NETWORK_mpi -DROSS_GVT_mpi_allreduce -DARCH_x86_64 \
 -I${CODES_BASE}/install/include -I${ROSS}/include
 
+CODES_NET_CFLAGS = -I${CODES_NET}/install/include
+
 CFLAGS = -g
 CXXFLAGS = -g
 LDFLAGS = -g

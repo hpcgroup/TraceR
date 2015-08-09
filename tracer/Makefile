@@ -1,7 +1,5 @@
 include Makefile.common
 
-CODES_NET_CFLAGS = -I${CODES_NET}/install/include
-
 TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o
 
