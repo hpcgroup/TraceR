@@ -1011,6 +1011,8 @@ static int send_msg(
         //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
         model_net_event(net_id, "test", dest_id, size, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
+        free(m_local);
+        free(m_remote);
     
     return 0;
 }
