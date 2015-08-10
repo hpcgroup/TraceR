@@ -528,6 +528,7 @@ static void proc_rev_event(
             break;
         case BCAST:
             handle_bcast_rev_event(ns, b, m, lp);
+            break;
         case EXEC_COMP:
             handle_exec_rev_event(ns, b, m, lp);
             break;
