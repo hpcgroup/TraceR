@@ -550,8 +550,6 @@ static void handle_kickoff_event(
     proc_msg * m,
     tw_lp* lp)
 {
-    //printf("handle_kickoff_event, lp_gid: %d -- ", (int)lp->gid);
-    //record when transfers started on this server
     ns->start_ts = tw_now(lp);
 
     int my_pe_num = ns->my_pe_num;
@@ -724,15 +722,8 @@ static void undone_task(
             undone_task(ns, fwd_deps[i], lp);
         }
     }
-
-    //Update the currentTask, if this event's task_id is smaller than the currentTask
-    //else there is no need to update, currentTask is already behind
-    /*
-    int currentTask = PE_get_currentTask(ns->my_pe);
-    if(currentTask > task_id)
-        PE_set_currentTask(ns->my_pe, task_id);
-    */
 }
+
 static void handle_recv_rev_event(
 		proc_state * ns,
 		tw_bf * b,
@@ -849,7 +840,6 @@ static unsigned long long exec_task(
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
         unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
-        //printf("\tENTRY node:%d, thread:%d\n", node, thread);
         
         //If there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
@@ -984,31 +974,12 @@ static int send_msg(
 
         memcpy(m_remote, m_local, sizeof(proc_msg));
         m_remote->proc_event_type = RECV_MSG;
-        /* send the message */
         /*   model_net_event params:
-             int net_id,
-             char* category,
-             tw_lpid final_dest_lp,
-             uint64_t message_size,
-             tw_stime offset,
-             int remote_event_size,
-             const void* remote_event,
-             int self_event_size,
-             const void* self_event,
-             tw_lp *sender
-        */
+             int net_id, char* category, tw_lpid final_dest_lp,
+             uint64_t message_size, tw_stime offset, int remote_event_size,
+             const void* remote_event, int self_event_size,
+             const void* self_event, tw_lp *sender */
 
-        /*
-        int payload = size;
-        int chunk_size = 0;
-        //calculate the message payload by rounding the size with the chunk size
-        if(size <= chunk_size )
-            payload = chunk_size;
-        else
-            payload = size + chunk_size - size%chunk_size;
-        */
-
-        //printf("\t...sending message from %d to %d, size: %d, id:%d with offset: %llu \n", lpid_to_pe(lp->gid), lpid_to_pe(dest_id), size, m_local->msg_id.id, sendOffset);
         model_net_event(net_id, "test", dest_id, size, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
         ns->msg_sent_count++;
         free(m_local);
@@ -1023,11 +994,6 @@ static int exec_comp(
     int recv,
     tw_lp * lp)
 {
-    /*
-    if(recv)
-        printf("\tPE:%d Sending and RECV_MSG event to myself for msg id: %d\n", lpid_to_pe(lp->gid), task_id);
-    else printf("\tPE:%d Sending and EXEC_COMP event to myself for task: %d\n", lpid_to_pe(lp->gid), task_id);
-    */
     //If it's a self event use codes_event_new instead of model_net_event 
     tw_event *e;
     proc_msg *m;
