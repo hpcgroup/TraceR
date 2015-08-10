@@ -963,26 +963,23 @@ static int send_msg(
         int dest_id,
         unsigned long long sendOffset,
         tw_lp * lp) {
-        proc_msg* m_local = malloc(sizeof(proc_msg));
         proc_msg* m_remote = malloc(sizeof(proc_msg));
 
-        m_local->proc_event_type = LOCAL;
-        m_local->src = lp->gid;
-        m_local->msg_id.size = size;
-        m_local->msg_id.pe = src_pe;
-        m_local->msg_id.id = id;
-
-        memcpy(m_remote, m_local, sizeof(proc_msg));
         m_remote->proc_event_type = RECV_MSG;
+        m_remote->src = lp->gid;
+        m_remote->msg_id.size = size;
+        m_remote->msg_id.pe = src_pe;
+        m_remote->msg_id.id = id;
+
         /*   model_net_event params:
              int net_id, char* category, tw_lpid final_dest_lp,
              uint64_t message_size, tw_stime offset, int remote_event_size,
              const void* remote_event, int self_event_size,
              const void* self_event, tw_lp *sender */
 
-        model_net_event(net_id, "test", dest_id, size, sendOffset,  sizeof(proc_msg), (const void*)m_remote, sizeof(proc_msg), (const void*)m_local, lp);
+        model_net_event(net_id, "test", dest_id, size, sendOffset,
+          sizeof(proc_msg), (const void*)m_remote, 0, NULL, lp);
         ns->msg_sent_count++;
-        free(m_local);
         free(m_remote);
     
     return 0;
