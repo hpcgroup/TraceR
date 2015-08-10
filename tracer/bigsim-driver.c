@@ -53,6 +53,7 @@ JobInf *jobs;
 tw_stime *jobTimes;
 int num_jobs = 0;
 
+#define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
 
 /* types of events that will constitute triton requests */
@@ -61,6 +62,7 @@ enum proc_event
     KICKOFF,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
+    BCAST,      /* broadcast */
     EXEC_COMP   /* bigsim, when completed an execution */
 };
 
@@ -73,7 +75,6 @@ struct proc_state
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     TraceReader* trace_reader; /* for reading the bigsim traces */
-    int current_task;
     clock_t sim_start;
     int my_pe_num, my_job;
 };
@@ -87,6 +88,7 @@ struct proc_msg
     MsgID msg_id;
     bool incremented_flag; /* helper for reverse computation */
     tw_stime saved_ts;
+    int model_net_calls;
 };
 
 static void proc_init(
@@ -137,6 +139,11 @@ static void handle_recv_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_bcast_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 static void handle_exec_event(
     proc_state * ns,
     tw_bf * b,
@@ -159,6 +166,11 @@ static void handle_recv_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+static void handle_bcast_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void handle_exec_rev_event(
     proc_state * ns,
     tw_bf * b,
@@ -171,17 +183,17 @@ const tw_optdef app_opt [] =
     TWOPT_END()
 };
 
-//helper function declarations
-static void undone_task(
-    proc_state * ns,
-    int task_id,
-    tw_lp * lp);
-
 static unsigned long long exec_task(
     proc_state * ns,
     int task_id,
-    int flag,
-    tw_lp * lp);
+    tw_lp * lp,
+    proc_msg *m);
+
+static void exec_task_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m);
 
 static int send_msg(
     proc_state * ns,
@@ -190,7 +202,18 @@ static int send_msg(
     int id,
     int dest_id,
     unsigned long long timeOffset,
+    enum proc_event evt_type,
     tw_lp * lp);
+
+static int bcast_msg(
+    proc_state * ns,
+    int size,
+    int src_pe,
+    int id,
+    unsigned long long timeOffset,
+    unsigned long long copyTime,
+    tw_lp * lp,
+    proc_msg *m);
 
 static int exec_comp(
     proc_state * ns,
@@ -472,6 +495,9 @@ static void proc_event(
         case RECV_MSG:
             handle_recv_event(ns, b, m, lp);
             break;
+        case BCAST:
+            handle_bcast_event(ns, b, m, lp);
+            break;
         case EXEC_COMP:
             handle_exec_event(ns, b, m, lp);
             break;
@@ -500,6 +526,8 @@ static void proc_rev_event(
         case RECV_MSG:
             handle_recv_rev_event(ns, b, m, lp);
             break;
+        case BCAST:
+            handle_bcast_rev_event(ns, b, m, lp);
         case EXEC_COMP:
             handle_exec_rev_event(ns, b, m, lp);
             break;
@@ -516,7 +544,7 @@ static void proc_finalize(
 {
     if(ns->my_pe_num == -1) return;
 
-    tw_stime jobTime = ns->end_ts-ns->start_ts;
+    tw_stime jobTime = ns->end_ts - ns->start_ts;
 
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f (tw_now %f) seconds.\n", ns->my_job,
@@ -565,7 +593,7 @@ static void handle_kickoff_event(
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
 
-    exec_task(ns, PE_getFirstTask(ns->my_pe), 1, lp);
+    exec_task(ns, PE_getFirstTask(ns->my_pe), lp, m);
 }
 
 static void handle_local_event(
@@ -594,10 +622,7 @@ static void handle_kickoff_rev_event(
     printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", ns->my_pe_num, now);
 #endif
     PE_set_busy(ns->my_pe, false);
-    undone_task(ns, PE_getFirstTask(ns->my_pe), lp);
-    ns->msg_sent_count--;
-    ns->current_task = PE_getFirstTask(ns->my_pe);
-    model_net_event_rc(net_id, lp, m->msg_id.size);
+    exec_task_rev(ns, PE_getFirstTask(ns->my_pe), lp, m);
     return;
 }
 
@@ -652,7 +677,7 @@ static void handle_recv_event(
                 m->fwd_dep_count = 0;
             }
             if(buffd_task != -1){
-                exec_task(ns, buffd_task, 1, lp);
+                exec_task(ns, buffd_task, lp, m);
             }
         }
         return;
@@ -660,6 +685,24 @@ static void handle_recv_event(
     printf("PE%d: Going beyond hash look up on receiving a message %d:%d\n",
       lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id);
     assert(0);
+}
+
+static void handle_bcast_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp) {
+
+  unsigned long long soft_latency = codes_local_latency(lp);
+  m->model_net_calls = 0;
+  int num_sends = bcast_msg(ns, m->msg_id.size, m->msg_id.pe, m->msg_id.id,
+      0, soft_latency, lp, m);
+
+  tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency, lp);
+  proc_msg * msg = (proc_msg*)tw_event_data(e);
+  memcpy(&msg->msg_id, &m->msg_id, sizeof(m->msg_id));
+  msg->proc_event_type = RECV_MSG;
+  tw_event_send(e);
 }
 
 static void handle_exec_event(
@@ -697,30 +740,7 @@ static void handle_exec_event(
         m->executed_task = buffd_task;
     }
     if(buffd_task != -1){
-        exec_task(ns, buffd_task, 1, lp); //we don't care about the return value?
-    }
-}
-
-static void undone_task(
-            proc_state * ns,
-            int task_id,
-            tw_lp * lp)
-{
-    //Mark the task as not done
-#if DEBUG_PRINT
-    printf("Undo task_id: %d\n", task_id);
-#endif
-    PE_set_taskDone(ns->my_pe, task_id, false);
-
-    //Deal with the forward dependencies of the task
-    int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
-    int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
-    for(int i=0; i<fwd_dep_size; i++){
-        //if the forward dependency of the task is done
-        if(PE_get_taskDone(ns->my_pe, fwd_deps[i])){
-            //Recursively mark the forward depencies as not done
-            undone_task(ns, fwd_deps[i], lp);
-        }
+        exec_task(ns, buffd_task, lp, m); //we don't care about the return value?
     }
 }
 
@@ -731,7 +751,6 @@ static void handle_recv_rev_event(
 		tw_lp * lp)
 {
     if(m->executed_task == -2) {
-        model_net_event_rc(net_id, lp, m->msg_id.size);
         return;
     }
     bool wasBusy = m->incremented_flag;
@@ -752,14 +771,28 @@ static void handle_recv_rev_event(
             PE_addToFrontBuffer(ns->my_pe, m->executed_task);    
             PE_removeFromBuffer(ns->my_pe, task_id);
         }
+        if(m->executed_task != -1) {
+          exec_task_rev(ns, m->executed_task, lp, m);
+        }
     }
     else{
         assert(m->executed_task == -1);
         PE_removeFromBuffer(ns->my_pe, task_id);
     }
-
-    model_net_event_rc(net_id, lp, m->msg_id.size);
 }
+
+static void handle_bcast_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    model_net_event_rc(net_id, lp, 0);
+  }
+}
+
 static void handle_exec_rev_event(
 		proc_state * ns,
 		tw_bf * b,
@@ -779,12 +812,16 @@ static void handle_exec_rev_event(
     //mark the task as not done
     PE_set_taskDone(ns->my_pe, task_id, false);
     
-    if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe))
+    if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
         PE_clearMsgBuffer(ns->my_pe);
-    else{
+    } else {
         PE_resizeBuffer(ns->my_pe, m->fwd_dep_count);
-        if(m->executed_task != -1)
+        if(m->executed_task != -1) {
             PE_addToFrontBuffer(ns->my_pe, m->executed_task);
+        }
+    }
+    if(m->executed_task != -1) {
+      exec_task_rev(ns, m->executed_task, lp, m);
     }
 }
 
@@ -792,8 +829,8 @@ static void handle_exec_rev_event(
 static unsigned long long exec_task(
             proc_state * ns,
             int task_id,
-            int flag,   //determines if the completion event will be sent
-            tw_lp * lp)
+            tw_lp * lp,
+            proc_msg *m)
 {
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
@@ -813,6 +850,7 @@ static unsigned long long exec_task(
         //printf("PE:%d Task msg dep is not satisfied: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
     }
 
+    m->model_net_calls = 0;
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
 
@@ -832,7 +870,8 @@ static unsigned long long exec_task(
     int myPE = ns->my_pe_num;
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
-    unsigned long long copyTime = codes_local_latency(lp); //TODO! 
+    unsigned long long soft_latency = codes_local_latency(lp);
+    unsigned long long copyTime = soft_latency; //TODO: use better value
     unsigned long long delay = 0; //intra node latency
 
     for(int i=0; i<msgEntCount; i++){
@@ -844,115 +883,135 @@ static unsigned long long exec_task(
         //If there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
         {
-            if(node == -100-myNode && thread != -1)
+          if(node == -100-myNode && thread != -1)
+          {
+            int destPE = myNode*nWth - 1;
+            for(int i=0; i<nWth; i++)
             {
-              int destPE = myNode*nWth - 1;
-              for(int i=0; i<nWth; i++)
-              {        
-                destPE++;
-                if(i == thread) continue;
-                delay += copyTime;
-                if(destPE == ns->my_pe_num) {
-                    exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
-                }else{
+              destPE++;
+              if(i == thread) continue;
+              delay += copyTime;
+              if(destPE == ns->my_pe_num) {
+                exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
+              }else{
+                m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
-                }
+                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    lp);
               }
-            } else if(node != -100-myNode && node <= -100) {
-              int destPE = myNode*nWth - 1;
-              for(int i=0; i<nWth; i++)
-              {
-                destPE++;
-                delay += copyTime;
-                if(destPE == ns->my_pe_num){
-                    exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
-                }else{
-                send_msg(ns, MsgEntry_getSize(taskEntry), 
-                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
-                }
-              }
-            } else if(thread >= 0) {
-              int destPE = myNode*nWth + thread;
+            }
+          } else if(node != -100-myNode && node <= -100) {
+            int destPE = myNode*nWth - 1;
+            for(int i=0; i<nWth; i++)
+            {
+              destPE++;
               delay += copyTime;
               if(destPE == ns->my_pe_num){
-                  exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
+                exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
               }else{
-              send_msg(ns, MsgEntry_getSize(taskEntry),
-                  MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
-                      pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
-              }
-            } else if(thread==-1) { // broadcast to all work cores
-              int destPE = myNode*nWth - 1;
-              for(int i=0; i<nWth; i++)
-              {
-                destPE++;
-                delay += copyTime;
-                if(destPE == ns->my_pe_num){
-                    exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
-                }else{
+                m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                        pe_to_lpid(destPE, ns->my_job), sendOffset+delay, lp);
-                }
+                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    lp);
+              }
+            }
+          } else if(thread >= 0) {
+            int destPE = myNode*nWth + thread;
+            delay += copyTime;
+            if(destPE == ns->my_pe_num){
+              exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
+            }else{
+              m->model_net_calls++;
+              send_msg(ns, MsgEntry_getSize(taskEntry),
+                  MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
+                  pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                  lp);
+            }
+          } else if(thread==-1) { // broadcast to all work cores
+            int destPE = myNode*nWth - 1;
+            for(int i=0; i<nWth; i++)
+            {
+              destPE++;
+              delay += copyTime;
+              if(destPE == ns->my_pe_num){
+                exec_comp(ns, MsgEntry_getID(taskEntry), sendOffset+delay, 1, lp);
+              }else{
+                m->model_net_calls++;
+                send_msg(ns, MsgEntry_getSize(taskEntry), 
+                    MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
+                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    lp);
               }
             }
           }
+        }
           
-          if(node != myNode)
-          {
-                if(node >= 0){
-                    send_msg(ns, MsgEntry_getSize(taskEntry), 
-                        MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                            pe_to_lpid(node, ns->my_job), sendOffset+delay, lp);
-                }
-                else if(node == -1){
-                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
-                        if(j == myNode) continue;
-                        delay += copyTime;
-                        send_msg(ns, MsgEntry_getSize(taskEntry), 
-                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
-                    }
-                }
-                else if(node <= -100 && thread == -1){
-                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
-                        if(j == -node-100 || j == myNode) continue;
-                        delay += copyTime;
-                        send_msg(ns, MsgEntry_getSize(taskEntry), 
-                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
-                    }
-
-                }
-                else if(node <= -100){
-                    for(int j=0; j<jobs[ns->my_job].numRanks; j++){
-                        if(j == myNode) continue;
-                        delay += copyTime;
-                        send_msg(ns, MsgEntry_getSize(taskEntry), 
-                             MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry), 
-                                pe_to_lpid(j, ns->my_job), sendOffset+delay, lp);
-                    }
-                }
-                else{
-                    printf("message not supported yet! node:%d thread:%d\n",node,thread);
-                }
+        if(node != myNode)
+        {
+          if(node >= 0){
+            m->model_net_calls++;
+            send_msg(ns, MsgEntry_getSize(taskEntry),
+                MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
+                pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
           }
+          else if(node == -1){
+            bcast_msg(ns, MsgEntry_getSize(taskEntry),
+                MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
+                sendOffset, copyTime, lp, m);
+          }
+          else if(node <= -100 && thread == -1){
+            for(int j=0; j<jobs[ns->my_job].numRanks; j++){
+              if(j == -node-100 || j == myNode) continue;
+              delay += copyTime;
+              m->model_net_calls++;
+              send_msg(ns, MsgEntry_getSize(taskEntry),
+                  MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
+                  pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+            }
+
+          }
+          else if(node <= -100){
+            for(int j=0; j<jobs[ns->my_job].numRanks; j++){
+              if(j == myNode) continue;
+              delay += copyTime;
+              m->model_net_calls++;
+              send_msg(ns, MsgEntry_getSize(taskEntry),
+                  MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
+                  pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+            }
+          }
+          else{
+            printf("message not supported yet! node:%d thread:%d\n",node,thread);
+          }
+        }
     }
 
     PE_execPrintEvt(lp, ns->my_pe, task_id, tw_now(lp));
 
     //Complete the task
-    if(*execTime == 0)
-        exec_comp(ns, task_id, codes_local_latency(lp), 0, lp);
-    else
+    if(*execTime == 0) {
+        exec_comp(ns, task_id, soft_latency, 0, lp);
+    } else {
         exec_comp(ns, task_id, *execTime, 0, lp);
+    }
     //Return the execution time of the task
     return *execTime;
 }
 
+static void exec_task_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m) {
+
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+}
 
 //Creates and sends the message
 static int send_msg(
@@ -962,10 +1021,11 @@ static int send_msg(
         int id,
         int dest_id,
         unsigned long long sendOffset,
+        enum proc_event evt_type,
         tw_lp * lp) {
         proc_msg* m_remote = malloc(sizeof(proc_msg));
 
-        m_remote->proc_event_type = RECV_MSG;
+        m_remote->proc_event_type = evt_type;
         m_remote->src = lp->gid;
         m_remote->msg_id.size = size;
         m_remote->msg_id.pe = src_pe;
@@ -984,6 +1044,45 @@ static int send_msg(
     
     return 0;
 }
+
+//Creates and initiates bcast_msg
+static int bcast_msg(
+        proc_state * ns,
+        int size,
+        int src_pe,
+        int id,
+        unsigned long long sendOffset,
+        unsigned long long copyTime,
+        tw_lp * lp,
+        proc_msg *m) {
+
+    int numValidChildren = 0;
+    int myChildren[BCAST_DEGREE];
+    int thisTreePe = (ns->my_pe_num - src_pe + jobs[ns->my_job].numRanks) %
+                      jobs[ns->my_job].numRanks;
+
+    for(int i = 0; i < BCAST_DEGREE; i++) {
+      myChildren[i] = src_pe + (BCAST_DEGREE * thisTreePe + i + 1) %
+                      jobs[ns->my_job].numRanks;
+      if(ns->my_pe_num < src_pe && myChildren[i] >= src_pe) {
+        break;
+      }
+      if(ns->my_pe_num > src_pe && myChildren[i] <= ns->my_pe_num &&
+         myChildren[i] >= src_pe) {
+        break;
+      }
+      numValidChildren++;
+    }
+
+    for(int i = 0; i < numValidChildren; i++) {
+      send_msg(ns, size, src_pe, id, pe_to_lpid(myChildren[i], ns->my_job),
+        sendOffset + copyTime, BCAST, lp);
+      copyTime += copyTime;
+      m->model_net_calls++;
+    }
+    return numValidChildren;
+}
+
 static int exec_comp(
     proc_state * ns,
     int task_id,
