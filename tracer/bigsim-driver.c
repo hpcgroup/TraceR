@@ -654,7 +654,11 @@ static void handle_recv_event(
         if(PE_get_taskDone(ns->my_pe,task_id)){ //TODO: check this
             assert(0);
         }
-        assert(PE_getTaskMsgID(ns->my_pe, task_id).pe > 0);
+        if(PE_getTaskMsgID(ns->my_pe, task_id).pe < 0) {
+          printf("[%d:%d] received an already recvd message %d\n",
+            ns->my_job, ns->my_pe_num, task_id);
+          assert(0);
+        }
         PE_invertMsgPe(ns->my_pe, task_id);
         if(!PE_noUnsatDep(ns->my_pe, task_id)){
             assert(0);
@@ -839,18 +843,21 @@ static unsigned long long exec_task(
     //If not, do nothing yet
     //If yes, execute the task
     if(!PE_noUnsatDep(ns->my_pe, task_id)){
-        //printf("RETURNING ZERO\n");
+        printf("[%d:%d] WARNING: TASK HAS TASK DEP: %d\n", ns->my_job,
+          ns->my_pe_num, task_id);
         assert(0);
     }
     //Check if the task is already done -- safety check?
     if(PE_get_taskDone(ns->my_pe, task_id)){
-        //printf("PE:%d WARNING: TASK IS ALREADY DONE: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
+        printf("[%d:%d] WARNING: TASK IS ALREADY DONE: %d\n", ns->my_job,
+          ns->my_pe_num, task_id);
         assert(0);
     }
     //Check the task does not have any message dependency
     if(!PE_noMsgDep(ns->my_pe, task_id)){
+        printf("[%d:%d] WARNING: TASK HAS MESSAGE DEP: %d\n", ns->my_job,
+          ns->my_pe_num, task_id);
         assert(0);
-        //printf("PE:%d Task msg dep is not satisfied: %d\n", lpid_to_pe(PE_get_myNum(ns->my_pe)), task_id);
     }
 
     m->model_net_calls = 0;

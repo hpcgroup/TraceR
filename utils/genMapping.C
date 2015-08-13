@@ -12,6 +12,12 @@ int main(int argc, char**argv) {
   vector<FILE*> out_files;
   int numAllocCores = 0;
 
+  if(argc < 3) {
+    printf("Correct usage: %s <global_file_name> <ranks in each job>\n",
+        argv[0]);
+    exit(1);
+  }
+
   jobSizes.resize(numJobs);
   out_files.resize(numJobs);
   for(int i = 0; i < numJobs; i++) { 
