@@ -14,6 +14,7 @@
 #include <ross.h>
 #include <stdbool.h>
 #include <time.h>
+#include <signal.h>
 
 #include "codes/model-net.h"
 #include "codes/lp-io.h"
@@ -183,7 +184,7 @@ const tw_optdef app_opt [] =
     TWOPT_END()
 };
 
-static unsigned long long exec_task(
+static tw_stime exec_task(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -201,7 +202,7 @@ static int send_msg(
     int src_pe,
     int id,
     int dest_id,
-    unsigned long long timeOffset,
+    tw_stime timeOffset,
     enum proc_event evt_type,
     tw_lp * lp);
 
@@ -210,15 +211,15 @@ static int bcast_msg(
     int size,
     int src_pe,
     int id,
-    unsigned long long timeOffset,
-    unsigned long long copyTime,
+    tw_stime timeOffset,
+    tw_stime copyTime,
     tw_lp * lp,
     proc_msg *m);
 
 static int exec_comp(
     proc_state * ns,
     int task_id,
-    unsigned long long sendOffset,
+    tw_stime sendOffset,
     int recv,
     tw_lp * lp);
               
@@ -226,6 +227,13 @@ static inline int pe_to_lpid(int pe, int job);
 static inline int pe_to_job(int pe);
 static inline int lpid_to_pe(int lp_gid);
 static inline int lpid_to_job(int lp_gid);
+
+void term_handler (int sig) {
+    // Restore the default SIGABRT disposition
+    signal(SIGABRT, SIG_DFL);
+    // Abort (dumps core)
+    abort();
+}
 
 int main(int argc, char **argv)
 {
@@ -241,6 +249,8 @@ int main(int argc, char **argv)
 
     tw_opt_add(app_opt);
     tw_init(&argc, &argv);
+
+    signal(SIGTERM, term_handler);
     
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
@@ -457,7 +467,7 @@ static void proc_init(
     ns->my_pe = newPE();
     ns->trace_reader = newTraceReader(jobs[ns->my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
-    long long unsigned int startTime=0;
+    tw_stime startTime=0;
     TraceReader_loadTraceSummary(ns->trace_reader);
     TraceReader_setOffsets(ns->trace_reader, &(jobs[ns->my_job].offsets));
 
@@ -698,7 +708,7 @@ static void handle_bcast_event(
     proc_msg * m,
     tw_lp * lp) {
 
-  unsigned long long soft_latency = codes_local_latency(lp);
+  tw_stime soft_latency = codes_local_latency(lp);
   m->model_net_calls = 0;
   int num_sends = bcast_msg(ns, m->msg_id.size, m->msg_id.pe, m->msg_id.id,
       0, soft_latency, lp, m);
@@ -833,7 +843,7 @@ static void handle_exec_rev_event(
 }
 
 //executes the task with the specified id
-static unsigned long long exec_task(
+static tw_stime exec_task(
             proc_state * ns,
             int task_id,
             tw_lp * lp,
@@ -865,30 +875,30 @@ static unsigned long long exec_task(
     PE_set_busy(ns->my_pe, true);
 
     //Mark the execution time of the task
-    unsigned long long time = PE_getTaskExecTime(ns->my_pe, task_id);
-    unsigned long long* execTime = &time;
+    tw_stime time = PE_getTaskExecTime(ns->my_pe, task_id);
+    tw_stime* execTime = &time;
 
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id);
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: exec_task task_id: %d, num entries: %d, EXEC_TIME: %llu. TIME"
+    printf("PE%d: exec_task task_id: %d, num entries: %d, EXEC_TIME: %lf. TIME"
     " now:%f \n", ns->my_pe_num, task_id, msgEntCount, *execTime, now);
 #endif
 
     int myPE = ns->my_pe_num;
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
-    unsigned long long soft_latency = codes_local_latency(lp);
-    unsigned long long copyTime = soft_latency; //TODO: use better value
-    unsigned long long delay = 0; //intra node latency
+    tw_stime soft_latency = codes_local_latency(lp);
+    tw_stime copyTime = soft_latency; //TODO: use better value
+    tw_stime delay = 0; //intra node latency
 
     for(int i=0; i<msgEntCount; i++){
         MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id, i);
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
-        unsigned long long sendOffset = MsgEntry_getSendOffset(taskEntry);
+        tw_stime sendOffset = MsgEntry_getSendOffset(taskEntry);
         
         //If there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
@@ -1030,7 +1040,7 @@ static int send_msg(
         int src_pe,
         int id,
         int dest_id,
-        unsigned long long sendOffset,
+        tw_stime sendOffset,
         enum proc_event evt_type,
         tw_lp * lp) {
         proc_msg* m_remote = malloc(sizeof(proc_msg));
@@ -1061,8 +1071,8 @@ static int bcast_msg(
         int size,
         int src_pe,
         int id,
-        unsigned long long sendOffset,
-        unsigned long long copyTime,
+        tw_stime sendOffset,
+        tw_stime copyTime,
         tw_lp * lp,
         proc_msg *m) {
 
@@ -1092,22 +1102,25 @@ static int bcast_msg(
 static int exec_comp(
     proc_state * ns,
     int task_id,
-    unsigned long long sendOffset,
+    tw_stime sendOffset,
     int recv,
     tw_lp * lp)
 {
     //If it's a self event use codes_event_new instead of model_net_event 
     tw_event *e;
     proc_msg *m;
-    
-    e = codes_event_new(lp->gid, sendOffset + g_tw_lookahead, lp);
+
+    if(sendOffset < g_tw_lookahead) {
+      sendOffset += g_tw_lookahead;
+    }
+    e = codes_event_new(lp->gid, sendOffset, lp);
     m = (proc_msg*)tw_event_data(e);
     m->msg_id.size = 0;
     m->msg_id.pe = ns->my_pe_num;
     m->msg_id.id = task_id;
     if(recv) {
 #if DEBUG_PRINT
-        printf("PE%d: Send to PE: %d id: %d at time %f for time %f\n",
+        printf("PE%d: Send to PE: %d id: %d at time %lf for time %lf\n",
         ns->my_pe_num, ns->my_pe_num, task_id, tw_now(lp),
         tw_now(lp) + sendOffset + g_tw_lookahead);
 #endif

@@ -28,7 +28,7 @@ bool PE::noUnsatDep(int tInd)
   return true;
 }
 
-unsigned long long PE::taskExecTime(int tInd)
+double PE::taskExecTime(int tInd)
 {
     return myTasks[tInd].execTime;
 }
@@ -106,7 +106,7 @@ void PE::invertMsgPe(int tInd)
   myTasks[tInd].myMsgId.pe = -myTasks[tInd].myMsgId.pe;
 }
 
-unsigned long long PE::getTaskExecTime(int tInd)
+double PE::getTaskExecTime(int tInd)
 {
   return myTasks[tInd].execTime;
 }

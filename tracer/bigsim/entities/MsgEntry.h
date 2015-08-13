@@ -19,11 +19,11 @@ struct MsgID {
 struct MsgEntry {
 #ifdef __cplusplus
     MsgEntry();
-    void sendMsg(unsigned long long startTime);
+    void sendMsg(double startTime);
 #endif
     int node;	// node number in global order
     int thread;	// destination thread in node
-    unsigned long long sendOffset;
+    double sendOffset;
     MsgID msgId;
 };
 

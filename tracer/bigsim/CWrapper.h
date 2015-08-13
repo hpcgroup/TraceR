@@ -35,7 +35,7 @@ int MsgEntry_getID(MsgEntry* m);
 int MsgEntry_getPE(MsgEntry* m);
 int MsgEntry_getNode(MsgEntry* m);
 int MsgEntry_getThread(MsgEntry* m);
-unsigned long long MsgEntry_getSendOffset(MsgEntry* m);
+double MsgEntry_getSendOffset(MsgEntry* m);
 
 //PE
 typedef struct PE PE;
@@ -44,11 +44,11 @@ void PE_set_busy(PE* p, bool b);
 bool PE_is_busy(PE* p);
 bool PE_noUnsatDep(PE* p, int tInd);
 bool PE_noMsgDep(PE* p, int tInd);
-unsigned long long PE_getTaskExecTime(PE* p, int tInd);
+double PE_getTaskExecTime(PE* p, int tInd);
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
-void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, unsigned long long stime);
+void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime);
 void PE_set_taskDone(PE* p, int tInd, bool b);
 bool PE_get_taskDone(PE* p, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);
@@ -97,7 +97,7 @@ void TraceReader_loadOffsets(TraceReader* t);
 int* TraceReader_getOffsets(TraceReader* t);
 void TraceReader_setOffsets(TraceReader* t, int** offsets);
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
-    int* nwth, PE* pe, int penum, int jobnum, unsigned long long* startTime);
+    int* nwth, PE* pe, int penum, int jobnum, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
 
 #ifdef __cplusplus

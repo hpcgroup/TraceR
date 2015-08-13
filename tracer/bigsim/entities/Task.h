@@ -16,7 +16,7 @@ class MsgEntry;
 
 class BgPrint{
   public:
-    void print(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo)
+    void print(tw_lp * lp, double startTime, int PEno, int jobNo)
     {
       char str[1000];
       strcpy(str, "[%d %d : %s] ");
@@ -40,7 +40,7 @@ class Task {
   public:
     Task();
     ~Task();
-    void printEvt(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo);
+    void printEvt(tw_lp * lp, double startTime, int PEno, int jobNo);
     MsgID myMsgId;
     bool done;
     short charmEP;
@@ -50,7 +50,7 @@ class Task {
     int* backwardDep;	//forward dependent tasks
     int backwDepSize;	// size of backwDep array
 
-    unsigned long long execTime;	//execution time of the task
+    double execTime;	//execution time of the task
 
     int msgEntCount; // number of msg entries
     MsgEntry* myEntries; // outgoing messages of task

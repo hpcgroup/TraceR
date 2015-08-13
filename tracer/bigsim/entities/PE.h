@@ -27,7 +27,7 @@ class PE {
     vector<bool> busyStateBuffer;
     map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
     Task* myTasks;	// all tasks of this PE
-    unsigned long long currTime;
+    double currTime;
     bool busy;
     int windowOffset;
     int beforeTask, totalTasksCount;
@@ -37,14 +37,14 @@ class PE {
     int firstTask;
 
     bool noUnsatDep(int tInd);	// there is no unsatisfied dependency for task
-    unsigned long long taskExecTime(int tInd);
+    double taskExecTime(int tInd);
     void printStat();
     void check();
     void printState();
 
     //functions added by Bilge for codes-tracing
     void invertMsgPe(int tInd);
-    unsigned long long getTaskExecTime(int tInd);
+    double getTaskExecTime(int tInd);
     map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;

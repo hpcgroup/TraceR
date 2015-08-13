@@ -18,7 +18,7 @@ extern "C" {
     int MsgEntry_getID(MsgEntry* m){return m->msgId.id;}
     int MsgEntry_getNode(MsgEntry* m){return m->node;}
     int MsgEntry_getThread(MsgEntry* m){return m->thread;}
-    unsigned long long MsgEntry_getSendOffset(MsgEntry* m){return m->sendOffset;}
+    double MsgEntry_getSendOffset(MsgEntry* m){return m->sendOffset;}
 
     //PE
     PE* newPE(){return new PE();}
@@ -30,7 +30,7 @@ extern "C" {
             return true;
         return false; 
     }
-    unsigned long long PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
+    double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
     MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
         return &(p->myTasks[tInd].myEntries);
@@ -39,7 +39,7 @@ extern "C" {
         return &(p->myTasks[tInd].myEntries[mInd]);
     }
 
-    void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, unsigned long long stime) {
+    void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime) {
         p->myTasks[tInd].printEvt(lp, stime, p->myNum, p->jobNum);
     }
 
@@ -218,7 +218,7 @@ extern "C" {
     int* TraceReader_getOffsets(TraceReader* t){return t->allNodeOffsets;}
     void TraceReader_setOffsets(TraceReader* t, int** offsets){t->allNodeOffsets = *offsets;}
     void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
-    empes, int* nwth, PE* pe, int penum, int jobnum, unsigned long long* startTime){
+    empes, int* nwth, PE* pe, int penum, int jobnum, double* startTime){
          t->readTrace(tot, numnodes, empes, nwth, pe, penum, jobnum, startTime);
     }
     int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}

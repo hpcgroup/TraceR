@@ -34,7 +34,7 @@ MsgEntry::MsgEntry() {
 
 //Bilge: this function is not used bu kept as a reference here
 //For codes integration, sending messages happens in modelnet-test-bigsim.c file
-void MsgEntry::sendMsg(unsigned long long startTime)
+void MsgEntry::sendMsg(double startTime)
 {
 /*
   int myPE = msgId.pe;

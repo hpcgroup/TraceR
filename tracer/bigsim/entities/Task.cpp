@@ -16,7 +16,7 @@ Task::Task() {
   execTime = -1;
 }
 
-void Task::printEvt(tw_lp * lp, unsigned long long startTime, int PEno, int jobNo)
+void Task::printEvt(tw_lp * lp, double startTime, int PEno, int jobNo)
 {
   for(int i = 0; i < bgPrintCount; i++) {
     myBgPrints[i].print(lp, startTime, PEno, jobNo);

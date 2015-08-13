@@ -55,5 +55,5 @@ fastSim: $(OBJS) $(USER_OBJS)
 	@echo ' '
 
 clean:
-	-$(RM) $(OBJS)$(C++_DEPS)$(CC_DEPS)$(CPP_DEPS)$(EXECUTABLES)$(CXX_DEPS)$(C_UPPER_DEPS) fastSim
+	-$(RM) $(OBJS) $(C++_DEPS) $(CC_DEPS) $(CPP_DEPS) $(EXECUTABLES) $(CXX_DEPS) $(C_UPPER_DEPS) fastSim
 	-@echo ' '
