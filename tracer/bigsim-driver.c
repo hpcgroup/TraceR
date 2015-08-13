@@ -699,6 +699,8 @@ static void handle_bcast_event(
   int num_sends = bcast_msg(ns, m->msg_id.size, m->msg_id.pe, m->msg_id.id,
       0, soft_latency, lp, m);
 
+  if(!num_sends) num_sends++;
+
   tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency, lp);
   proc_msg * msg = (proc_msg*)tw_event_data(e);
   memcpy(&msg->msg_id, &m->msg_id, sizeof(m->msg_id));
@@ -1063,15 +1065,11 @@ static int bcast_msg(
                       jobs[ns->my_job].numRanks;
 
     for(int i = 0; i < BCAST_DEGREE; i++) {
-      myChildren[i] = src_pe + (BCAST_DEGREE * thisTreePe + i + 1) %
-                      jobs[ns->my_job].numRanks;
-      if(ns->my_pe_num < src_pe && myChildren[i] >= src_pe) {
+      int next_child = BCAST_DEGREE * thisTreePe + i + 1;
+      if(next_child >= jobs[ns->my_job].numRanks) {
         break;
       }
-      if(ns->my_pe_num > src_pe && myChildren[i] <= ns->my_pe_num &&
-         myChildren[i] >= src_pe) {
-        break;
-      }
+      myChildren[i] = (src_pe + next_child) % jobs[ns->my_job].numRanks;
       numValidChildren++;
     }
 
