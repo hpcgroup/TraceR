@@ -143,6 +143,13 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
 void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
 {
   t->execTime = (double)TIME_MULT * bglog->execTime;
+  if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
+    strcmp(bglog->name, "AMPI_generic") == 0 ||
+    strcmp(bglog->name, "AMPI_SEND") == 0 ||
+    strcmp(bglog->name, "AMPI_Recv") == 0 ||
+    strcmp(bglog->name, "AMPI_Sendrecv") == 0) {
+    t->execTime = 0.0;
+  }
   t->myMsgId.pe = bglog->msgId.pe() + jobPEindex;
   if(t->myMsgId.pe < 0)
     t->myMsgId.pe = -1;
@@ -163,7 +170,8 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     t->myEntries[i].thread = bglog->msgs[i]->tID;
 
     // sendTime is absolute
-    t->myEntries[i].sendOffset = (double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime);
+    //t->myEntries[i].sendOffset = (double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime);
+    t->myEntries[i].sendOffset = 0;
     assert(t->myEntries[i].sendOffset >= 0);
     t->myEntries[i].msgId.size = bglog->msgs[i]->msgsize;
   }

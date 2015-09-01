@@ -43,6 +43,8 @@ void decreaseMsgInfo(uint64_t nic_num, uint64_t msg_id, uint64_t recvSize,
             int reset_data) {
   std::map<uint64_t, MsgRecord >::iterator it = msgList[nic_num].find(msg_id);
   if(it == msgList[nic_num].end()) {
+    printf("Decrease called for non existing msg\n");
+    assert(0);
     return;
   }
   MsgRecord & msg = (it->second);

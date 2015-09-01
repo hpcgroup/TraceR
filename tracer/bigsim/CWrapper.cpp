@@ -90,7 +90,7 @@ extern "C" {
         if(found) assert(0);
         p->msgBuffer.push_front(task_id);
     }
-    int PE_getBufferSize(PE* p){p->msgBuffer.size();}
+    int PE_getBufferSize(PE* p){ return p->msgBuffer.size();}
     void PE_resizeBuffer(PE* p, int num_elems_to_remove){
         int cur_size = p->msgBuffer.size();
         p->msgBuffer.resize(cur_size - num_elems_to_remove);

@@ -26,9 +26,9 @@ CHARM_LIBS = -L$(CHARMPATH)/lib
 CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
 
 ifeq ($(ARCH),bgq)
-ARCH_FLAGS = -DROSS_CLOCK_bgq=1
+ARCH_FLAGS = -I/bgsys/drivers/ppcfloor
 else
-ARCH_FLAGS = -Wall -DROSS_CLOCK_amd64=1
+ARCH_FLAGS = -Wall 
 endif
 
 CODES_BASE_CFLAGS = -I${CODES_BASE}/install/include -I${ROSS}/include
@@ -38,4 +38,4 @@ CODES_NET_CFLAGS = -I${CODES_NET}/install/include
 CFLAGS = -g
 CXXFLAGS = -g
 LDFLAGS = -g
-OPTS = ${CXXFLAGS} ${CODES_BASE_CFLAGS}
+OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_BASE_CFLAGS}

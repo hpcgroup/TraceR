@@ -60,7 +60,7 @@ int num_jobs = 0;
 /* types of events that will constitute triton requests */
 enum proc_event
 {
-    KICKOFF,    /* initial event */
+    KICKOFF=1,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast */
@@ -512,7 +512,8 @@ static void proc_event(
             handle_exec_event(ns, b, m, lp);
             break;
         default:
-	    printf("\n Invalid message type %d ", m->proc_event_type);
+	    printf("\n Invalid message type %d event %lld ", 
+              m->proc_event_type, m);
             assert(0);
             break;
     }
@@ -596,9 +597,9 @@ static void handle_kickoff_event(
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
     if(my_pe_num == 0 && my_job == 0) {
         printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
-        "TASK: %d, TIME TILL NOW=%f s\n", my_pe_num, (int)lp->gid,
-        PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
-        (double)time_till_now);
+        "TASK: %d, RUN TIME TILL NOW=%f s, CURRENT SIM TIME %f\n", my_pe_num, 
+        (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
+        (double)time_till_now, ns->start_ts);
     }
 
     //Safety check if the pe_to_lpid converter is correct
@@ -892,7 +893,7 @@ static tw_stime exec_task(
     int myNode = myPE/nWth;
     tw_stime soft_latency = codes_local_latency(lp);
     tw_stime copyTime = soft_latency; //TODO: use better value
-    tw_stime delay = 0; //intra node latency
+    tw_stime delay = soft_latency; //intra node latency
 
     for(int i=0; i<msgEntCount; i++){
         MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id, i);
@@ -968,6 +969,7 @@ static tw_stime exec_task(
           }
         }
           
+        delay += copyTime;
         if(node != myNode)
         {
           if(node >= 0){
@@ -979,7 +981,7 @@ static tw_stime exec_task(
           else if(node == -1){
             bcast_msg(ns, MsgEntry_getSize(taskEntry),
                 MsgEntry_getPE(taskEntry), MsgEntry_getID(taskEntry),
-                sendOffset, copyTime, lp, m);
+                sendOffset+delay, copyTime, lp, m);
           }
           else if(node <= -100 && thread == -1){
             for(int j=0; j<jobs[ns->my_job].numRanks; j++){
@@ -1011,11 +1013,11 @@ static tw_stime exec_task(
     PE_execPrintEvt(lp, ns->my_pe, task_id, tw_now(lp));
 
     //Complete the task
-    if(*execTime == 0) {
-        exec_comp(ns, task_id, soft_latency, 0, lp);
-    } else {
-        exec_comp(ns, task_id, *execTime, 0, lp);
+    tw_stime finish_time = delay;
+    if(finish_time < *execTime) {
+      finish_time = *execTime;
     }
+    exec_comp(ns, task_id, finish_time, 0, lp);
     //Return the execution time of the task
     return *execTime;
 }
