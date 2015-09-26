@@ -14,6 +14,8 @@
 #include "datatypes.h"
 #include <cmath>
 
+extern double soft_delay_mpi;
+
 // global variables of bigsim
 extern char* traceFileName;
 extern JobInf *jobs;
@@ -143,13 +145,21 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
 void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
 {
   t->execTime = (double)TIME_MULT * bglog->execTime;
-  if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
-    strcmp(bglog->name, "AMPI_generic") == 0 ||
-    strcmp(bglog->name, "AMPI_SEND") == 0 ||
-    strcmp(bglog->name, "AMPI_Recv") == 0 ||
-    strcmp(bglog->name, "AMPI_Sendrecv") == 0) {
+  if( strcmp(bglog->name, "AMPI_generic") == 0 ||
+    strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
+    strcmp(bglog->name, "msgep") == 0 ||
+    strcmp(bglog->name, "AMPI_WAITALL") == 0) {
     t->execTime = 0.0;
   }
+  if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
+    strcmp(bglog->name, "AMPI_SEND") == 0 ||
+    strcmp(bglog->name, "AMPI_Recv") == 0 ||
+    strcmp(bglog->name, "AMPI_Sendrecv") == 0 ||
+    strcmp(bglog->name, "AMPI_Waitall") == 0 ||
+    strcmp(bglog->name, "AMPI_Wait") == 0) {
+    t->execTime = soft_delay_mpi;
+  }
+
   t->myMsgId.pe = bglog->msgId.pe() + jobPEindex;
   if(t->myMsgId.pe < 0)
     t->myMsgId.pe = -1;

@@ -53,6 +53,7 @@ CoreInf *global_rank;
 JobInf *jobs;
 tw_stime *jobTimes;
 int num_jobs = 0;
+tw_stime soft_delay_mpi = 0;
 
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
@@ -325,12 +326,13 @@ int main(int argc, char **argv)
     total_lps = num_servers + num_nics + num_routers;
     lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
 
+    configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
+        &soft_delay_mpi);
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
     {
         return(-1);
     }
-
 
     if(!rank) printf("Begin reading %s\n", tracer_input);
 
@@ -899,7 +901,8 @@ static tw_stime exec_task(
         MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id, i);
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
-        tw_stime sendOffset = MsgEntry_getSendOffset(taskEntry);
+        //tw_stime sendOffset = MsgEntry_getSendOffset(taskEntry);
+        tw_stime sendOffset = soft_delay_mpi;
         
         //If there are intraNode messages
         if (node == myNode || node == -1 || (node <= -100 && (node != -100-myNode || thread != -1)))
