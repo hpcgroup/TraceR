@@ -34,7 +34,7 @@ int main(int argc, char**argv) {
     fwrite(&i, sizeof(int), 1, binout);
     fwrite(&coresperjob, sizeof(int), 1, binout);
     fwrite(&jobid, sizeof(int), 1, binout);
-    printf("%d %d %d\n", i, coresperjob, jobid);
+    //printf("%d %d %d\n", i, coresperjob, jobid);
     fwrite(&i, sizeof(int), 1, out_files[jobid]);
     coresperjob++;
     if(coresperjob == jobSizes[jobid]) {

@@ -55,6 +55,11 @@ tw_stime *jobTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 0;
 
+int size_replace_by = 0;
+int size_replace_limit = -1;
+double time_replace_by = 0;
+double time_replace_limit = -1;
+
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
 
@@ -380,6 +385,25 @@ int main(int argc, char **argv)
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
+    }
+
+    char next = ' ';
+    fscanf(jobIn, "%c", &next);
+    while(next != ' ') {
+      if(next == 'M' || next == 'm') {
+        fscanf(jobIn, "%d %d", &size_replace_limit, &size_replace_by);
+        if(!rank)
+          printf("Will replace all messages of size greater than %d by %d\n", 
+              size_replace_limit, size_replace_by);
+      }
+      if(next == 'T' || next == 't') {
+        fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
+        if(!rank)
+          printf("Will replace all methods with exec time greater than %lf by %lf\n", 
+              time_replace_limit, time_replace_by);
+      }
+      next = ' ';
+      fscanf(jobIn, "%c", &next);
     }
 
     //Load all summaries on proc 0 and bcast

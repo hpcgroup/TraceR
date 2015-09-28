@@ -15,6 +15,10 @@
 #include <cmath>
 
 extern double soft_delay_mpi;
+extern int size_replace_by;
+extern int size_replace_limit;
+extern double time_replace_by;
+extern double time_replace_limit;
 
 // global variables of bigsim
 extern char* traceFileName;
@@ -144,7 +148,11 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
 
 void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
 {
-  t->execTime = (double)TIME_MULT * bglog->execTime;
+  if(time_replace_limit != -1 && bglog->execTime >= time_replace_limit) {
+    t->execTime = (double)TIME_MULT * time_replace_by;
+  } else {
+    t->execTime = (double)TIME_MULT * bglog->execTime;
+  }
   if( strcmp(bglog->name, "AMPI_generic") == 0 ||
     strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
     strcmp(bglog->name, "msgep") == 0 ||
@@ -182,8 +190,11 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     // sendTime is absolute
     //t->myEntries[i].sendOffset = (double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime);
     t->myEntries[i].sendOffset = 0;
-    assert(t->myEntries[i].sendOffset >= 0);
-    t->myEntries[i].msgId.size = bglog->msgs[i]->msgsize;
+    if(size_replace_limit != -1 && bglog->msgs[i]->msgsize >= size_replace_limit) {
+      t->myEntries[i].msgId.size = size_replace_by;
+    } else {
+      t->myEntries[i].msgId.size = bglog->msgs[i]->msgsize;
+    }
   }
 
   t->backwDepSize = bglog->backwardDeps.length();

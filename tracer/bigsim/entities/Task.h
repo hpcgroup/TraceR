@@ -21,7 +21,7 @@ class BgPrint{
       char str[1000];
       strcpy(str, "[%d %d : %s] ");
       strcat(str, msg);
-      tw_output(lp, str, jobNo, PEno, taskName, startTime/((double)TIME_MULT)+time);
+      tw_output(lp, str, jobNo, PEno, taskName, startTime/((double)TIME_MULT));
     }
     char* msg;
     double time;
