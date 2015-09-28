@@ -1,15 +1,12 @@
 CC = g++
 
-all: genMapping
+all: genMapping dfly_map
 
 genMapping: genMapping.C
-	$(CC) -O3 -o genMapping $<
+	$(CC) -O3 -o $@ $<
 
-trace: genMapping.C
-	$(CC) -o genMapping.trace $< $(CFLAGS) $(TRACE_LIB)
-
-scal: genMapping.C
-	$(PREP) $(CC) -o genMapping.scal $< $(CFLAGS) $(SCALIB)
+dfly_map: genMapping_dfly.C
+	$(CC) -O3 -o $@ $<
 
 clean:
-	rm -f *.o genMapping
+	rm -f *.o genMapping dfly_map
