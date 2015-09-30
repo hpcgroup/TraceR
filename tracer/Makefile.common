@@ -2,6 +2,10 @@ ifeq ($(ARCH),bgq)
 CC = mpixlc_r
 CXX = mpixlcxx_r
 SEQ_CXX = bgxlC
+else ifeq ($(ARCH),cray)
+CC = cc -std=gnu99
+CXX = CC
+SEQ_CXX = CC
 else
 CC = mpicc -std=gnu99
 CXX = mpicxx

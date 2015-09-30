@@ -156,14 +156,21 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   if( strcmp(bglog->name, "AMPI_generic") == 0 ||
     strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
     strcmp(bglog->name, "msgep") == 0 ||
+    strcmp(bglog->name, "GroupReduce") == 0 ||
+    strcmp(bglog->name, "RECV_RESUME") == 0 ||
+    strcmp(bglog->name, "start-broadcast") == 0 ||
+    strcmp(bglog->name, "split-broadcast") == 0 ||
+    strcmp(bglog->name, "end-broadcast") == 0 ||
     strcmp(bglog->name, "AMPI_WAITALL") == 0) {
     t->execTime = 0.0;
   }
   if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
     strcmp(bglog->name, "AMPI_SEND") == 0 ||
+    strcmp(bglog->name, "AMPI_Allreduce") == 0 ||
     strcmp(bglog->name, "AMPI_Recv") == 0 ||
     strcmp(bglog->name, "AMPI_Sendrecv") == 0 ||
     strcmp(bglog->name, "AMPI_Waitall") == 0 ||
+    strcmp(bglog->name, "AMPI_Barrier") == 0 ||
     strcmp(bglog->name, "AMPI_Wait") == 0) {
     t->execTime = soft_delay_mpi;
   }
