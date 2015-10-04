@@ -49,6 +49,7 @@ class Task {
 
     int* backwardDep;	//forward dependent tasks
     int backwDepSize;	// size of backwDep array
+    int endEvent;
 
     double execTime;	//execution time of the task
 

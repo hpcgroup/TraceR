@@ -30,6 +30,7 @@ extern "C" {
             return true;
         return false; 
     }
+    int PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
     double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
     MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){

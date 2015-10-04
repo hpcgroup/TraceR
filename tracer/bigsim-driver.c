@@ -94,7 +94,6 @@ struct proc_msg
     int fwd_dep_count;
     MsgID msg_id;
     bool incremented_flag; /* helper for reverse computation */
-    tw_stime saved_ts;
     int model_net_calls;
 };
 
@@ -254,6 +253,7 @@ int main(int argc, char **argv)
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
 
     tw_opt_add(app_opt);
+    g_tw_lookahead = .5;
     tw_init(&argc, &argv);
 
     signal(SIGTERM, term_handler);
@@ -518,8 +518,6 @@ static void proc_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    m->saved_ts = ns->end_ts;
-    ns->end_ts = tw_now(lp);
     switch (m->proc_event_type)
     {
         case KICKOFF:
@@ -551,7 +549,6 @@ static void proc_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    ns->end_ts = m->saved_ts;
     switch (m->proc_event_type)
     {
         case KICKOFF:
@@ -1045,6 +1042,9 @@ static tw_stime exec_task(
       finish_time = *execTime;
     }
     exec_comp(ns, task_id, finish_time, 0, lp);
+    if(PE_isEndEvent(ns->my_pe, task_id)) {
+      ns->end_ts = tw_now(lp);
+    }
     //Return the execution time of the task
     return *execTime;
 }

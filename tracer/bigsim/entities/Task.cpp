@@ -14,6 +14,7 @@ Task::Task() {
   myEntries = 0;
   done = false;
   execTime = -1;
+  endEvent = 0;
 }
 
 void Task::printEvt(tw_lp * lp, double startTime, int PEno, int jobNo)
