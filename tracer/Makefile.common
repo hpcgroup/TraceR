@@ -39,7 +39,7 @@ CODES_BASE_CFLAGS = -I${CODES_BASE}/install/include -I${ROSS}/include
 
 CODES_NET_CFLAGS = -I${CODES_NET}/install/include
 
-CFLAGS = -g
-CXXFLAGS = -g
-LDFLAGS = -g
+CFLAGS = -O3 -g
+CXXFLAGS = -O3 -g
+LDFLAGS = -O3 -g
 OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_BASE_CFLAGS}
