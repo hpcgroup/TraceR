@@ -32,12 +32,16 @@ int main(int argc, char** argv)
       "numPes:%d\n", totalWorkerProcs, numX, numY, numZ, numCth, numWth,numPes);
   allNodeOffsets = BgLoadOffsets(totalWorkerProcs, numPes);
 
+  int startTranslate = 0;
   if(argc == 2) {
     numPesToTranslate = atoi(argv[1]);
+  } else if(argc == 3) {
+    startTranslate = atoi(argv[1]);
+    numPesToTranslate = atoi(argv[2]);
   } else {
     numPesToTranslate = totalWorkerProcs;
   }
-  for (int i = 0; i < numPesToTranslate; ++i) {
+  for (int i = startTranslate; i < numPesToTranslate; ++i) {
     BgTimeLineRec tlinerec; // Time line (list of logs)
     currTline = &tlinerec;  // set global variable
     currTlineIdx = i;	// set global variable
