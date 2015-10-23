@@ -53,7 +53,7 @@ int main(int argc, char**argv) {
           break;
         }
         int i = g * size_per_group + r * rr_group * rr;
-        int useRank = mapping[currNode] * rr_group * rr + j * rr;
+        int useRank = mapping[currNode] * skip * rr + j * rr;
         if(useRank > numAllocCores) continue;
         for(int k = 0; k < rr; k++) {
           int global_rank = i + j + k * rr_group;
