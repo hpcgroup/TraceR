@@ -29,17 +29,17 @@ int main(int argc, char**argv) {
   int local_rank = 0;
   int size_per_group = numRouters * rr_group * rr;
 
-  int numRouter = numGroups * numRouters;
-  int *mapping = new int[numRouters];
+  int totalRouters = numGroups * numRouters;
+  int *mapping = new int[totalRouters];
   int *granks = new int[numAllocCores];
-  for(int i = 0; i < numRouters; i++) {
+  for(int i = 0; i < totalRouters; i++) {
     mapping[i] = i;
   }
 
   srand(1331);
-  for(int i = 0; i < numRouters; i++) {
-    int node1 = rand() % numRouters;
-    int node2 = rand() % numRouters;
+  for(int i = 0; i < totalRouters; i++) {
+    int node1 = rand() % totalRouters;
+    int node2 = rand() % totalRouters;
     int temp = mapping[node1];
     mapping[node1] = mapping[node2];
     mapping[node2] = temp;
