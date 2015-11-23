@@ -54,7 +54,10 @@ int main(int argc, char**argv) {
       for(int g = 0; g < numGroups; g++) {
         int i = g * size_per_group + r * rr_group * rr;
         int useRank = mapping[currNode] * rr;
-        if(useRank > numAllocCores) continue;
+        if(useRank >= numAllocCores) {
+          currNode++;
+          continue;
+        }
         for(int k = 0; k < rr; k++) {
           int global_rank = i + j + k * rr_group;
           fwrite(&global_rank, sizeof(int), 1, binout);
