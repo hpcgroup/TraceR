@@ -422,6 +422,15 @@ int main(int argc, char **argv)
           printf("Will replace all methods with exec time greater than %lf by %lf\n", 
               time_replace_limit, time_replace_by);
       }
+      if(next == 'E' || next == 'e') {
+        double etime;
+        char eName[256];
+        fscanf(jobIn, "%s %lf", eName, &etime);
+        if(!rank)
+          printf("Will make all events with name %s run for %lf s\n", eName,
+              etime);
+        addEventSub(eName, etime);
+      }
       next = ' ';
       fscanf(jobIn, "%c", &next);
     }

@@ -23,6 +23,15 @@ extern double time_replace_limit;
 // global variables of bigsim
 extern char* traceFileName;
 extern JobInf *jobs;
+#include <map>
+#include <string>
+
+std::map<std::string, double> eventSubs;
+
+extern "C" void addEventSub(char *key, double val) {
+  std::string skey(key);
+  eventSubs[key] = (double)TIME_MULT * val;
+}
 
 TraceReader::TraceReader(char *s) {
   strncpy(tracePath, s, strlen(s) + 1);
@@ -238,6 +247,14 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
       t->myBgPrints[pInd].time = (bglog->evts[i]->rTime);
       strcpy(t->myBgPrints[pInd].taskName, bglog->name);
       pInd++;
+    } else {
+      std::map<std::string, double>::iterator loc =
+        eventSubs.find(std::string((char *)bglog->evts[i]->data));
+      if(loc != eventSubs.end()) {
+        printf("Replacing time for %s by %lf\n", (char *)bglog->evts[i]->data,
+        loc->second);
+        t->execTime = (double)TIME_MULT * loc->second;
+      }
     }
   }
 }
