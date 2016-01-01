@@ -251,9 +251,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
       std::map<std::string, double>::iterator loc =
         eventSubs.find(std::string((char *)bglog->evts[i]->data));
       if(loc != eventSubs.end()) {
-        printf("Replacing time for %s by %lf\n", (char *)bglog->evts[i]->data,
-        loc->second);
-        t->execTime = (double)TIME_MULT * loc->second;
+        t->execTime = loc->second;
       }
     }
   }
