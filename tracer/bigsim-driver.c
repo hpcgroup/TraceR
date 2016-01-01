@@ -51,6 +51,8 @@ typedef struct CoreInf {
 
 CoreInf *global_rank;
 JobInf *jobs;
+int default_mapping;
+int total_ranks;
 tw_stime *jobTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 0;
@@ -342,6 +344,10 @@ int main(int argc, char **argv)
     if(!rank) printf("Begin reading %s\n", tracer_input);
 
     FILE *jobIn = fopen(tracer_input, "r");
+    if(!rank && jobIn == NULL) {
+      printf("Unable to open tracer input file %s. Aborting\n", tracer_input);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
     char globalIn[256];
     fscanf(jobIn, "%s", globalIn);
 
@@ -352,29 +358,38 @@ int main(int argc, char **argv)
         global_rank[i].jobID = -1;
     }
 
-    if(!rank) printf("Reading %s\n", globalIn);
-
-    if(rank == 0) {
+    if(strcmp("NA", globalIn) == 0) {
+      if(!rank) printf("Using default linear mapping of jobs\n");
+      default_mapping = 1;
+    } else {
+      if(!rank) printf("Reading %s\n", globalIn);
+      default_mapping = 0;
+      if(rank == 0) {
         int line_data[3], localCount = 0;;
         FILE *gfile = fopen(globalIn, "rb");
-        while(fread(line_data, sizeof(int), 3, gfile) != 0) {
-            global_rank[line_data[0]].mapsTo = line_data[1];
-            global_rank[line_data[0]].jobID = line_data[2];
-#if DEBUG_PRINT
-            printf("Read %d/%d %d %d\n", line_data[0], num_servers,
-            global_rank[line_data[0]].mapsTo, global_rank[line_data[0]].jobID);
-#endif
-            localCount++;
+        if(gfile == NULL) {
+          printf("Unable to open global rank file %s. Aborting\n", globalIn);
+          MPI_Abort(MPI_COMM_WORLD, 1);
         }
+        while(fread(line_data, sizeof(int), 3, gfile) != 0) {
+          global_rank[line_data[0]].mapsTo = line_data[1];
+          global_rank[line_data[0]].jobID = line_data[2];
+#if DEBUG_PRINT
+          printf("Read %d/%d %d %d\n", line_data[0], num_servers,
+              global_rank[line_data[0]].mapsTo, global_rank[line_data[0]].jobID);
+#endif
+          localCount++;
+        }
+        printf("Read mapping of %d ranks\n", localCount);
         fclose(gfile);
-        printf("Read %d ranks\n", localCount);
+      }
+      MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
     }
-    MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
-
 
     fscanf(jobIn, "%d", &num_jobs);
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    total_ranks = 0;
 
     for(int i = 0; i < num_jobs; i++) {
         char tempTrace[200];
@@ -382,9 +397,14 @@ int main(int argc, char **argv)
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
         fscanf(jobIn, "%s", jobs[i].map_file);
         fscanf(jobIn, "%d", &jobs[i].numRanks);
+        total_ranks += jobs[i].numRanks;
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
+    }
+
+    if(!rank) {
+      printf("Done reading meta-information about jobs\n");
     }
 
     char next = ' ';
@@ -407,6 +427,7 @@ int main(int argc, char **argv)
     }
 
     //Load all summaries on proc 0 and bcast
+    int ranks_till_now = 0;
     for(int i = 0; i < num_jobs; i++) {
         if(!rank) printf("Loading trace summary for job %d from %s\n", i,
                 jobs[i].traceDir);
@@ -422,15 +443,29 @@ int main(int argc, char **argv)
         }
         MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
 
-        if(!rank) printf("Loading map file for job %d from %s\n", i,
-                jobs[i].map_file);
         jobs[i].rankMap = (int *) malloc(sizeof(int) * num_workers);
-        if(rank == 0){ //only rank 0 loads the ranks and broadcasts
+        if(default_mapping) {
+          for(int local_rank = 0; local_rank < num_workers; local_rank++,
+            ranks_till_now++) {
+            jobs[i].rankMap[local_rank] = ranks_till_now;
+            global_rank[ranks_till_now].mapsTo = local_rank;
+            global_rank[ranks_till_now].jobID = i;
+          }
+        } else {
+          if(!rank) printf("Loading map file for job %d from %s\n", i,
+              jobs[i].map_file);
+          if(rank == 0){ //only rank 0 loads the ranks and broadcasts
             FILE *rfile = fopen(jobs[i].map_file, "rb");
+            if(rfile == NULL) {
+              printf("Unable to open local rank file %s. Aborting\n",
+                  jobs[i].map_file);
+              MPI_Abort(MPI_COMM_WORLD, 1);
+            }
             fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
             fclose(rfile);
+          }
+          MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
         }
-        MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
 #if DEBUG_PRINT
         if(rank == 0) {
             for(int j = 0; j < num_workers; j++) {
