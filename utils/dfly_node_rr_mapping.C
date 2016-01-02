@@ -10,8 +10,8 @@ int main(int argc, char**argv) {
   int jobid = 0;
   FILE* out_files;
 
-  if(argc < 5) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <rr group> <#rr> [skip]\n",
+  if(argc < 8) {
+    printf("Correct usage: %s <global_file_name> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group>\n",
         argv[0]);
     exit(1);
   }
@@ -42,7 +42,7 @@ int main(int argc, char**argv) {
           fwrite(&local_rank, sizeof(int), 1, binout);
           fwrite(&jobid, sizeof(int), 1, binout);
           fwrite(&global_rank, sizeof(int), 1, out_files);
-          printf("%d %d %d\n", global_rank, local_rank, jobid);
+          //printf("%d %d %d\n", global_rank, local_rank, jobid);
           local_rank++;
           if(local_rank == numAllocCores) {
             break;
@@ -57,8 +57,6 @@ int main(int argc, char**argv) {
       }
     }
   }
-
-
   fclose(binout);
   fclose(out_files);
 }

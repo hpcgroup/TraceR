@@ -1,12 +1,12 @@
 CC = g++
 
-all: genMapping dfly_map
+SRCS=$(wildcard *.C)
+PGMS=$(SRCS:.C=)
 
-genMapping: genMapping.C
-	$(CC) -O3 -o $@ $<
+all: $(PGMS)
 
-dfly_map: genMapping_dfly.C
+%: %.C
 	$(CC) -O3 -o $@ $<
 
 clean:
-	rm -f *.o genMapping dfly_map
+	rm -f $(PGMS)

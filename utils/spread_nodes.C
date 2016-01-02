@@ -10,8 +10,8 @@ int main(int argc, char**argv) {
   int jobid = 0;
   FILE* out_files;
 
-  if(argc < 5) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <rr group> <#rr>\n",
+  if(argc < 7) {
+    printf("Correct usage: %s <global_file_name> <total ranks> <number of nodes per router> <number of ranks per node> <number of routers> <number of nodes>\n",
         argv[0]);
     exit(1);
   }

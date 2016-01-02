@@ -11,7 +11,7 @@ int main(int argc, char**argv) {
   FILE* out_files;
 
   if(argc < 5) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <rr> <#nodes>\n",
+    printf("Correct usage: %s <global_file_name> <total ranks> <number of ranks per node> <number of nodes>\n",
         argv[0]);
     exit(1);
   }
@@ -28,7 +28,16 @@ int main(int argc, char**argv) {
   int *mapping = new int[numNodes];
   int *granks = new int[numAllocCores];
   for(int i = 0; i < numNodes; i++) {
-    mapping[i] = (i/144) + (i % 144) * 324;
+    mapping[i] = i;
+  }
+
+  srand(1331);
+  for(int i = 0; i < numNodes; i++) {
+    int node1 = rand() % numNodes;
+    int node2 = rand() % numNodes;
+    int temp = mapping[node1];
+    mapping[node1] = mapping[node2];
+    mapping[node2] = temp;
   }
 
   for(int currNode = 0; currNode < numNodes; currNode++) {
