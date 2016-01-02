@@ -64,8 +64,11 @@ int main(int argc, char**argv) {
           fwrite(&useRank, sizeof(int), 1, binout);
           fwrite(&jobid, sizeof(int), 1, binout);
           granks[useRank] = global_rank;
-          //fwrite(&global_rank, sizeof(int), 1, out_files);
+#if PRINT_MAP
           printf("%d %d %d\n", global_rank, useRank++, jobid);
+#else
+          useRank++;
+#endif
           local_rank++;
           if(local_rank == numAllocCores) {
             break;
@@ -84,7 +87,6 @@ int main(int argc, char**argv) {
   
   for(int i = 0; i < numAllocCores; i++) {
     fwrite(&granks[i], sizeof(int), 1, out_files);
-    printf("%d\n", granks[i]);
   }
 
   fclose(binout);

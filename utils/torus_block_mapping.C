@@ -44,7 +44,9 @@ int main(int argc, char**argv) {
       fwrite(&local_rank, sizeof(int), 1, binout);
       fwrite(&jobid, sizeof(int), 1, binout);
       fwrite(&global_rank, sizeof(int), 1, out_files);
+#if PRINT_MAP
       printf("%d %d %d\n", global_rank, local_rank, jobid);
+#endif
       local_rank++;
       if(local_rank == numAllocCores) {
         break;
