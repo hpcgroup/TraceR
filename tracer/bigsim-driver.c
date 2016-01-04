@@ -783,7 +783,7 @@ static void handle_bcast_event(
 
   if(!num_sends) num_sends++;
 
-  tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency, lp);
+  tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency + codes_local_latency(lp), lp);
   proc_msg * msg = (proc_msg*)tw_event_data(e);
   memcpy(&msg->msg_id, &m->msg_id, sizeof(m->msg_id));
   msg->proc_event_type = RECV_MSG;
@@ -872,6 +872,7 @@ static void handle_bcast_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+  codes_local_latency_reverse(lp);
   codes_local_latency_reverse(lp);
   for(int i = 0; i < m->model_net_calls; i++) {
     model_net_event_rc(net_id, lp, 0);
@@ -1081,10 +1082,7 @@ static tw_stime exec_task(
     PE_execPrintEvt(lp, ns->my_pe, task_id, tw_now(lp));
 
     //Complete the task
-    tw_stime finish_time = delay;
-    if(finish_time < *execTime) {
-      finish_time = *execTime;
-    }
+    tw_stime finish_time = codes_local_latency(lp) + *execTime;
     exec_comp(ns, task_id, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id)) {
       ns->end_ts = tw_now(lp);
@@ -1104,6 +1102,7 @@ static void exec_task_rev(
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
   }
+  codes_local_latency_reverse(lp);
 }
 
 //Creates and sends the message
@@ -1162,11 +1161,13 @@ static int bcast_msg(
       myChildren[i] = (src_pe + next_child) % jobs[ns->my_job].numRanks;
       numValidChildren++;
     }
+    
+    tw_stime delay = copyTime;
 
     for(int i = 0; i < numValidChildren; i++) {
       send_msg(ns, size, src_pe, id, pe_to_lpid(myChildren[i], ns->my_job),
-        sendOffset + copyTime, BCAST, lp);
-      copyTime += copyTime;
+        sendOffset + delay, BCAST, lp);
+      delay += copyTime;
       m->model_net_calls++;
     }
     return numValidChildren;
