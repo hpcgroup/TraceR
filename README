@@ -1,0 +1,27 @@
+Step to compile traceR (lots of dependencies makes this cumbersome).
+
+1. Download and install ROSS. 
+git clone https://github.com/carothersc/ROSS
+Latest verified commit: d62031fb226ffce968299571bd781cefe7270d71
+
+2. Download and install codes-base. 
+git clone git://git.mcs.anl.gov/radix/codes-base
+Latest verfied commit: 7e9a569449ae914d2ee6f21fbd20cc31657a6651
+
+3. Download and install code-net.
+git clone -b uiuc_tracer git://git.mcs.anl.gov/radix/codes-net
+Branch user - uiuc_tracer
+
+Use install-libLIBRARIES and install-data-am as target. We need C++ maps that
+are implemented inside tracer. Hence, only the library build is possible.
+
+4. Download and build Charm++ with bgampi target. 
+git clone http://charm.cs.uiuc.edu/gerrit/charm
+
+Follow instructions here:
+http://charm.cs.illinois.edu/manuals/html/charm++/A.html
+Replace the "charm++" target with bgampi.
+
+5. Set the appropriate paths in tracer/Makefile.common.
+
+6. Change to tracer directory, and make.

@@ -1,0 +1,46 @@
+To compile - make
+
+Multi-job mappers
+------------------
+def_lin_mapping.C : generate linear mapping which is also the default mapping
+when no mapping is specified. If nodes per router is more than 1, then this
+mapping will spread the ranks in a round-robin fashion among the nodes.
+
+Single job mappers
+------------------
+node_mapping.C : generates mapping that always provides contiguous ranks on a
+node. If there is only 1 node per router, this is same as the default linear
+mapping.
+
+torus_block_mapping.C : generate block mapping (2^6 sized). Needs changes in
+file to modify torus dims, block dims, ranks per node for any other machine.
+
+torus_node_random_mapping.C : generate node level random mapping for torus.
+dfly_node_random_mapping.C : generate node level random mapping for dragonfly or fat-tree.
+router_random_mapping.C : generate router level random mapping for dragonfly or fat-tree.
+
+dfly_node_rr_mapping.C : generate node level round robin mapping.
+dfly_router_rr_mapping.C : generate router level round robin mapping.
+
+Commands for execution
+----------------------
+./def_lin_mapping <global_map_file> <space sepated #ranks in each job>
+./node_mapping <global_map_file> <total ranks in the job> <nodes per router> <cores per node> <nodes to skip after>
+./torus_node_random_mapping <global_map_file> <total ranks> <number of ranks per node> <number of nodes>
+./dfly_node_random_mapping <global_map_file> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group>
+./router_random_mapping <global_map_file> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group>
+./dfly_node_rr_mapping <global_map_file> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group>
+./dfly_router_rr_mapping <global_map_file> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group>
+./torus_block_mapping.C <global_map_file> <total ranks in the job>
+
+Output - 
+<global_map_file> in binary format
+job{0,1..} files in binary format
+
+Example:
+./def_lin_mapping global.bin 32 32 64
+
+generates global.bin with 128 ranks, where first 32 are mapped to job0, next 32
+to job1, and last 64 to job2.
+Also generates job0, job1, job2 that maps ranks from these jobs to global ranks.
+

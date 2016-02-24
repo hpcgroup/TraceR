@@ -1,0 +1,45 @@
+ifeq ($(ARCH),bgq)
+CC = mpixlc_r
+CXX = mpixlcxx_r
+SEQ_CXX = bgxlC
+else ifeq ($(ARCH),cray)
+CC = cc -std=gnu99
+CXX = CC
+SEQ_CXX = CC
+else
+CC = mpicc -std=gnu99
+CXX = mpicxx
+SEQ_CXX = g++
+endif
+
+CHARMPATH = /scratch/nikhil/charm-master/netlrts-linux-x86_64-bigemulator
+
+#ross install directory
+ROSS = /scratch/nikhil/ROSS/install
+#base directory of this code
+BASE_DIR = /scratch/nikhil
+CODES_BASE = ${BASE_DIR}/codes-base
+CODES_NET = ${BASE_DIR}/codes-net
+CODES_BASE_LIBS = -L${CODES_NET}/install/lib
+CODES_BASE_LIBS += -L${CODES_BASE}/install/lib
+CODES_BASE_LIBS += -L${ROSS}/lib
+CODES_BASE_LIBS += -lcodes-net
+CODES_BASE_LIBS += -lcodes-base -lROSS -lm
+
+CHARM_LIBS = -L$(CHARMPATH)/lib
+CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
+
+ifeq ($(ARCH),bgq)
+ARCH_FLAGS = -I/bgsys/drivers/ppcfloor
+else
+ARCH_FLAGS = -Wall 
+endif
+
+CODES_BASE_CFLAGS = -I${CODES_BASE}/install/include -I${ROSS}/include
+
+CODES_NET_CFLAGS = -I${CODES_NET}/install/include
+
+CFLAGS = -O3 -g
+CXXFLAGS = -O3 -g
+LDFLAGS = -O3 -g
+OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_BASE_CFLAGS}

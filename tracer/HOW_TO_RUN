@@ -1,0 +1,16 @@
+Run command:
+mpirun -np <p> ../traceR --sync=3  -- ../conf/<choose here> <tracer_config>
+
+Format of trace_config:
+
+<global_map file>
+<num jobs>
+<Trace folder for job0> <map file for job0> <number of ranks in job0>
+<Trace folder for job1> <map file for job1> <number of ranks in job1>
+....
+
+For generating simple global and job map file, use the code in utils.
+
+Example files are in jacobi2d. Sample run command:
+
+mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/tracer-torus.conf tracer_config
