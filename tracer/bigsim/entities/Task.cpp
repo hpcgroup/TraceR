@@ -3,6 +3,7 @@
  *
  */
 
+#include "assert.h"
 #include "Task.h"
 #include "PE.h"
 
@@ -15,6 +16,8 @@ Task::Task() {
   done = false;
   execTime = -1;
   endEvent = 0;
+  msgEntCount = 0;
+  bgPrintCount = 0;
 }
 
 void Task::printEvt(tw_lp * lp, double startTime, int PEno, int jobNo)

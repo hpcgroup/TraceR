@@ -25,7 +25,7 @@ class BgPrint{
     }
     char* msg;
     double time;
-    char taskName[20];
+    char taskName[50];
     void copy(BgPrint *b){
       time = b->time;
       strcpy(taskName, b->taskName);

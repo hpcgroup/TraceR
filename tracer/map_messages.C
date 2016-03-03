@@ -13,6 +13,14 @@ void createMsgMap(int numNics) {
   }
 }
 
+void checkNonZero() {
+  for(int i = 0; i < msgList.size(); i++) {
+    if(msgList[i].size() != 0) {
+      printf("Non zero found at %d size %d\n", i, msgList[i].size());
+    }
+  }
+}
+
 int addMsgInfo(uint64_t nic_num, uint64_t msg_id, uint64_t recvSize,
             int eventSize, char * data) {
   MsgRecord & msg = msgList[nic_num][msg_id];

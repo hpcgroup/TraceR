@@ -1,3 +1,4 @@
+#include "assert.h"
 #include "entities/MsgEntry.h"
 #include "entities/PE.h"
 #include "CWrapper.h"
@@ -8,8 +9,8 @@ extern "C" {
     //MsgID
     MsgID* newMsgID(int size, int pe, int id){return new MsgID(size, pe, id);}
     int MsgID_getSize(MsgID* m){return m->size;}
-    int MsgID_getID(MsgID* m){return m->pe;}
-    int MsgID_getPE(MsgID* m){return m->id;}
+    int MsgID_getID(MsgID* m){return m->id;}
+    int MsgID_getPE(MsgID* m){return m->pe;}
 
     //MsgEntry
     MsgEntry* newMsgEntry(){return new MsgEntry();}
@@ -94,6 +95,7 @@ extern "C" {
     int PE_getBufferSize(PE* p){ return p->msgBuffer.size();}
     void PE_resizeBuffer(PE* p, int num_elems_to_remove){
         int cur_size = p->msgBuffer.size();
+        assert(cur_size >= num_elems_to_remove);
         p->msgBuffer.resize(cur_size - num_elems_to_remove);
     }
     void PE_removeFromBuffer(PE* p, int task_id){

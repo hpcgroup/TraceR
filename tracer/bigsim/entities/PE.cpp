@@ -1,3 +1,4 @@
+#include "assert.h"
 #include "PE.h"
 #include <math.h>
 #define MAX_LOGS 5000000

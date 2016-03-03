@@ -54,6 +54,7 @@ JobInf *jobs;
 int default_mapping;
 int total_ranks;
 tw_stime *jobTimes;
+tw_stime *finalizeTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 0;
 
@@ -255,7 +256,8 @@ int main(int argc, char **argv)
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
 
     tw_opt_add(app_opt);
-    g_tw_lookahead = .5;
+    //g_tw_lookahead = 0.0001;
+    g_tw_lookahead = 0.0001;
     tw_init(&argc, &argv);
 
     signal(SIGTERM, term_handler);
@@ -288,7 +290,7 @@ int main(int argc, char **argv)
 
     net_ids=model_net_configure(&num_nets);
     assert(num_nets==1);
-    net_id = *net_ids;
+    net_id = net_ids[0];
     free(net_ids);
 
     proc_add_lp_type();
@@ -335,6 +337,8 @@ int main(int argc, char **argv)
 
     configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
         &soft_delay_mpi);
+    if(!rank) 
+      printf("Found soft_delay as %f\n", soft_delay_mpi);
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
     {
@@ -389,6 +393,7 @@ int main(int argc, char **argv)
     fscanf(jobIn, "%d", &num_jobs);
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    finalizeTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
 
     for(int i = 0; i < num_jobs; i++) {
@@ -401,6 +406,7 @@ int main(int argc, char **argv)
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
+        finalizeTimes[i] = 0;
     }
 
     if(!rank) {
@@ -499,6 +505,14 @@ int main(int argc, char **argv)
     if(rank == 0) {
         for(int i = 0; i < num_jobs; i++) {
             printf("Job %d Time %f s\n", i, ns_to_s(jobTimesMax[i]));
+        }
+    }
+    
+    MPI_Reduce(finalizeTimes, jobTimesMax, num_jobs, MPI_DOUBLE, MPI_MAX, 0,
+    MPI_COMM_WORLD);
+    if(rank == 0) {
+        for(int i = 0; i < num_jobs; i++) {
+            printf("Job %d Finalize Time %f s\n", i, ns_to_s(jobTimesMax[i]));
         }
     }
     tw_end();
@@ -624,6 +638,7 @@ static void proc_finalize(
     if(ns->my_pe_num == -1) return;
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
+    tw_stime finalTime = tw_now(lp);
 
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f (tw_now %f) seconds.\n", ns->my_job,
@@ -633,6 +648,9 @@ static void proc_finalize(
 
     if(jobTime > jobTimes[ns->my_job]) {
         jobTimes[ns->my_job] = jobTime;
+    }
+    if(finalTime > finalizeTimes[ns->my_job]) {
+        finalizeTimes[ns->my_job] = finalTime;
     }
 
     return;
@@ -668,10 +686,10 @@ static void handle_kickoff_event(
         (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
         (double)time_till_now, ns->start_ts);
     }
-
+  
     //Safety check if the pe_to_lpid converter is correct
     assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
-
+    assert(PE_is_busy(ns->my_pe) == false);
     exec_task(ns, PE_getFirstTask(ns->my_pe), lp, m);
 }
 
@@ -945,7 +963,6 @@ static tw_stime exec_task(
 
     //Mark the execution time of the task
     tw_stime time = PE_getTaskExecTime(ns->my_pe, task_id);
-    tw_stime* execTime = &time;
 
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
@@ -1082,13 +1099,13 @@ static tw_stime exec_task(
     PE_execPrintEvt(lp, ns->my_pe, task_id, tw_now(lp));
 
     //Complete the task
-    tw_stime finish_time = codes_local_latency(lp) + *execTime;
+    tw_stime finish_time = codes_local_latency(lp) + time;
     exec_comp(ns, task_id, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id)) {
       ns->end_ts = tw_now(lp);
     }
     //Return the execution time of the task
-    return *execTime;
+    return time;
 }
 
 static void exec_task_rev(

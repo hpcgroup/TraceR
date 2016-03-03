@@ -7,10 +7,10 @@
 #include <cstdio>
 
 MsgEntry::MsgEntry() {
-  sendOffset = 0;
-  node = 0;
-  thread = 0;
-  msgId.size = 0;
+  sendOffset = INT_MIN;
+  node = INT_MIN;
+  thread = INT_MIN;
+  msgId.size = INT_MIN;
 }
 
 // From TCsim.C file:
