@@ -267,7 +267,7 @@ int main(int argc, char **argv)
 
     tw_opt_add(app_opt);
     //g_tw_lookahead = 0.0001;
-    g_tw_lookahead = 0.0001;
+    g_tw_lookahead = 0.001;
     tw_init(&argc, &argv);
 
     signal(SIGTERM, term_handler);
