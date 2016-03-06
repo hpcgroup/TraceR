@@ -9,6 +9,7 @@ Format of trace_config:
 <Trace folder for job1> <map file for job1> <number of ranks in job1>
 ....
 
+If <global_map file> is not needed, use NA for it and <map file for job*>.
 For generating simple global and job map file, use the code in utils.
 
 Example files are in jacobi2d. Sample run command:
