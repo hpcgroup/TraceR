@@ -65,7 +65,7 @@ mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/tracer-torus.conf tracer_c
 
 ### Reference
 
-Any published work which utilizes this API should include the following
+Any published work that utilizes this software should include the following
 reference:
 
 ```
