@@ -191,6 +191,10 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     strcmp(bglog->name, "AMPI_Wait") == 0) {
     t->execTime = soft_delay_mpi;
   }
+
+  if(t->execTime < 0) {
+     t->execTime = 0;
+  }
   
   if(strcmp(bglog->name, "AMPI_BgSetEndEvent") == 0) {
     t->endEvent = 1;

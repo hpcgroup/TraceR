@@ -24,7 +24,7 @@ Latest verfied commit: 7e9a569449ae914d2ee6f21fbd20cc31657a6651
 ```
 git clone -b uiuc_tracer git://git.mcs.anl.gov/radix/codes-net
 ```
-Branch user - uiuc_tracer
+Branch used - uiuc_tracer
 
 Use install-libLIBRARIES and install-data-am as target. We need C++ maps that
 are implemented inside tracer. Hence, only the library build is possible.
