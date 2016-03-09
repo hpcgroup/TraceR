@@ -69,7 +69,11 @@ Any published work which utilizes this API should include the following
 reference:
 
 ```
-Bilge Acun, Nikhil Jain, Abhinav Bhatele, Misbah Mubarak, Christopher D. Carothers, and Laxmikant V. Kale. Preliminary evaluation of a parallel trace replay tool for HPC network simulations. In Proceedings of the 3rd Workshop on Parallel and Distributed Agent-Based Simulations, PADABS '15, August 2015. LLNL-CONF-667225.
+Bilge Acun, Nikhil Jain, Abhinav Bhatele, Misbah Mubarak, Christopher D.
+Carothers, and Laxmikant V. Kale. Preliminary evaluation of a parallel trace
+replay tool for HPC network simulations. In Proceedings of the 3rd Workshop on
+Parallel and Distributed Agent-Based Simulations, PADABS '15, August 2015.
+LLNL-CONF-667225.
 ```
 
 ### Release
