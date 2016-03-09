@@ -1,6 +1,11 @@
 TraceR v1.0
 ===========
 
+TraceR is a trace replay tool built upon the ROSS-based CODES simulation
+framework. TraceR can be used for predicting network performance and
+understanding network behavior by simulating messaging in High Performance
+Computing applications on interconnection networks.
+
 ### Build
 
 * Download and install ROSS:
@@ -56,6 +61,15 @@ For generating simple global and job map file, use the code in utils.
 Example files are in jacobi2d. Sample run command:
 ```
 mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/tracer-torus.conf tracer_config
+```
+
+### Reference
+
+Any published work which utilizes this API should include the following
+reference:
+
+```
+Bilge Acun, Nikhil Jain, Abhinav Bhatele, Misbah Mubarak, Christopher D. Carothers, and Laxmikant V. Kale. Preliminary evaluation of a parallel trace replay tool for HPC network simulations. In Proceedings of the 3rd Workshop on Parallel and Distributed Agent-Based Simulations, PADABS '15, August 2015. LLNL-CONF-667225.
 ```
 
 ### Release
