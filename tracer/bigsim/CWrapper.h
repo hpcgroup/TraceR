@@ -31,9 +31,9 @@
 
  #include <ross.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+//#ifdef __cplusplus
+//extern "C" {
+//#endif
 
 //MsgID
 typedef struct MsgID MsgID;
@@ -58,49 +58,51 @@ typedef struct PE PE;
 PE* newPE();
 void PE_set_busy(PE* p, bool b);
 bool PE_is_busy(PE* p);
-bool PE_noUnsatDep(PE* p, int tInd);
-bool PE_noMsgDep(PE* p, int tInd);
+bool PE_noUnsatDep(PE* p, int, int tInd);
+bool PE_noMsgDep(PE* p, int, int tInd);
+int PE_get_iter(PE* p);
+void PE_inc_iter(PE* p);
+void PE_dec_iter(PE* p);
 double PE_getTaskExecTime(PE* p, int tInd);
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
 void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime);
-void PE_set_taskDone(PE* p, int tInd, bool b);
-bool PE_get_taskDone(PE* p, int tInd);
+void PE_set_taskDone(PE* p, int, int tInd, bool b);
+bool PE_get_taskDone(PE* p, int, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);
-void PE_undone_fwd_deps(PE* p, int tInd);
+void PE_undone_fwd_deps(PE* p, int iter, int tInd);
 void PE_set_currentTask(PE* p, int tInd);
 int PE_get_currentTask(PE* p);
-void PE_increment_currentTask(PE* p, int tInd);
 int PE_get_myEmPE(PE* p);
 int PE_get_myNum(PE* p);
 int PE_getFirstTask(PE* p);
-int PE_isEndEvent(PE *p, int task_id);
+bool PE_isEndEvent(PE *p, int task_id);
+bool PE_isLoopEvent(PE *p, int task_id);
 
 int PE_getBufferSize(PE* p);
 void PE_clearMsgBuffer(PE* p);
-void PE_addToBuffer(PE* p, int task_id);
-void PE_addToFrontBuffer(PE* p, int task_id);
-void PE_removeFromBuffer(PE* p, int task_id);
+void PE_addToBuffer(PE* p, TaskPair *task_id);
+void PE_addToFrontBuffer(PE* p, TaskPair *task_id);
+void PE_removeFromBuffer(PE* p, TaskPair *task_id);
 void PE_resizeBuffer(PE* p, int num_elems_to_remove);
-int PE_getNextBuffedMsg(PE* p);
+TaskPair PE_getNextBuffedMsg(PE* p);
 
 //---
 //Optimistic mode related stuff
-void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
-void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
-int PE_getCopyBufferSize(PE* p, int entry_task_id);
-int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id);
-void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id);
-void PE_addToBusyStateBuffer(PE* p, bool state);
-bool PE_popBusyStateBuffer(PE* p);
-bool PE_isLastStateBusy(PE* p);
+//void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
+//void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
+//int PE_getCopyBufferSize(PE* p, int entry_task_id);
+//int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id);
+//void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id);
+//void PE_addToBusyStateBuffer(PE* p, bool state);
+//bool PE_popBusyStateBuffer(PE* p);
+//bool PE_isLastStateBusy(PE* p);
 //---
 
 int PE_findTaskFromMsg(PE* p, MsgID* msgId);
-void PE_invertMsgPe(PE* p, int tInd);
-MsgID PE_getTaskMsgID(PE* p, int tInd);
+void PE_invertMsgPe(PE* p, int, int tInd);
 int PE_get_tasksCount(PE* p);
 int PE_get_totalTasksCount(PE* p);
 void PE_printStat(PE* p);
@@ -118,8 +120,8 @@ void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
 int TraceReader_totalWorkerProcs(TraceReader* t);
 void addEventSub(char *key, double val);
 
-#ifdef __cplusplus
-}
-#endif
+//#ifdef __cplusplus
+//}
+//#endif
 
 #endif

@@ -52,15 +52,14 @@ class Task {
     Task();
     ~Task();
     void printEvt(tw_lp * lp, double startTime, int PEno, int jobNo);
-    MsgID myMsgId;
-    bool done;
     short charmEP;
     int* forwardDep; //backward dependent tasks
     int forwDepSize;	// size of forwardDep array
 
     int* backwardDep;	//forward dependent tasks
     int backwDepSize;	// size of backwDep array
-    int endEvent;
+    bool endEvent;
+    bool loopEvent;
 
     double execTime;	//execution time of the task
 
@@ -69,7 +68,6 @@ class Task {
 
     int bgPrintCount;
     BgPrint* myBgPrints;
-    void copyFromTask(Task* t);
 };
 
 #endif /* TASK_H_ */

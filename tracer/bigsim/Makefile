@@ -17,9 +17,9 @@ CPP_DEPS += entities/MsgEntry.d entities/PE.d entities/Task.d
 events/%.o: events/%.cpp
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -27,9 +27,9 @@ endif
 entities/%.o: entities/%.cpp
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -37,9 +37,9 @@ endif
 %.o: %.cpp
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '

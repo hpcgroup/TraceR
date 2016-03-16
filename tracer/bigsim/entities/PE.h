@@ -20,22 +20,22 @@
 #include "MsgEntry.h"
 #include <cstring>
 #include "Task.h"
-#include <vector>
-#include <algorithm>
 #include <list>
 #include <map>
+#include "datatypes.h"
 
-using namespace std;
 class Task;
 
 class PE {
   public:
     PE();
     ~PE();
-    list<int> msgBuffer;
-    vector<bool> busyStateBuffer;
-    map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
+    std::list<TaskPair> msgBuffer;
+    //vector<bool> busyStateBuffer;
+    //map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
     Task* myTasks;	// all tasks of this PE
+    bool **taskStatus;
+    bool **msgStatus;
     double currTime;
     bool busy;
     int windowOffset;
@@ -44,17 +44,18 @@ class PE {
     int tasksCount;	//total number of tasks
     int currentTask; // index of first not-executed task (helps searching messages)
     int firstTask;
+    int currIter;
 
-    bool noUnsatDep(int tInd);	// there is no unsatisfied dependency for task
+    bool noUnsatDep(int iter, int tInd);	// there is no unsatisfied dependency for task
     double taskExecTime(int tInd);
     void printStat();
     void check();
     void printState();
 
     //functions added by Bilge for codes-tracing
-    void invertMsgPe(int tInd);
+    void invertMsgPe(int iter, int tInd);
     double getTaskExecTime(int tInd);
-    map<int, int>* msgDestLogs;
+    std::map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
 

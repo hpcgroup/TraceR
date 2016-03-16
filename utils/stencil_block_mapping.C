@@ -49,6 +49,7 @@ int main(int argc, char**argv) {
   int s_z = atoi(argv[11]);
 
   int *localRanks = new int[numAllocCores];
+  int *granks = new int[numAllocCores];
   int bx = box_x/s_x;
   int by = box_y/s_y;
   int bz = box_z/s_z;
@@ -81,7 +82,7 @@ int main(int argc, char**argv) {
         fwrite(&global_rank, sizeof(int), 1, binout);
         fwrite(&localRanks[local_rank], sizeof(int), 1, binout);
         fwrite(&jobid, sizeof(int), 1, binout);
-        fwrite(&global_rank, sizeof(int), 1, out_files);
+        granks[localRanks[local_rank]] = global_rank;
 #if PRINT_MAP
         printf("%d %d %d\n", global_rank, localRanks[local_rank], jobid);
 #endif
@@ -97,6 +98,10 @@ int main(int argc, char**argv) {
     if(local_rank == numAllocCores) {
       break;
     }
+  }
+  
+  for(int i = 0; i < numAllocCores; i++) {
+    fwrite(&granks[i], sizeof(int), 1, out_files);
   }
 
   fclose(binout);

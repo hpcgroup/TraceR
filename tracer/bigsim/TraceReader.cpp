@@ -16,6 +16,8 @@
 
 #include "TraceReader.h"
 #include <cstdio>
+//#include <iostream>
+//#include <fstream>
 
 #include "blue.h"
 #include "blue_impl.h"
@@ -36,7 +38,7 @@ extern JobInf *jobs;
 
 std::map<std::string, double> eventSubs;
 
-extern "C" void addEventSub(char *key, double val) {
+void addEventSub(char *key, double val) {
   std::string skey(key);
   eventSubs[key] = (double)TIME_MULT * val;
 }
@@ -80,7 +82,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
 
   traceFileName = tracePath;
 
-  pe->msgDestLogs = new map<int, int>[numEmPes];
+  pe->msgDestLogs = new std::map<int, int>[numEmPes];
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
 
@@ -107,6 +109,12 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   pe->jobNum = jobnum;
   pe->myEmPE = (penum/numWth)%numEmPes;
   pe->myTasks= new Task[tlinerec.length()];
+  pe->taskStatus= new bool*[jobs[jobnum].numIters];
+  pe->msgStatus= new bool*[jobs[jobnum].numIters];
+  for(int i = 0; i < jobs[jobnum].numIters; i++) {
+    pe->taskStatus[i] = new bool[tlinerec.length()];
+    pe->msgStatus[i] = new bool[tlinerec.length()];
+  }
   pe->tasksCount = tlinerec.length();
   pe->totalTasksCount = tlinerec.length();
   pe->firstTask = -1;
@@ -114,10 +122,6 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   if(jobs[jobnum].skipMsgId == -2) {
      pe->firstTask = 0;
   }
-
-  //int status = BgReadProcWindow( penum, numWth , numEmPes, totalWorkerProcs,
-  //            allNodeOffsets, tlinerec, fileLoc, totalTlineLength, firstLog,
-  //            totalTlineLength);
 
   *startTime = 0;
 
@@ -129,26 +133,28 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
       if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == jobs[jobnum].skipMsgId) {
         pe->firstTask = logInd;
       } else {
-        pe->myTasks[logInd].done = true;
+        for(int i = 0; i < jobs[jobnum].numIters; i++) {
+          pe->taskStatus[i][logInd] = true;
+        }
         continue;
       }
     }
 
     if(logInd < pe->firstTask) {
-      return;
+      assert(0);
     }
 
     // first job's index is zero
-    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe);
+    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe, logInd);
 
     int sPe = bglog->msgId.pe();
     int smsgID = bglog->msgId.msgID();
     if(sPe >= 0) {
-        map<int, int>::iterator it;
+        std::map<int, int>::iterator it;
         it = pe->msgDestLogs[(sPe/numWth)%numEmPes].find(smsgID); 
         // some task set it before so it is a broadcast
         if (it == pe->msgDestLogs[(sPe/numWth)%numEmPes].end()){
-            pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(pair<int,int>(smsgID, logInd + firstLog));
+            pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(std::pair<int,int>(smsgID, logInd + firstLog));
         } else{
             // it may be a broadcast
             printf(" %d I should never come here, please fix me %d\n", penum, it->second);
@@ -157,19 +163,22 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
         }
     }
     if(logInd == pe->firstTask) {
-      pe->myTasks[logInd].myMsgId.pe = -1;
+      for(int i = 0; i < jobs[jobnum].numIters; i++) {
+        pe->msgStatus[i][logInd] = true;
+      }
     }
   }
   firstLog += tlinerec.length();
 }
 
-void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe)
+void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe, int logInd)
 {
   if(time_replace_limit != -1 && bglog->execTime >= time_replace_limit) {
     t->execTime = (double)TIME_MULT * time_replace_by;
   } else {
     t->execTime = (double)TIME_MULT * bglog->execTime;
   }
+
   if( strcmp(bglog->name, "AMPI_generic") == 0 ||
     strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
     strcmp(bglog->name, "msgep") == 0 ||
@@ -181,6 +190,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     strcmp(bglog->name, "AMPI_WAITALL") == 0) {
     t->execTime = 0.0;
   }
+
   if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
     strcmp(bglog->name, "AMPI_SEND") == 0 ||
     strcmp(bglog->name, "AMPI_Allreduce") == 0 ||
@@ -197,18 +207,30 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   }
   
   if(strcmp(bglog->name, "AMPI_BgSetEndEvent") == 0) {
-    t->endEvent = 1;
+    t->endEvent = true;
   } else {
-    t->endEvent = 0;
+    t->endEvent = false;
   }
 
-  t->myMsgId.pe = bglog->msgId.pe() + jobPEindex;
-  if(t->myMsgId.pe < 0)
-    t->myMsgId.pe = -1;
-  else
-    t->myMsgId.pe++; //can't use 0 since a completed receive is indicated by negative value.
+  if(strcmp(bglog->name, "AMPI_BgLoopToStart") == 0) {
+    t->loopEvent = true;
+  } else {
+    t->loopEvent = false;
+  }
 
-  t->myMsgId.id = bglog->msgId.msgID();
+  //depends on message or not
+  if(bglog->msgId.pe() < 0) {
+    for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
+      pe->msgStatus[i][logInd] = true;
+      pe->taskStatus[i][logInd] = false;
+    }
+  } else {
+    for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
+      pe->msgStatus[i][logInd] = false;
+      pe->taskStatus[i][logInd] = false;
+    }
+  }
+
   t->charmEP = bglog->charm_ep;
   t->msgEntCount = bglog->msgs.length();
   t->myEntries = new MsgEntry[t->msgEntCount];

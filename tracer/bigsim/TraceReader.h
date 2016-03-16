@@ -21,10 +21,6 @@
 #include "blue_impl.h"
 #include "entities/PE.h"
 #include "entities/Task.h"
-#include <string>
-#include <iostream>
-#include <fstream>
-using namespace std;
 class PE;
 class Node;
 class Task;
@@ -37,7 +33,7 @@ public:
     void loadTraceSummary();
     void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe,
         int penum, int jobnum, double* startTime);
-    void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe);
+    void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe, int);
 
     int numEmPes;	// number of emulation PEs, there is a trace file for each of them
     int totalWorkerProcs;
