@@ -821,7 +821,7 @@ static void handle_bcast_event(
 
   tw_stime soft_latency = codes_local_latency(lp);
   m->model_net_calls = 0;
-  int num_sends = bcast_msg(ns, m->iteration, m->msg_id.size, m->msg_id.pe, m->msg_id.id,
+  int num_sends = bcast_msg(ns, m->msg_id.size, m->msg_id.pe, m->iteration, m->msg_id.id,
       0, soft_latency, lp, m);
 
   if(!num_sends) num_sends++;
@@ -857,13 +857,17 @@ static void handle_exec_event(
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     int counter = 0;
 
-    for(int i=0; i<fwd_dep_size; i++){
+    if(PE_isLoopEvent(ns->my_pe, task_id) && (PE_get_iter(ns->my_pe) > iter)) {
+      PE_mark_all_done(ns->my_pe, iter, task_id);
+    } else {
+      for(int i=0; i<fwd_dep_size; i++){
         if(PE_noUnsatDep(ns->my_pe, iter, fwd_deps[i]) && PE_noMsgDep(ns->my_pe, iter, fwd_deps[i])){
-            TaskPair pair;
-            pair.iter = iter; pair.taskid = fwd_deps[i];
-            PE_addToBuffer(ns->my_pe, &pair);
-            counter++;
+          TaskPair pair;
+          pair.iter = iter; pair.taskid = fwd_deps[i];
+          PE_addToBuffer(ns->my_pe, &pair);
+          counter++;
         }
+      }
     }
     TaskPair buffd_task = PE_getNextBuffedMsg(ns->my_pe);
     //Store the executed_task id for reverse handler msg
@@ -1140,14 +1144,12 @@ static tw_stime exec_task(
       TaskPair pair;
       pair.iter = PE_get_iter(ns->my_pe); pair.taskid = PE_getFirstTask(ns->my_pe);
       PE_addToBuffer(ns->my_pe, &pair);
-    } else {
-      //Complete the task
-      b->c2 = 1;
-      tw_stime finish_time = codes_local_latency(lp) + time;
-      exec_comp(ns, task_id.iter, task_id.taskid, finish_time, 0, lp);
-      if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
-        ns->end_ts = tw_now(lp);
-      }
+    }
+    //Complete the task
+    tw_stime finish_time = codes_local_latency(lp) + time;
+    exec_comp(ns, task_id.iter, task_id.taskid, finish_time, 0, lp);
+    if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
+      ns->end_ts = tw_now(lp);
     }
     //Return the execution time of the task
     return time;
@@ -1171,9 +1173,7 @@ static void exec_task_rev(
     PE_dec_iter(ns->my_pe);
     PE_removeFromBuffer(ns->my_pe, &pair);
   }
-  if(b->c2) {
-    codes_local_latency_reverse(lp);
-  }
+  codes_local_latency_reverse(lp);
 }
 
 //Creates and sends the message

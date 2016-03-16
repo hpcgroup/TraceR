@@ -66,6 +66,10 @@
 
     int PE_getFirstTask(PE* p){ return p->firstTask;}
     void PE_set_taskDone(PE* p, int iter, int tInd, bool b){ p->taskStatus[iter][tInd] = b; }
+    void PE_mark_all_done(PE *p, int iter, int task_id) {
+      p->mark_all_done(iter, task_id);
+    }
+
     bool PE_get_taskDone(PE* p, int iter, int tInd){ return p->taskStatus[iter][tInd]; }
     int* PE_getTaskFwdDep(PE* p, int tInd){ return p->myTasks[tInd].forwardDep; }
     int PE_getTaskFwdDepSize(PE* p, int tInd){ return p->myTasks[tInd].forwDepSize; }

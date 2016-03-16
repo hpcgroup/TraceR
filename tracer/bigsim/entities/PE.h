@@ -36,6 +36,7 @@ class PE {
     Task* myTasks;	// all tasks of this PE
     bool **taskStatus;
     bool **msgStatus;
+    bool *allMarked;
     double currTime;
     bool busy;
     int windowOffset;
@@ -47,6 +48,7 @@ class PE {
     int currIter;
 
     bool noUnsatDep(int iter, int tInd);	// there is no unsatisfied dependency for task
+    void mark_all_done(int iter, int tInd);
     double taskExecTime(int tInd);
     void printStat();
     void check();

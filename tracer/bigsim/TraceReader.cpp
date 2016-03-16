@@ -111,9 +111,11 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   pe->myTasks= new Task[tlinerec.length()];
   pe->taskStatus= new bool*[jobs[jobnum].numIters];
   pe->msgStatus= new bool*[jobs[jobnum].numIters];
+  pe->allMarked= new bool[jobs[jobnum].numIters];
   for(int i = 0; i < jobs[jobnum].numIters; i++) {
     pe->taskStatus[i] = new bool[tlinerec.length()];
     pe->msgStatus[i] = new bool[tlinerec.length()];
+    pe->allMarked[i] = false;
   }
   pe->tasksCount = tlinerec.length();
   pe->totalTasksCount = tlinerec.length();
@@ -208,12 +210,14 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
   
   if(strcmp(bglog->name, "AMPI_BgSetEndEvent") == 0) {
     t->endEvent = true;
+    t->execTime = 0;
   } else {
     t->endEvent = false;
   }
 
   if(strcmp(bglog->name, "AMPI_BgLoopToStart") == 0) {
     t->loopEvent = true;
+    t->execTime = 0;
   } else {
     t->loopEvent = false;
   }

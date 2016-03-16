@@ -69,6 +69,7 @@ MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
 void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime);
 void PE_set_taskDone(PE* p, int, int tInd, bool b);
+void PE_mark_all_done(PE *p, int iter, int task_id);
 bool PE_get_taskDone(PE* p, int, int tInd);
 int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);

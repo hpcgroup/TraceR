@@ -36,6 +36,14 @@ PE::~PE() {
     delete [] msgDestLogs;
 }
 
+void PE::mark_all_done(int iter, int tInd) {
+  if(allMarked[iter]) return;
+  for(int i = tInd + 1; i < tasksCount; i++) {
+    taskStatus[iter][i] = true;
+  }
+  if(allMarked[iter]) true;
+}
+
 bool PE::noUnsatDep(int iter, int tInd)
 {
   for(int i=0; i<myTasks[tInd].backwDepSize; i++)
