@@ -110,8 +110,13 @@
     void PE_removeFromBuffer(PE* p, TaskPair *task_id){
         //if the task_id is in the buffer, remove it from the buffer
         if(!p->msgBuffer.size()) assert(0);
-        if(p->msgBuffer.back().taskid != task_id->taskid) assert(0);
-         p->msgBuffer.pop_back();
+        if(p->msgBuffer.back().taskid != task_id->taskid) {
+          printf("[PE %d] Mismatch (%d,%d) (%d,%d)\n", 
+            p->myNum, p->msgBuffer.back().iter, p->msgBuffer.back().taskid, 
+            task_id->iter, task_id->taskid);
+          assert(0);
+        }
+        p->msgBuffer.pop_back();
     }
     TaskPair PE_getNextBuffedMsg(PE* p){
         if(p->msgBuffer.size()<=0) return TaskPair(-1,-1);

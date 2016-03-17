@@ -857,8 +857,14 @@ static void handle_exec_event(
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
     int counter = 0;
 
-    if(PE_isLoopEvent(ns->my_pe, task_id) && (PE_get_iter(ns->my_pe) > iter)) {
+    if(PE_isLoopEvent(ns->my_pe, task_id) && (PE_get_iter(ns->my_pe) != (jobs[ns->my_job].numIters - 1))) {
+      b->c1 = 1;
       PE_mark_all_done(ns->my_pe, iter, task_id);
+      PE_inc_iter(ns->my_pe);
+      TaskPair pair;
+      pair.iter = PE_get_iter(ns->my_pe); pair.taskid = PE_getFirstTask(ns->my_pe);
+      PE_addToBuffer(ns->my_pe, &pair);
+      counter++;
     } else {
       for(int i=0; i<fwd_dep_size; i++){
         if(PE_noUnsatDep(ns->my_pe, iter, fwd_deps[i]) && PE_noMsgDep(ns->my_pe, iter, fwd_deps[i])){
@@ -954,6 +960,10 @@ static void handle_exec_rev_event(
     //mark the task as not done
     int iter = m->iteration;
     PE_set_taskDone(ns->my_pe, iter, task_id, false);
+      
+    if(b->c1) {
+      PE_dec_iter(ns->my_pe);
+    }
     
     if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
         PE_clearMsgBuffer(ns->my_pe);
@@ -1138,13 +1148,6 @@ static tw_stime exec_task(
 
     PE_execPrintEvt(lp, ns->my_pe, task_id.taskid, tw_now(lp));
 
-    if(PE_isLoopEvent(ns->my_pe, task_id.taskid) && (PE_get_iter(ns->my_pe) != (jobs[ns->my_job].numIters - 1))) {
-      b->c1 = 1;
-      PE_inc_iter(ns->my_pe);
-      TaskPair pair;
-      pair.iter = PE_get_iter(ns->my_pe); pair.taskid = PE_getFirstTask(ns->my_pe);
-      PE_addToBuffer(ns->my_pe, &pair);
-    }
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + time;
     exec_comp(ns, task_id.iter, task_id.taskid, finish_time, 0, lp);
@@ -1166,12 +1169,6 @@ static void exec_task_rev(
   for(int i = 0; i < m->model_net_calls; i++) {
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
-  }
-  if(b->c1) {
-    TaskPair pair;
-    pair.iter = PE_get_iter(ns->my_pe); pair.taskid = PE_getFirstTask(ns->my_pe);
-    PE_dec_iter(ns->my_pe);
-    PE_removeFromBuffer(ns->my_pe, &pair);
   }
   codes_local_latency_reverse(lp);
 }

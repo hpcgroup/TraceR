@@ -74,7 +74,7 @@ void PE::printStat()
     }
   }
   if(countTask != 0) {
-    printf("PE%d: not done count:%d ",myNum, countTask);
+    printf("PE%d: not done count:%d \n ",myNum, countTask);
   }
 }
 
