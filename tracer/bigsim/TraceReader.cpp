@@ -181,27 +181,28 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     t->execTime = (double)TIME_MULT * bglog->execTime;
   }
 
-  if( strcmp(bglog->name, "AMPI_generic") == 0 ||
+  if(strncmp(bglog->name, "AMPI_", 5) == 0) {
+    t->execTime = soft_delay_mpi;
+  }
+
+  if(strcmp(bglog->name, "AMPI_START") == 0 ||
+    strcmp(bglog->name, "AMPI_generic") == 0 ||
+    strcmp(bglog->name, "AMPI_SEND") == 0 ||
     strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
+    strcmp(bglog->name, "ATAReq_wait") == 0 ||
+    strcmp(bglog->name, "RECV_RESUME") == 0 ||
+    strcmp(bglog->name, "SPLIT_RESUME") == 0 ||
+    strcmp(bglog->name, "PROBE_RESUME") == 0 ||
+    strcmp(bglog->name, "IPROBE_RESUME") == 0 ||
     strcmp(bglog->name, "msgep") == 0 ||
     strcmp(bglog->name, "GroupReduce") == 0 ||
-    strcmp(bglog->name, "RECV_RESUME") == 0 ||
     strcmp(bglog->name, "start-broadcast") == 0 ||
     strcmp(bglog->name, "split-broadcast") == 0 ||
     strcmp(bglog->name, "end-broadcast") == 0 ||
-    strcmp(bglog->name, "AMPI_WAITALL") == 0) {
+    strcmp(bglog->name, "AMPI_WAIT") == 0 ||
+    strcmp(bglog->name, "AMPI_WAITALL") == 0 ||
+    strcmp(bglog->name, "user_code") == 0) {
     t->execTime = 0.0;
-  }
-
-  if(strcmp(bglog->name, "AMPI_Irecv") == 0 ||
-    strcmp(bglog->name, "AMPI_SEND") == 0 ||
-    strcmp(bglog->name, "AMPI_Allreduce") == 0 ||
-    strcmp(bglog->name, "AMPI_Recv") == 0 ||
-    strcmp(bglog->name, "AMPI_Sendrecv") == 0 ||
-    strcmp(bglog->name, "AMPI_Waitall") == 0 ||
-    strcmp(bglog->name, "AMPI_Barrier") == 0 ||
-    strcmp(bglog->name, "AMPI_Wait") == 0) {
-    t->execTime = soft_delay_mpi;
   }
 
   if(t->execTime < 0) {
