@@ -93,9 +93,9 @@ int main(int argc, char**argv) {
   }
 
   srand(1331);
-  for(int i = 0; i < numRouters; i++) {
-    int node1 = rand() % numRouters;
-    int node2 = rand() % numRouters;
+  for(int i = 0; i < 4*totalRouters; i++) {
+    int node1 = rand() % totalRouters;
+    int node2 = rand() % totalRouters;
     int temp = mapping[node1];
     mapping[node1] = mapping[node2];
     mapping[node2] = temp;
