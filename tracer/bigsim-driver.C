@@ -70,8 +70,8 @@ tw_stime *finalizeTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 0;
 
-int size_replace_by = 0;
-int size_replace_limit = -1;
+int* size_replace_by;
+int* size_replace_limit;
 double time_replace_by = 0;
 double time_replace_limit = -1;
 
@@ -436,14 +436,24 @@ int main(int argc, char **argv)
       printf("Done reading meta-information about jobs\n");
     }
 
+    size_replace_limit = new int[num_jobs];
+    size_replace_by = new int[num_jobs];
+    for(int i = 0; i < num_jobs; i++) {
+      size_replace_limit[i] = -1;
+      size_replace_by[i] = 0;
+    }
+
     char next = ' ';
     fscanf(jobIn, "%c", &next);
     while(next != ' ') {
       if(next == 'M' || next == 'm') {
-        fscanf(jobIn, "%d %d", &size_replace_limit, &size_replace_by);
+        int size_limit, size_by, jobid;
+        fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by);
+        size_replace_limit[jobid] = size_limit;
+        size_replace_by[jobid] = size_by;
         if(!rank)
-          printf("Will replace all messages of size greater than %d by %d\n", 
-              size_replace_limit, size_replace_by);
+          printf("Will replace all messages of size greater than %d by %d for job %d\n", 
+              size_replace_limit[jobid], size_replace_by[jobid], jobid);
       }
       if(next == 'T' || next == 't') {
         fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
@@ -667,7 +677,7 @@ static void proc_finalize(
         printf("Job[%d]PE[%d]: FINALIZE in %f (tw_now %f) seconds.\n", ns->my_job,
           ns->my_pe_num, ns_to_s(jobTime), ns_to_s(tw_now(lp)-ns->start_ts));
 
-    PE_printStat(ns->my_pe);
+    //PE_printStat(ns->my_pe);
 
     if(jobTime > jobTimes[ns->my_job]) {
         jobTimes[ns->my_job] = jobTime;
