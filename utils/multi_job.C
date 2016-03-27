@@ -120,7 +120,7 @@ void allocateJob(int job_num, vector<int> &routers) {
       localRanks[i] = i;
     }
   } else if(map_type == J_BLOCKED || map_type == J_RAND_BLOCKED) {
-    int bigger_box =  skip * prod_xyz;
+    int bigger_box =  r_x*r_y*r_z * prod_xyz;
     int bbx = box_x/(r_x*s_x);
     int bby = box_y/(r_y*s_y);
     int bbz = box_z/(r_z*s_z);
