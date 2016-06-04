@@ -51,8 +51,8 @@ Format of trace_config:
 ```
 <global_map file>
 <num jobs>
-<Trace folder for job0> <map file for job0> <number of ranks in job0>
-<Trace folder for job1> <map file for job1> <number of ranks in job1>
+<Trace folder for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
+<Trace folder for job1> <map file for job1> <number of ranks in job1> <iterations (use 1 if running in normal mode)>
 ...
 ```
 If <global_map file> is not needed, use NA for it and <map file for job*>.

@@ -1,4 +1,4 @@
 global_map.bin
 2
-traceJ0 job0 64
-traceJ1 job1 32
+traceJ0 job0 64 1
+traceJ1 job1 32 1
