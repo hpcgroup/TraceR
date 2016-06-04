@@ -19,8 +19,9 @@
 #include "CWrapper.h"
 #include "TraceReader.h"
 #include "assert.h"
+#include <algorithm>
 
-extern "C" {
+//extern "C" {
 
     //MsgID
     MsgID* newMsgID(int size, int pe, int id){return new MsgID(size, pe, id);}
@@ -39,15 +40,17 @@ extern "C" {
 
     //PE
     PE* newPE(){return new PE();}
+    int PE_get_iter(PE* p) { return p->currIter; }
+    void PE_inc_iter(PE* p) { p->currIter++; }
+    void PE_dec_iter(PE* p) { p->currIter--; }
     void PE_set_busy(PE* p, bool b){p->busy = b;}
     bool PE_is_busy(PE* p){return p->busy;}
-    bool PE_noUnsatDep(PE* p, int tInd){return p->noUnsatDep(tInd);}
-    bool PE_noMsgDep(PE* p, int tInd){
-        if(p->myTasks[tInd].myMsgId.pe < 0)
-            return true;
-        return false; 
+    bool PE_noUnsatDep(PE* p, int iter, int tInd){return p->noUnsatDep(iter, tInd);}
+    bool PE_noMsgDep(PE* p, int iter, int tInd){
+      return p->msgStatus[iter][tInd];
     }
-    int PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
+    bool PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
+    bool PE_isLoopEvent(PE *p, int tInd) { return p->myTasks[tInd].loopEvent; }
     double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
     MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
@@ -62,51 +65,41 @@ extern "C" {
     }
 
     int PE_getFirstTask(PE* p){ return p->firstTask;}
-    void PE_set_taskDone(PE* p, int tInd, bool b){p->myTasks[tInd].done=b;}
-    bool PE_get_taskDone(PE* p, int tInd){return p->myTasks[tInd].done;}
-    int* PE_getTaskFwdDep(PE* p, int tInd){return p->myTasks[tInd].forwardDep;}
-    int PE_getTaskFwdDepSize(PE* p, int tInd){return p->myTasks[tInd].forwDepSize;}
-    void PE_undone_fwd_deps(PE* p, int tInd){
-        int fwd_dep_size = PE_getTaskFwdDepSize(p, tInd);
-        int* fwd_deps = PE_getTaskFwdDep(p, tInd);
-        for(int i=0; i<fwd_dep_size; i++){
-            //if the forward dependency of the task is done
-            if(PE_get_taskDone(p, fwd_deps[i])){
-                //printf("Undo task_id: %d\n", fwd_deps[i]);
-                PE_set_taskDone(p, fwd_deps[i], false);
-                //Recursively mark the forward depencies as not done
-                PE_undone_fwd_deps(p, fwd_deps[i]);
-            }
-        }
+    void PE_set_taskDone(PE* p, int iter, int tInd, bool b){ p->taskStatus[iter][tInd] = b; }
+    void PE_mark_all_done(PE *p, int iter, int task_id) {
+      p->mark_all_done(iter, task_id);
     }
-    void PE_set_currentTask(PE* p, int tInd){p->currentTask=tInd;}
-    int PE_get_currentTask(PE* p){return p->currentTask;}
-    void PE_increment_currentTask(PE* p, int tInd){
-        if(PE_get_currentTask(p) == tInd){
-            PE_set_currentTask(p, tInd+1);
-            // Search the following tasks until you see a not done task,
-            // and increment the current task
-            int i;
-            for(i=tInd+1; i<PE_get_tasksCount(p); i++){
-                if(PE_get_taskDone(p, i)){
-                    PE_set_currentTask(p, i+1);
-                }
-                else return;
-            }
+
+    bool PE_get_taskDone(PE* p, int iter, int tInd){ return p->taskStatus[iter][tInd]; }
+    int* PE_getTaskFwdDep(PE* p, int tInd){ return p->myTasks[tInd].forwardDep; }
+    int PE_getTaskFwdDepSize(PE* p, int tInd){ return p->myTasks[tInd].forwDepSize; }
+    void PE_undone_fwd_deps(PE* p, int iter, int tInd){
+      int fwd_dep_size = PE_getTaskFwdDepSize(p, tInd);
+      int* fwd_deps = PE_getTaskFwdDep(p, tInd);
+      for(int i=0; i<fwd_dep_size; i++){
+        //if the forward dependency of the task is done
+        if(PE_get_taskDone(p, iter, fwd_deps[i])){
+          //printf("Undo task_id: %d\n", fwd_deps[i]);
+          PE_set_taskDone(p, iter, fwd_deps[i], false);
+          //Recursively mark the forward depencies as not done
+          PE_undone_fwd_deps(p, iter, fwd_deps[i]);
         }
+      }
     }
+    void PE_set_currentTask(PE* p, int tInd){ p->currentTask=tInd; }
+    int PE_get_currentTask(PE* p){ return p->currentTask; }
     int PE_get_myEmPE(PE* p){return p->myEmPE;}
     int PE_get_myNum(PE* p){return p->myNum;}
     void PE_clearMsgBuffer(PE* p){p->msgBuffer.clear();}
-    void PE_addToBuffer(PE* p, int task_id){
-        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), task_id) != p->msgBuffer.end());
+    void PE_addToBuffer(PE* p, TaskPair *task_id){
+        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), *task_id) != p->msgBuffer.end());
         if(found) assert(0);
-        p->msgBuffer.push_back(task_id);
+        p->msgBuffer.push_back(*task_id);
     }
-    void PE_addToFrontBuffer(PE* p, int task_id){
-        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), task_id) != p->msgBuffer.end());
+    void PE_addToFrontBuffer(PE* p, TaskPair *task_id){
+        bool found = (std::find(p->msgBuffer.begin(), p->msgBuffer.end(), *task_id) != p->msgBuffer.end());
         if(found) assert(0);
-        p->msgBuffer.push_front(task_id);
+        p->msgBuffer.push_front(*task_id);
     }
     int PE_getBufferSize(PE* p){ return p->msgBuffer.size();}
     void PE_resizeBuffer(PE* p, int num_elems_to_remove){
@@ -114,31 +107,27 @@ extern "C" {
         assert(cur_size >= num_elems_to_remove);
         p->msgBuffer.resize(cur_size - num_elems_to_remove);
     }
-    void PE_removeFromBuffer(PE* p, int task_id){
+    void PE_removeFromBuffer(PE* p, TaskPair *task_id){
         //if the task_id is in the buffer, remove it from the buffer
         if(!p->msgBuffer.size()) assert(0);
-        if(p->msgBuffer.back() != task_id) assert(0);
-         p->msgBuffer.pop_back();
-
-//No need to search the whole buffer, removes will be always from the back
-/*
-        for(int i=0; i<p->msgBuffer.size(); i++){
-            if(p->msgBuffer[i] == task_id){
-                p->msgBuffer.erase(p->msgBuffer.begin()+i);
-                break;
-            }
+        if(p->msgBuffer.back().taskid != task_id->taskid) {
+          printf("[PE %d] Mismatch (%d,%d) (%d,%d)\n", 
+            p->myNum, p->msgBuffer.back().iter, p->msgBuffer.back().taskid, 
+            task_id->iter, task_id->taskid);
+          assert(0);
         }
-*/
+        p->msgBuffer.pop_back();
     }
-    int PE_getNextBuffedMsg(PE* p){
-        if(p->msgBuffer.size()<=0) return -1;
+    TaskPair PE_getNextBuffedMsg(PE* p){
+        if(p->msgBuffer.size()<=0) return TaskPair(-1,-1);
         else{
-            int id = p->msgBuffer.front();
+            TaskPair id = p->msgBuffer.front();
             p->msgBuffer.pop_front();
             return id;
         }
     }
-    void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id){
+    //Not used anymore
+    /*void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id){
         //printf("Adding to copy buffer entry_task_id: %d, msg_task_id: %d\n", entry_task_id, msg_task_id);
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
@@ -158,18 +147,7 @@ extern "C" {
         if(!it->second.size()) assert(0);
         if(it->second.back() != msg_task_id) assert(0);
         it->second.pop_back();
-
-//No need to search the whole buffer, removes will be always from the back
-/*
-        for(int i=0; i<it->second.size(); i++){
-            if((it->second)[i] == msg_task_id){
-                (it->second).erase((it->second).begin()+i);
-                return;
-            }
-        }
-        assert(0);
-*/
-}
+    }
     int PE_getCopyBufferSize(PE* p, int entry_task_id){
         map<int, vector<int> >::iterator it;
         it=p->taskMsgBuffer.find(entry_task_id);
@@ -215,15 +193,13 @@ extern "C" {
     bool PE_isLastStateBusy(PE* p){
         return p->busyStateBuffer.back();
     }
+    */
 
     int PE_findTaskFromMsg(PE* p, MsgID* msgId){
         return p->findTaskFromMsg(msgId);
     }
-    void PE_invertMsgPe(PE* p, int tInd){
-        p->invertMsgPe(tInd);
-    }
-    MsgID PE_getTaskMsgID(PE* p, int tInd){
-        return p->myTasks[tInd].myMsgId;
+    void PE_invertMsgPe(PE* p, int iter, int tInd){
+        p->invertMsgPe(iter, tInd);
     }
     int PE_get_tasksCount(PE* p){return p->tasksCount;}
     int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
@@ -242,4 +218,4 @@ extern "C" {
     }
     int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
 
-}
+//}

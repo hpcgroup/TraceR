@@ -26,8 +26,8 @@ int main(int argc, char**argv) {
   int jobid = 0;
   FILE* out_files;
 
-  if(argc < 6) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <nodes per router> <cores per node> <nodes to skip after> <stencil dims> <block dims>\n",
+  if(argc < 8) {
+    printf("Correct usage: %s <global_file_name> <total ranks> <number of nodes per router> <number of ranks per node> <skip after node> <number of groups> <number of routers per group> <stencil dims> <block dims>\n",
         argv[0]);
     exit(1);
   }
@@ -40,16 +40,24 @@ int main(int argc, char**argv) {
   int rr_group = atoi(argv[3]);
   int rr = atoi(argv[4]);
   int skip = atoi(argv[5]);
+  int numGroups = atoi(argv[6]);
+  int numRouters = atoi(argv[7]);
   int local_rank = 0;
-  int box_x = atoi(argv[6]);
-  int box_y = atoi(argv[7]);
-  int box_z = atoi(argv[8]);
-  int s_x = atoi(argv[9]);
-  int s_y = atoi(argv[10]);
-  int s_z = atoi(argv[11]);
+  int box_x = atoi(argv[8]);
+  int box_y = atoi(argv[9]);
+  int box_z = atoi(argv[10]);
+  int s_x = atoi(argv[11]);
+  int s_y = atoi(argv[12]);
+  int s_z = atoi(argv[13]);
 
   int *localRanks = new int[numAllocCores];
+
+  int size_per_group = numRouters * rr_group * rr;
+
+  int numNodes = numGroups * numRouters * skip;
+  int *mapping = new int[numNodes];
   int *granks = new int[numAllocCores];
+  
   int bx = box_x/s_x;
   int by = box_y/s_y;
   int bz = box_z/s_z;
@@ -71,32 +79,57 @@ int main(int argc, char**argv) {
    
     localRanks[i] = my_rank;
   }
-  
-  for(int i = 0; ; i += rr_group*rr) {
-    for(int j = 0; j < rr_group; j++) {
-      if(j == skip) {
-        break;
-      }
-      for(int k = 0; k < rr; k++) {
-        int global_rank = i + j + k * rr_group;
-        fwrite(&global_rank, sizeof(int), 1, binout);
-        fwrite(&localRanks[local_rank], sizeof(int), 1, binout);
-        fwrite(&jobid, sizeof(int), 1, binout);
-        granks[localRanks[local_rank]] = global_rank;
+
+  for(int i = 0; i < numNodes; i++) {
+    mapping[i] = i;
+  }
+
+  srand(1331);
+  for(int i = 0; i < numNodes; i++) {
+    int node1 = rand() % numNodes;
+    int node2 = rand() % numNodes;
+    int temp = mapping[node1];
+    mapping[node1] = mapping[node2];
+    mapping[node2] = temp;
+  }
+
+  int currNode = 0;
+  for(int g = 0; g < numGroups; g++) {
+    for(int r = 0; r < numRouters; r++) {
+      for(int j = 0; j < rr_group; j++) {
+        if(j >= skip) {
+          break;
+        }
+        int i = g * size_per_group + r * rr_group * rr;
+        int useRank = mapping[currNode] * rr;
+        if(useRank >= numAllocCores) {
+          currNode++;
+          continue;
+        }
+        for(int k = 0; k < rr; k++) {
+          int global_rank = i + j + k * rr_group;
+          fwrite(&global_rank, sizeof(int), 1, binout);
+          fwrite(&localRanks[useRank], sizeof(int), 1, binout);
+          fwrite(&jobid, sizeof(int), 1, binout);
+          granks[localRanks[useRank]] = global_rank;
 #if PRINT_MAP
-        printf("%d %d %d\n", global_rank, localRanks[local_rank], jobid);
+          printf("%d %d %d\n", global_rank, localRanks[useRank++], jobid);
+#else
+          useRank++;
 #endif
-        local_rank++;
+          local_rank++;
+          if(local_rank == numAllocCores) {
+            break;
+          }
+        }
         if(local_rank == numAllocCores) {
           break;
         }
+        currNode++;
       }
       if(local_rank == numAllocCores) {
         break;
       }
-    }
-    if(local_rank == numAllocCores) {
-      break;
     }
   }
   

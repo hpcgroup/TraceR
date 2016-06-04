@@ -17,6 +17,34 @@
 #ifndef _DATATYPES_H_
 #define _DATATYPES_H_
 
+struct TaskPair {
+  int iter;
+  int taskid;
+
+#ifdef __cplusplus
+  TaskPair(int a, int b) {
+    iter = a;
+    taskid = b;
+  }
+
+  TaskPair() {
+    iter = -1;
+    taskid = -1;
+  }
+
+  TaskPair(const TaskPair &t) {
+    iter = t.iter;
+    taskid = t.taskid;
+  }
+
+  inline bool operator==(const TaskPair &t) {
+    return iter == t.iter && taskid == t.taskid;
+  }
+#endif
+};
+
+typedef struct TaskPair TaskPair;
+
 typedef struct JobInf {
     int numRanks;
     char traceDir[256];
@@ -24,6 +52,7 @@ typedef struct JobInf {
     int *rankMap;
     int *offsets;
     int skipMsgId;
+    int numIters;
 } JobInf;
 
 #endif

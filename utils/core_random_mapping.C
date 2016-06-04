@@ -27,7 +27,7 @@ int main(int argc, char**argv) {
   FILE* out_files;
 
   if(argc < 6) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <nodes per router> <cores per node> <nodes to skip after> <stencil dims> <block dims>\n",
+    printf("Correct usage: %s <global_file_name> <total ranks> <nodes per router> <cores per node> <nodes to skip after>\n",
         argv[0]);
     exit(1);
   }
@@ -41,36 +41,23 @@ int main(int argc, char**argv) {
   int rr = atoi(argv[4]);
   int skip = atoi(argv[5]);
   int local_rank = 0;
-  int box_x = atoi(argv[6]);
-  int box_y = atoi(argv[7]);
-  int box_z = atoi(argv[8]);
-  int s_x = atoi(argv[9]);
-  int s_y = atoi(argv[10]);
-  int s_z = atoi(argv[11]);
 
   int *localRanks = new int[numAllocCores];
   int *granks = new int[numAllocCores];
-  int bx = box_x/s_x;
-  int by = box_y/s_y;
-  int bz = box_z/s_z;
-  int prod_xyz = s_x * s_y * s_z;
-  int prod_xy = s_x * s_y;
 
   for(int i = 0; i < numAllocCores; i++) {
-    int box_num = i / prod_xyz;
-    int box_rank = i % prod_xyz;
-    int x = box_num % bx;
-    int y = (box_num / bx) % by;
-    int z = box_num / (bx*by);
-
-    int my_x = x * s_x + box_rank % s_x;
-    int my_y = y * s_y + (box_rank / s_x) % s_y;
-    int my_z = z * s_z + box_rank / (s_x * s_y);
-
-    int my_rank = my_x + my_y * box_x + my_z * box_x * box_y;
-   
-    localRanks[i] = my_rank;
+    localRanks[i] = i;
   }
+  srand(1789637);
+
+  for(int i = 0; i < 5*numAllocCores; i++) {
+    int t1 = rand() % numAllocCores;
+    int t2 = rand() % numAllocCores;
+    int tmp = localRanks[t1];
+    localRanks[t1] = localRanks[t2];
+    localRanks[t2] = tmp;
+  }
+
   
   for(int i = 0; ; i += rr_group*rr) {
     for(int j = 0; j < rr_group; j++) {

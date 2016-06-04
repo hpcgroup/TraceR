@@ -18,28 +18,38 @@
 #include "PE.h"
 #include <math.h>
 #define MAX_LOGS 5000000
+//extern "C" JobInf *jobs;
+extern JobInf *jobs;
 
 PE::PE() {
   busy = false;
   currentTask = 0;
   windowOffset = 0;
   beforeTask = 0;
-  busyStateBuffer.push_back(false);
+  //busyStateBuffer.push_back(false);
+  currIter = 0;
 }
 
 PE::~PE() {
     msgBuffer.clear();
-    taskMsgBuffer.clear();
     delete [] myTasks;
     delete [] msgDestLogs;
 }
 
-bool PE::noUnsatDep(int tInd)
+void PE::mark_all_done(int iter, int tInd) {
+  if(allMarked[iter]) return;
+  for(int i = tInd + 1; i < tasksCount; i++) {
+    taskStatus[iter][i] = true;
+  }
+  if(allMarked[iter]) true;
+}
+
+bool PE::noUnsatDep(int iter, int tInd)
 {
   for(int i=0; i<myTasks[tInd].backwDepSize; i++)
   {
-    int bwInd = myTasks[tInd].backwardDep[i] - windowOffset;
-    if(/*bwInd >= currentTask &&*/ !myTasks[bwInd].done)
+    int bwInd = myTasks[tInd].backwardDep[i];
+    if(!taskStatus[iter][bwInd])
       return false;
   }
   return true;
@@ -49,78 +59,38 @@ double PE::taskExecTime(int tInd)
 {
     return myTasks[tInd].execTime;
 }
-// no stats yet?
+
 void PE::printStat()
 {
   int countTask=0;
-  for(int i=0; i<tasksCount; i++)
-  {
-    // assert(myTasks[i].done);
-    if(!myTasks[i].done)
+  for(int j = 0; j < jobs[jobNum].numIters; j++) {
+    for(int i=0; i<tasksCount; i++)
     {
-      printf("PE: %d not done:%d\n", myNum, i);
-      countTask++;
+      if(!taskStatus[j][i])
+      {
+        printf("PE: %d not done:%d,%d\n", myNum, j, i);
+        countTask++;
+      }
     }
+  }
+  if(countTask != 0) {
+    printf("PE%d: not done count:%d \n ",myNum, countTask);
   }
 }
 
 void PE::check()
 {
-  int countTask=0;
-  for(int i=firstTask; i<tasksCount; i++)
-  {
-    if(!myTasks[i].done)
-    {
-      countTask++;
-    }
-  }
-
-  if(countTask != 0) {
-    printf("PE%d: not done count:%d ",myNum, countTask);
-    int i = 0, count=0;
-    while (i < tasksCount) {
-      if (!myTasks[i].done) {
-        printf(" %d", i);
-        i++;
-        count = 0;
-        while ((i < tasksCount) && (!myTasks[i].done)) {
-          i++;
-          count++;
-        }
-        if (count) {
-          printf("-%d", i-1);
-        }
-      }
-      i++;
-    }
-    printf("\n");
-  }
-  //else printf("PE:%d ALL TASKS ARE DONE\n", myNum);
+  printStat();
 }
 
 void PE::printState()
 {
-  printf("PE:%d, busy:%d, currentTask:%d totalTasks:%d\n", myNum, busy, currentTask, totalTasksCount);
-  printf("msgBuffer: ");
-/*
-  for(int i=0; i<msgBuffer.size(); i++)
-  {
-    printf("%d, ",msgBuffer[i]);
-  }
-*/
-  printf("\n tasks from curr: ");
-  for(int i=currentTask; i<tasksCount; i++)
-  {
-    printf("%d, ", myTasks[i].done);
-  }
-  printf("\n");
-
+  printStat();
 }
 
-//BILGE
-void PE::invertMsgPe(int tInd)
+void PE::invertMsgPe(int iter, int tInd)
 {
-  myTasks[tInd].myMsgId.pe = -myTasks[tInd].myMsgId.pe;
+  msgStatus[iter][tInd] = !msgStatus[iter][tInd];
 }
 
 double PE::getTaskExecTime(int tInd)
@@ -130,7 +100,7 @@ double PE::getTaskExecTime(int tInd)
 
 int PE::findTaskFromMsg(MsgID* msgId)
 {
-  map<int, int>::iterator it;
+  std::map<int, int>::iterator it;
   int sPe = msgId->pe;
   int sEmPe = (sPe/numWth)%numEmPes;
   int smsgID = msgId->id;
