@@ -203,9 +203,16 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     strcmp(bglog->name, "split-broadcast") == 0 ||
     strcmp(bglog->name, "end-broadcast") == 0 ||
     strcmp(bglog->name, "AMPI_WAIT") == 0 ||
-    strcmp(bglog->name, "AMPI_WAITALL") == 0 ||
-    strcmp(bglog->name, "user_code") == 0) {
+    strcmp(bglog->name, "AMPI_WAITALL") == 0) {
     t->execTime = 0.0;
+  }
+ 
+  if(eventSubs != NULL) {
+    std::map<std::string, double>::iterator loc =
+      eventSubs[pe->jobNum].find(bglog->name);
+    if(loc != eventSubs[pe->jobNum].end()) {
+      t->execTime = loc->second;
+    }
   }
 
   if(t->execTime < 0) {
@@ -289,7 +296,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
       t->myBgPrints[pInd].time = (bglog->evts[i]->rTime);
       strcpy(t->myBgPrints[pInd].taskName, bglog->name);
       pInd++;
-    } else {
+    } else if(eventSubs != NULL) {
       std::map<std::string, double>::iterator loc =
         eventSubs[pe->jobNum].find(std::string((char *)bglog->evts[i]->data));
       if(loc != eventSubs[pe->jobNum].end()) {
