@@ -463,12 +463,13 @@ int main(int argc, char **argv)
       }
       if(next == 'E' || next == 'e') {
         double etime;
+        int jobid;
         char eName[256];
-        fscanf(jobIn, "%s %lf", eName, &etime);
+        fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime);
         if(!rank)
-          printf("Will make all events with name %s run for %lf s\n", eName,
-              etime);
-        addEventSub(eName, etime);
+          printf("Will make all events with name %s run for %lf s for job %d\n", 
+            eName, etime, jobid);
+        addEventSub(jobid, eName, etime, num_jobs);
       }
       next = ' ';
       fscanf(jobIn, "%c", &next);

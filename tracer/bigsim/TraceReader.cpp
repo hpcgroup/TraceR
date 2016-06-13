@@ -36,11 +36,14 @@ extern JobInf *jobs;
 #include <map>
 #include <string>
 
-std::map<std::string, double> eventSubs;
+std::map<std::string, double> *eventSubs = NULL;
 
-void addEventSub(char *key, double val) {
+void addEventSub(int jobid, char *key, double val, int numjobs) {
+  if(eventSubs == NULL) {
+    eventSubs = new std::map<std::string, double>[numjobs];
+  }
   std::string skey(key);
-  eventSubs[key] = (double)TIME_MULT * val;
+  eventSubs[jobid][key] = (double)TIME_MULT * val;
 }
 
 TraceReader::TraceReader(char *s) {
@@ -288,8 +291,8 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
       pInd++;
     } else {
       std::map<std::string, double>::iterator loc =
-        eventSubs.find(std::string((char *)bglog->evts[i]->data));
-      if(loc != eventSubs.end()) {
+        eventSubs[pe->jobNum].find(std::string((char *)bglog->evts[i]->data));
+      if(loc != eventSubs[pe->jobNum].end()) {
         t->execTime = loc->second;
       }
     }

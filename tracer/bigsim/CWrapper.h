@@ -119,7 +119,7 @@ void TraceReader_setOffsets(TraceReader* t, int** offsets);
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
     int* nwth, PE* pe, int penum, int jobnum, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
-void addEventSub(char *key, double val);
+void addEventSub(int job, char *key, double val, int numjobs);
 
 //#ifdef __cplusplus
 //}

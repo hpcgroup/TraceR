@@ -29,17 +29,17 @@ if __name__ == '__main__':
               "qbox-128", "qbox-256", "qbox-512",
               "qbox-1K", "qbox-2K", "qbox-4K")
 
-  job_iters = (1,1,1,1,1,1,
-               1,1,1,1,1,1,
-               1,1,1,1,1,1,
-               1,1,1,1,1,1,
-               1,1,1,1,1,1,
-               1,1,1,1,1,1)
+  job_iters = (5,5,4,4,4,4,
+               3,3,3,3,3,3,
+               3,3,2,2,2,2,
+               3,3,3,3,3,3,
+               3,3,2,1,1,1,
+               3,2,2,1,1,1)
 
 
-  msg_size =   (2000,2000,2000,2000,2000,2000,
+  msg_size =   (4000,4000,4000,4000,4000,4000,
                 2592000, 2592000, 5184000, 5184000, 10368000, 10368000,
-                10368000,10368000,10368000,10368000,10368000, 10368000,
+                5184000,5184000,5184000,10368000,10368000, 10368000,
                 9540000, 9540000, 6360000, 6360000, 4770000, 4770000,
                 0,0,0,0,0,0,
                 0,0,0,0,0,0)
@@ -56,9 +56,9 @@ if __name__ == '__main__':
                   [ ["Permuation_Setup", 0.0065 ], ["Permuation_Work", 0.0065] ],
                   [ ["Permuation_Setup", 0.0075 ], ["Permuation_Work", 0.0075] ],
                   [ ["Permuation_Setup", 0.0085 ], ["Permuation_Work", 0.0085] ],
-                  [ ["Stencil3D_Setup", 0.001 ], ["Stencil3D_Work", 0.036 ] ],
-                  [ ["Stencil3D_Setup", 0.0012 ], ["Stencil3D_Work", 0.036 ] ],
-                  [ ["Stencil3D_Setup", 0.0014 ], ["Stencil3D_Work", 0.036 ] ],
+                  [ ["Stencil3D_Setup", 0.001 ], ["Stencil3D_Work", 0.020 ] ],
+                  [ ["Stencil3D_Setup", 0.0012 ], ["Stencil3D_Work", 0.020 ] ],
+                  [ ["Stencil3D_Setup", 0.0014 ], ["Stencil3D_Work", 0.020 ] ],
                   [ ["Stencil3D_Setup", 0.0016 ], ["Stencil3D_Work", 0.036 ] ],
                   [ ["Stencil3D_Setup", 0.0018 ], ["Stencil3D_Work", 0.036 ] ],
                   [ ["Stencil3D_Setup", 0.002 ], ["Stencil3D_Work", 0.036 ] ],
@@ -68,12 +68,12 @@ if __name__ == '__main__':
                   [ ["FFT_Setup", 0.0008], ["FFT_WORK", 0.0008] ],
                   [ ["FFT_Setup", 0.0004], ["FFT_WORK", 0.0004] ],
                   [ ["FFT_Setup", 0.0004], ["FFT_WORK", 0.0004] ],
+                  [ ["Kripke_SolveCompute", 0.006 ], ["Kripke_SweepCompute", 0.000135 ] ],
+                  [ ["Kripke_SolveCompute", 0.006 ], ["Kripke_SweepCompute", 0.000135 ] ],
                   [ ["Kripke_SolveCompute", 0.013 ], ["Kripke_SweepCompute", 0.000135 ] ],
                   [ ["Kripke_SolveCompute", 0.013 ], ["Kripke_SweepCompute", 0.000135 ] ],
                   [ ["Kripke_SolveCompute", 0.026 ], ["Kripke_SweepCompute", 0.000135 ] ],
                   [ ["Kripke_SolveCompute", 0.026 ], ["Kripke_SweepCompute", 0.000135 ] ],
-                  [ ["Kripke_SolveCompute", 0.052 ], ["Kripke_SweepCompute", 0.000135 ] ],
-                  [ ["Kripke_SolveCompute", 0.052 ], ["Kripke_SweepCompute", 0.000135 ] ],
                   [ ["QBOX_Setup", 0.001  ], ["QBOX_OverlapWork", 0], ["QBOX_FFTTime", 0.0005 ], ["QBOX_Work1", .005], ["QBOX_Work2", 0.006 ] ],
                   [ ["QBOX_Setup", 0.0015  ], ["QBOX_OverlapWork", 0], ["QBOX_FFTTime", 0.008 ], ["QBOX_Work1", .007], ["QBOX_Work2", 0.008 ] ],
                   [ ["QBOX_Setup", 0.002  ], ["QBOX_OverlapWork", 0], ["QBOX_FFTTime", 0.001 ], ["QBOX_Work1", .009], ["QBOX_Work2", 0.010 ] ],
