@@ -52,6 +52,7 @@
     bool PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
     bool PE_isLoopEvent(PE *p, int tInd) { return p->myTasks[tInd].loopEvent; }
     double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
+    void PE_addTaskExecTime(PE* p, int tInd, double time){ p->addTaskExecTime(tInd, time);}
     int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
     MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
         return &(p->myTasks[tInd].myEntries);

@@ -64,6 +64,7 @@ int PE_get_iter(PE* p);
 void PE_inc_iter(PE* p);
 void PE_dec_iter(PE* p);
 double PE_getTaskExecTime(PE* p, int tInd);
+void PE_addTaskExecTime(PE* p, int tInd, double time);
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);

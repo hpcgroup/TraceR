@@ -74,6 +74,8 @@ int* size_replace_by;
 int* size_replace_limit;
 double time_replace_by = 0;
 double time_replace_limit = -1;
+double copy_per_byte = 0.0;
+double eager_limit = 8192;
 
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
@@ -357,6 +359,19 @@ int main(int argc, char **argv)
         &soft_delay_mpi);
     if(!rank) 
       printf("Found soft_delay as %f\n", soft_delay_mpi);
+    
+    configuration_get_value_double(&config, "PARAMS", "copy_per_byte", NULL,
+        &copy_per_byte);
+
+    if(!rank) 
+      printf("Copy cost per byte is %f ns\n", copy_per_byte);
+   
+
+    configuration_get_value_double(&config, "PARAMS", "eager_limit", NULL,
+        &eager_limit);
+
+    if(!rank) 
+      printf("Eager limit is %f bytes\n", eager_limit);
 
     if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
     {
@@ -792,7 +807,11 @@ static void handle_recv_event(
         PE_invertMsgPe(ns->my_pe, iter, task_id);
         if(!PE_noUnsatDep(ns->my_pe, iter, task_id)){
             assert(0);
-        }   
+        }
+        if(m->msg_id.size <= eager_limit) {
+          b->c1 = 1;
+          PE_addTaskExecTime(ns->my_pe, task_id, m->msg_id.size * copy_per_byte);
+        }
         //Add task to the task buffer
         TaskPair pair;
         pair.iter = iter; pair.taskid = task_id;
@@ -918,6 +937,9 @@ static void handle_recv_rev_event(
     " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msg_id.id, task_id,
     wasBusy, now);
 #endif
+    if(b->c1) {
+      PE_addTaskExecTime(ns->my_pe, task_id, -1 * m->msg_id.size * copy_per_byte);
+    }
 
     if(!wasBusy){
         //if the task that I executed was not me
@@ -1038,11 +1060,15 @@ static tw_stime exec_task(
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
     tw_stime soft_latency = codes_local_latency(lp);
-    tw_stime copyTime = soft_latency; //TODO: use better value
     tw_stime delay = soft_latency; //intra node latency
+    double sendFinishTime = 0;
 
     for(int i=0; i<msgEntCount; i++){
         MsgEntry* taskEntry = PE_getTaskMsgEntry(ns->my_pe, task_id.taskid, i);
+        tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
+        if(MsgEntry_getSize(taskEntry) > eager_limit) {
+          copyTime = soft_latency;
+        }
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
         //tw_stime sendOffset = MsgEntry_getSendOffset(taskEntry);
@@ -1116,9 +1142,9 @@ static tw_stime exec_task(
           }
         }
           
-        delay += copyTime;
         if(node != myNode)
         {
+          delay += copyTime;
           if(node >= 0){
             m->model_net_calls++;
             send_msg(ns, MsgEntry_getSize(taskEntry),
@@ -1155,12 +1181,13 @@ static tw_stime exec_task(
             printf("message not supported yet! node:%d thread:%d\n",node,thread);
           }
         }
+        sendFinishTime = delay;
     }
 
     PE_execPrintEvt(lp, ns->my_pe, task_id.taskid, tw_now(lp));
 
     //Complete the task
-    tw_stime finish_time = codes_local_latency(lp) + time;
+    tw_stime finish_time = codes_local_latency(lp) + ((sendFinishTime > time) ? sendFinishTime : time);
     exec_comp(ns, task_id.iter, task_id.taskid, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
       ns->end_ts = tw_now(lp);

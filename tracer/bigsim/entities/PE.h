@@ -57,6 +57,7 @@ class PE {
     //functions added by Bilge for codes-tracing
     void invertMsgPe(int iter, int tInd);
     double getTaskExecTime(int tInd);
+    void addTaskExecTime(int tInd, double time);
     std::map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;

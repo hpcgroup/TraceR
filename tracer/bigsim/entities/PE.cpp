@@ -98,6 +98,11 @@ double PE::getTaskExecTime(int tInd)
   return myTasks[tInd].execTime;
 }
 
+void PE::addTaskExecTime(int tInd, double time)
+{
+  myTasks[tInd].execTime += time;
+}
+
 int PE::findTaskFromMsg(MsgID* msgId)
 {
   std::map<int, int>::iterator it;
