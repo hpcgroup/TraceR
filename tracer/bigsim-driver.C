@@ -137,6 +137,7 @@ tw_lptype proc_lp = {
      (pre_run_f) NULL,
      (event_f) proc_event,
      (revent_f) proc_rev_event,
+     (commit_f) NULL,
      (final_f)  proc_finalize, 
      (map_f) codes_mapping,
      sizeof(proc_state),
@@ -309,7 +310,6 @@ int main(int argc, char **argv)
     model_net_register();
 
     net_ids=model_net_configure(&num_nets);
-    assert(num_nets==1);
     net_id = net_ids[0];
     free(net_ids);
 
@@ -331,11 +331,11 @@ int main(int argc, char **argv)
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
                 "modelnet_dragonfly", NULL, 1);
         num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, 
-                "dragonfly_router", NULL, 1);
+                "modelnet_dragonfly_router", NULL, 1);
         num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
                 "modelnet_dragonfly", NULL, 1);
         num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "dragonfly_router", NULL, 1);
+                "modelnet_dragonfly_router", NULL, 1);
     }
 
     if(net_id == FATTREE) {

@@ -32,7 +32,7 @@ endif
 CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator
 
 #ross install directory
-ROSS = /p/lscratchf/jain6/network-sim/ROSS/install
+ROSS = /p/lscratchf/jain6/migrate-tracer/ROSS/install
 #base directory of this code
 BASE_DIR = /p/lscratchf/jain6/migrate-tracer
 CODES = ${BASE_DIR}/codes
