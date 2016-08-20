@@ -29,19 +29,16 @@ SEQ_CXX = icpc
 endif
 
 #CHARMPATH = /p/lscratchf/jain6/network-sim/charm/verbs-linux-x86_64-bigemulator-icc
-CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator-mpicxx
+CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator
 
 #ross install directory
 ROSS = /p/lscratchf/jain6/network-sim/ROSS/install
 #base directory of this code
-BASE_DIR = /p/lscratchf/jain6/network-sim
-CODES_BASE = ${BASE_DIR}/codes-base
-CODES_NET = ${BASE_DIR}/codes-net
-CODES_BASE_LIBS = -L${CODES_NET}/install/lib
-CODES_BASE_LIBS += -L${CODES_BASE}/install/lib
-CODES_BASE_LIBS += -L${ROSS}/lib
-CODES_BASE_LIBS += -lcodes-net
-CODES_BASE_LIBS += -lcodes-base -lROSS -lm
+BASE_DIR = /p/lscratchf/jain6/migrate-tracer
+CODES = ${BASE_DIR}/codes
+CODES_LIBS = -L${CODES}/install/lib
+CODES_LIBS += -L${ROSS}/lib
+CODES_LIBS += -lcodes -lROSS -lm
 
 CHARM_LIBS = -L$(CHARMPATH)/lib
 CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
@@ -52,12 +49,10 @@ else
 ARCH_FLAGS = -Wall 
 endif
 
-CODES_BASE_CFLAGS = -I${CODES_BASE}/install/include -I${ROSS}/include
-
-CODES_NET_CFLAGS = -I${CODES_NET}/install/include
+CODES_CFLAGS = -I${CODES}/install/include -I${ROSS}/include
 
 CFLAGS = -O3 -g
 CXXFLAGS = -O3 -g
 LDFLAGS = -O3 -g 
-OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_BASE_CFLAGS}
+OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS}
 BASE_INCS= -Ibigsim -I.
