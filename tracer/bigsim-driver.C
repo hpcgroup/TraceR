@@ -76,6 +76,7 @@ double time_replace_by = 0;
 double time_replace_limit = -1;
 double copy_per_byte = 0.0;
 double eager_limit = 8192;
+int dump_topo_only = 0;
 
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
@@ -365,7 +366,12 @@ int main(int argc, char **argv)
 
     if(!rank) 
       printf("Copy cost per byte is %f ns\n", copy_per_byte);
-   
+
+    configuration_get_value_int(&config, "PARAMS", "dump_topo", NULL,
+        &dump_topo_only);
+
+    if(!rank && dump_topo_only) 
+      printf("Run to dump topology only\n");
 
     configuration_get_value_double(&config, "PARAMS", "eager_limit", NULL,
         &eager_limit);
@@ -395,7 +401,7 @@ int main(int argc, char **argv)
         global_rank[i].jobID = -1;
     }
 
-    if(strcmp("NA", globalIn) == 0) {
+    if(dump_topo_only || strcmp("NA", globalIn) == 0) {
       if(!rank) printf("Using default linear mapping of jobs\n");
       default_mapping = 1;
     } else {
@@ -492,7 +498,7 @@ int main(int argc, char **argv)
 
     //Load all summaries on proc 0 and bcast
     int ranks_till_now = 0;
-    for(int i = 0; i < num_jobs; i++) {
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
         if(!rank) printf("Loading trace summary for job %d from %s\n", i,
                 jobs[i].traceDir);
         TraceReader* t = newTraceReader(jobs[i].traceDir);
@@ -587,6 +593,8 @@ static void proc_init(
     tw_stime kickoff_time;
     
     memset(ns, 0, sizeof(*ns));
+
+    if(dump_topo_only) return;
 
     //Each server read it's trace
     ns->sim_start = clock();
@@ -685,6 +693,7 @@ static void proc_finalize(
     tw_lp * lp)
 {
     if(ns->my_pe_num == -1) return;
+    if(dump_topo_only) return;
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
     tw_stime finalTime = tw_now(lp);
