@@ -17,23 +17,7 @@
 #ifndef __CWRAPPER_H
 #define __CWRAPPER_H
 
-/*
- *
- * This file is a wrapper for the c++ functions in this folder
- * to be called from the modelnet-test-bigsim.c file.
- * The functions are used for trace reading and storing task dependencies.
- * BigSim trace reading code and the entities are taken from fastSim code.
- *
- * Author: Bilge Acun
- * 2014
- *
- */
-
  #include <ross.h>
-
-//#ifdef __cplusplus
-//extern "C" {
-//#endif
 
 //MsgID
 typedef struct MsgID MsgID;
@@ -41,7 +25,6 @@ MsgID* newMsgID(int size, int pe, int id);
 int MsgID_getSize(MsgID* m);
 int MsgID_getID(MsgID* m);
 int MsgID_getPE(MsgID* m);
-
 
 //MsgEntry
 typedef struct MsgEntry MsgEntry;
@@ -51,7 +34,6 @@ int MsgEntry_getID(MsgEntry* m);
 int MsgEntry_getPE(MsgEntry* m);
 int MsgEntry_getNode(MsgEntry* m);
 int MsgEntry_getThread(MsgEntry* m);
-double MsgEntry_getSendOffset(MsgEntry* m);
 
 //PE
 typedef struct PE PE;
@@ -91,18 +73,6 @@ void PE_removeFromBuffer(PE* p, TaskPair *task_id);
 void PE_resizeBuffer(PE* p, int num_elems_to_remove);
 TaskPair PE_getNextBuffedMsg(PE* p);
 
-//---
-//Optimistic mode related stuff
-//void PE_addToCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
-//void PE_removeFromCopyBuffer(PE* p, int entry_task_id, int msg_task_id);
-//int PE_getCopyBufferSize(PE* p, int entry_task_id);
-//int PE_getNextCopyBuffedMsg(PE* p, int entry_task_id);
-//void PE_moveFromCopyToMessageBuffer(PE* p, int entry_task_id);
-//void PE_addToBusyStateBuffer(PE* p, bool state);
-//bool PE_popBusyStateBuffer(PE* p);
-//bool PE_isLastStateBusy(PE* p);
-//---
-
 int PE_findTaskFromMsg(PE* p, MsgID* msgId);
 void PE_invertMsgPe(PE* p, int, int tInd);
 int PE_get_tasksCount(PE* p);
@@ -121,9 +91,5 @@ void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
     int* nwth, PE* pe, int penum, int jobnum, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
 void addEventSub(int job, char *key, double val, int numjobs);
-
-//#ifdef __cplusplus
-//}
-//#endif
 
 #endif

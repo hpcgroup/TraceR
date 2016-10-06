@@ -19,12 +19,15 @@
 #include "MsgEntry.h"
 #include <cstdlib>
 #include <cstdio>
+#if TRACER_BIGSIM_TRACES
 #include <ross.h>
+#endif
 
 class MsgEntry;
 #include <cstring>
 #define TIME_MULT 1000000000
 
+#if TRACER_BIGSIM_TRACES
 class BgPrint{
   public:
     void print(tw_lp * lp, double startTime, int PEno, int jobNo)
@@ -37,37 +40,36 @@ class BgPrint{
     char* msg;
     double time;
     char taskName[50];
-    void copy(BgPrint *b){
-      time = b->time;
-      strcpy(taskName, b->taskName);
-      msg = new char[strlen(b->msg)+1];
-      strcpy(msg, b->msg);
-    }
-
 };
+#endif
 
 // represents each DEP ~ SEB
 class Task {
   public:
     Task();
     ~Task();
+#if TRACER_BIGSIM_TRACES
     void printEvt(tw_lp * lp, double startTime, int PEno, int jobNo);
-    short charmEP;
+    int msgEntCount; // number of msg entries
+    MsgEntry* myEntries; // outgoing messages of task
     int* forwardDep; //backward dependent tasks
     int forwDepSize;	// size of forwardDep array
 
     int* backwardDep;	//forward dependent tasks
     int backwDepSize;	// size of backwDep array
-    bool endEvent;
-    bool loopEvent;
-
-    double execTime;	//execution time of the task
-
-    int msgEntCount; // number of msg entries
-    MsgEntry* myEntries; // outgoing messages of task
-
     int bgPrintCount;
     BgPrint* myBgPrints;
+#elif TRACER_OTF_TRACES
+    int64_t event_id;
+    int64_t req_id;
+    bool isNonBlocking;
+    MsgEntry myEntry;
+#else
+#error Either TRACER_BIGSIM_TRACES or TRACER_OTF_TRACES should be 1
+#endif
+    bool endEvent;
+    bool loopEvent;
+    double execTime;	//execution time of the task
 };
 
 #endif /* TASK_H_ */

@@ -1,4 +1,4 @@
-//////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
 // Copyright (c) 2015, Lawrence Livermore National Security, LLC.
 // Produced at the Lawrence Livermore National Laboratory.
 //
@@ -18,7 +18,6 @@
 #include <cstdio>
 
 MsgEntry::MsgEntry() {
-  sendOffset = INT_MIN;
   node = INT_MIN;
   thread = INT_MIN;
   msgId.size = INT_MIN;

@@ -26,10 +26,10 @@ TRACER_CFLAGS = ${CODES_CFLAGS}
 all: traceR
 .PHONY: components
 
-traceR: bigsim-driver.o components
+traceR: tracer-driver.o components
 	$(CXX) ${LDFLAGS} $< -o $@ ${TRACER_LDADD}
 
-bigsim-driver.o: bigsim-driver.C
+tracer-driver.o: tracer-driver.C
 	$(CXX) $(CFLAGS) ${BASE_INCS} $(TRACER_CFLAGS) -c $< -o $@
 
 components:

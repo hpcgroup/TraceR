@@ -246,7 +246,6 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     }
   }
 
-  t->charmEP = bglog->charm_ep;
   t->msgEntCount = bglog->msgs.length();
   t->myEntries = new MsgEntry[t->msgEntCount];
 
@@ -258,9 +257,6 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     t->myEntries[i].node = bglog->msgs[i]->dstNode;
     t->myEntries[i].thread = bglog->msgs[i]->tID;
 
-    // sendTime is absolute
-    //t->myEntries[i].sendOffset = (double)TIME_MULT * (bglog->msgs[i]->sendTime - bglog->startTime);
-    t->myEntries[i].sendOffset = 0;
     if(size_replace_limit[pe->jobNum] != -1 && bglog->msgs[i]->msgsize >= size_replace_limit[pe->jobNum]) {
       t->myEntries[i].msgId.size = size_replace_by[pe->jobNum];
     } else {

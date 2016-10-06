@@ -1,4 +1,4 @@
-/** \file bigsim-driver.c
+/** \file tracer-driver.c
  * Copyright (c) 2015, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  *
@@ -1097,7 +1097,6 @@ static tw_stime exec_task(
         }
         int node = MsgEntry_getNode(taskEntry);
         int thread = MsgEntry_getThread(taskEntry);
-        //tw_stime sendOffset = MsgEntry_getSendOffset(taskEntry);
         tw_stime sendOffset = soft_delay_mpi;
         
         //If there are intraNode messages

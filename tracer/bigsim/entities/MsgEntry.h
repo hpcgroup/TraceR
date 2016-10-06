@@ -20,15 +20,19 @@
 #ifdef __cplusplus
 #include <climits>
 #endif
+#include <stdint.h>
 
 struct MsgID {
-    int pe;	// PE that sent it
-    int id; // emulating PE increments with each msg it sends
-    int size;
+    int pe;	
+    int id; 
+    uint64_t size;
 #ifdef __cplusplus
     MsgID() : pe(INT_MIN), id(0), size(0) {}
     MsgID(int size_) : pe(INT_MIN), id(0), size(size_) {}
     MsgID(int size_, int pe_, int id_) : pe(pe_), id(id_), size(size_) {};
+#endif
+#if TRACER_OTF_TRACES
+    int comm, coll_type;
 #endif
 };
 
@@ -38,8 +42,7 @@ struct MsgEntry {
     void sendMsg(double startTime);
 #endif
     int node;	// node number in global order
-    int thread;	// destination thread in node
-    double sendOffset;
+    int thread;
     MsgID msgId;
 };
 

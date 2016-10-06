@@ -16,33 +16,38 @@
 
 #include "assert.h"
 #include "Task.h"
-#include "PE.h"
 
 Task::Task() {
+  execTime = -1;
+  endEvent = false;
+  loopEvent = false;
+#if TRACER_BIGSIM_TRACES
   backwDepSize = 0;
   forwDepSize = 0;
   backwardDep = 0;
   forwardDep = 0;
   myEntries = 0;
-  execTime = -1;
-  endEvent = false;
-  loopEvent = false;
   msgEntCount = 0;
   bgPrintCount = 0;
+#endif
 }
 
+#if TRACER_BIGSIM_TRACES
 void Task::printEvt(tw_lp * lp, double startTime, int PEno, int jobNo)
 {
   for(int i = 0; i < bgPrintCount; i++) {
     myBgPrints[i].print(lp, startTime, PEno, jobNo);
   }
 }
+#endif
 
 Task::~Task()
 {
+#if TRACER_BIGSIM_TRACES
   delete[] forwardDep;
   delete[] backwardDep;
   delete[] myBgPrints;
   delete[] myEntries;
+#endif
 }
 
