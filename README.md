@@ -12,22 +12,14 @@ Computing applications on interconnection networks.
 ```
 git clone https://github.com/carothersc/ROSS
 ```
-Latest verified commit: d62031fb226ffce968299571bd781cefe7270d71
+Latest verified commit: 8af4b4167859d68a4d838d88d35b41791612a110
 
-* Download and install codes-base:
+* Download and install CODES:
 ```
-git clone git://git.mcs.anl.gov/radix/codes-base
+Website: https://xgitlab.cels.anl.gov/codes/codes
+git clone https://xgitlab.cels.anl.gov/codes/codes.git
 ```
-Latest verfied commit: 7e9a569449ae914d2ee6f21fbd20cc31657a6651
-
-* Download and install codes-net:
-```
-git clone -b uiuc_tracer git://git.mcs.anl.gov/radix/codes-net
-```
-Branch used - uiuc_tracer
-
-Use install-libLIBRARIES and install-data-am as target. We need C++ maps that
-are implemented inside tracer. Hence, only the library build is possible.
+Latest verfied commit: 2f6fc4ac652b1ef53d8b0df68b1a98ed9bbe7fbf
 
 * Download and build Charm++ with bgampi target:
 ```
@@ -35,7 +27,7 @@ git clone http://charm.cs.uiuc.edu/gerrit/charm
 ```
 Follow instructions in the [Charm++ manual](http://charm.cs.illinois.edu/manuals/html/charm++/A.html). Replace the "charm++" target with bgampi.
 
-* Set the appropriate paths in tracer/Makefile.common and then:
+* Set the appropriate paths CHARMPATH, ROSS, BASE_DIR/CODES in tracer/Makefile.common and then:
 ```
 cd tracer
 make
@@ -57,6 +49,7 @@ Format of trace_config:
 ```
 If <global_map file> is not needed, use NA for it and <map file for job*>.
 For generating simple global and job map file, use the code in utils.
+More information on how to set up network config files can be found in CODES:codes/src/networks/model-net/doc
 
 Example files are in jacobi2d. Sample run command:
 ```
