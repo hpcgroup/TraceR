@@ -41,13 +41,13 @@ mpirun -np <p> ../traceR --sync=3  -- ../conf/<choose here> <tracer_config>
 
 Format of trace_config:
 ```
-<global_map file>
+<global map file>
 <num jobs>
 <Trace folder for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
 <Trace folder for job1> <map file for job1> <number of ranks in job1> <iterations (use 1 if running in normal mode)>
 ...
 ```
-If <global_map file> is not needed, use NA for it and <map file for job*>.
+If "global map file" is not needed, use NA for it and "map file for job*".
 For generating simple global and job map file, use the code in utils.
 More information on how to set up network config files can be found in CODES:codes/src/networks/model-net/doc
 
