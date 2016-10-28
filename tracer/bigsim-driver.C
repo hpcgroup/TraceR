@@ -203,9 +203,11 @@ static void handle_exec_rev_event(
     proc_msg * m,
     tw_lp * lp);
 
+static char lp_io_dir[256] = {'\0'};
 const tw_optdef app_opt [] =
 {
     TWOPT_GROUP("Model net test case" ),
+    TWOPT_CHAR("lp-io-dir", lp_io_dir, "Where to place io output (unspecified -> tracer-out"),
     TWOPT_END()
 };
 
@@ -279,7 +281,7 @@ int main(int argc, char **argv)
 
     tw_opt_add(app_opt);
     //g_tw_lookahead = 0.0001;
-    g_tw_lookahead = 0.001;
+    g_tw_lookahead = 0.1;
     tw_init(&argc, &argv);
 
     signal(SIGTERM, term_handler);
@@ -328,6 +330,17 @@ int main(int argc, char **argv)
                 "modelnet_torus", NULL, 1);
     }
 
+    if(net_id == HYPER_TORUS) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_hyper_torus", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_hyper_torus_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_hyper_torus", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_hyper_torus_router", NULL, 1);
+    }
+    
     if(net_id == DRAGONFLY) {
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
                 "modelnet_dragonfly", NULL, 1);
@@ -348,6 +361,17 @@ int main(int argc, char **argv)
                 "modelnet_fattree", NULL, 1);
         num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
                 "fattree_switch", NULL, 1);
+    }
+    
+    if(net_id == SLIMFLY) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_slimfly", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "slimfly_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_slimfly", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "slimfly_router", NULL, 1);
     }
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
@@ -379,10 +403,14 @@ int main(int argc, char **argv)
     if(!rank) 
       printf("Eager limit is %f bytes\n", eager_limit);
 
-    if(lp_io_prepare("modelnet-test", LP_IO_UNIQ_SUFFIX, &handle, MPI_COMM_WORLD) < 0)
-    {
-        return(-1);
+    int ret;
+    if(lp_io_dir[0]) {
+      ret = lp_io_prepare(lp_io_dir, 0, &handle, MPI_COMM_WORLD);
+    } else {
+      ret = lp_io_prepare("tracer-out", LP_IO_UNIQ_SUFFIX, &handle, 
+                          MPI_COMM_WORLD);
     }
+    assert(ret == 0);
 
     if(!rank) printf("Begin reading %s\n", tracer_input);
 
@@ -400,7 +428,6 @@ int main(int argc, char **argv)
         global_rank[i].mapsTo = -1;
         global_rank[i].jobID = -1;
     }
-
     if(dump_topo_only || strcmp("NA", globalIn) == 0) {
       if(!rank) printf("Using default linear mapping of jobs\n");
       default_mapping = 1;
@@ -570,8 +597,8 @@ int main(int argc, char **argv)
             printf("Job %d Finalize Time %f s\n", i, ns_to_s(jobTimesMax[i]));
         }
     }
+    model_net_report_stats(net_id);
     tw_end();
-
     return 0;
 }
 
@@ -633,6 +660,7 @@ static void proc_event(
     proc_msg * m,
     tw_lp * lp)
 {
+  fflush(stdout);
     switch (m->proc_event_type)
     {
         case KICKOFF:
@@ -738,7 +766,7 @@ static void handle_kickoff_event(
     int my_pe_num = ns->my_pe_num;
     int my_job = ns->my_job;
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
-    if(my_pe_num == 0 && my_job == 0) {
+    if(my_pe_num == 0 && (my_job == 0 || my_job == num_jobs - 1)) {
         printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
         "TASK: %d, RUN TIME TILL NOW=%f s, CURRENT SIM TIME %f\n", my_pe_num, 
         (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
