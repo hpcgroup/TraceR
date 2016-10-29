@@ -22,17 +22,28 @@
 #include "Task.h"
 #include <list>
 #include <map>
+#include <vector>
 #include "datatypes.h"
 
 class Task;
+
+class MsgKey {
+  uint32_t rank, comm, tag;
+  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm) {
+    rank = _rank; tag = _tag; comm = _comm;
+  }
+  bool operator< (const MsgKey &rhs) const {
+    if(rank != rhs.rank) return rank < rhs.rank;
+    else if(tag != rhs.tag) return tag < rhs.tag;
+    else return comm < rhs.comm;
+  }
+};
 
 class PE {
   public:
     PE();
     ~PE();
     std::list<TaskPair> msgBuffer;
-    //vector<bool> busyStateBuffer;
-    //map<int, vector<int> > taskMsgBuffer; //For optimistic mode: store copy of the messages received per task
     Task* myTasks;	// all tasks of this PE
     bool **taskStatus;
     bool **msgStatus;
@@ -61,7 +72,7 @@ class PE {
     std::map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
-
+    std::map< MsgKey, std::vector<int> > pendingMsgs;
 };
 
 #endif /* PE_H_ */

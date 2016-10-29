@@ -29,11 +29,13 @@ class TraceReader {
 public:
     TraceReader(char *);
     ~TraceReader();
+#if TRACER_BIGSIM_TRACES
     void loadOffsets();
     void loadTraceSummary();
     void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe,
         int penum, int jobnum, double* startTime);
     void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe, int);
+#endif
 
     int numEmPes;	// number of emulation PEs, there is a trace file for each of them
     int totalWorkerProcs;

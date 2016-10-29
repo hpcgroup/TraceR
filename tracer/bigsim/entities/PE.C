@@ -18,7 +18,6 @@
 #include "PE.h"
 #include <math.h>
 #define MAX_LOGS 5000000
-//extern "C" JobInf *jobs;
 extern JobInf *jobs;
 
 PE::PE() {
@@ -26,14 +25,15 @@ PE::PE() {
   currentTask = 0;
   windowOffset = 0;
   beforeTask = 0;
-  //busyStateBuffer.push_back(false);
   currIter = 0;
 }
 
 PE::~PE() {
     msgBuffer.clear();
+#if TRACER_BIGSIM_TRACES
     delete [] myTasks;
     delete [] msgDestLogs;
+#endif
 }
 
 void PE::mark_all_done(int iter, int tInd) {
@@ -46,6 +46,7 @@ void PE::mark_all_done(int iter, int tInd) {
 
 bool PE::noUnsatDep(int iter, int tInd)
 {
+#if TRACER_BIGSIM_TRACES
   for(int i=0; i<myTasks[tInd].backwDepSize; i++)
   {
     int bwInd = myTasks[tInd].backwardDep[i];
@@ -53,11 +54,14 @@ bool PE::noUnsatDep(int iter, int tInd)
       return false;
   }
   return true;
+#else
+  return taskStatus[iter][tInd - 1];
+#endif
 }
 
 double PE::taskExecTime(int tInd)
 {
-    return myTasks[tInd].execTime;
+  return myTasks[tInd].execTime;
 }
 
 void PE::printStat()

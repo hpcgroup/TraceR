@@ -1,0 +1,513 @@
+#include "otf2_reader.h"
+#include "CWrapper.h"
+#include <cassert>
+#define VERBOSE_L1 1
+#define VERBOSE_L2 0
+#define VERBOSE_L3 0
+
+static OTF2_CallbackCode
+callbackDefLocations(void*                 userData,
+                     OTF2_LocationRef      location,
+                     OTF2_StringRef        name,
+                     OTF2_LocationType     locationType,
+                     uint64_t              numberOfEvents,
+                     OTF2_LocationGroupRef locationGroup )
+{
+  std::vector<uint64_t>& locations = ((AllData*)userData)->locations;
+  locations.push_back(location);
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+
+static OTF2_CallbackCode 
+callbackDefClockProperties(void * userData,
+                          uint64_t timerResolution,
+                          uint64_t globalOffset,
+                          uint64_t traceLength)
+{
+  ClockProperties &clockProperties = ((AllData*)userData)->clockProperties;
+  clockProperties.ticks_per_second = timerResolution;
+  clockProperties.ticksToSecond = TIME_MULT * 1.0/timerResolution;
+#if VERBOSE_L1
+  printf("Clock Props: %lld %lld %f\n", clockProperties.ticks_per_second,
+    TIME_MULT, clockProperties.ticksToSecond);
+  fflush(stdout);
+#endif
+  clockProperties.time_offset = globalOffset;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackDefString(void * userData,
+                  OTF2_StringRef self,
+                  const char * s)
+{
+  ((AllData*)userData)->strings[self] = std::string(s);
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackDefGroup(void* userData,
+                OTF2_GroupRef self,
+                OTF2_StringRef name,
+                OTF2_GroupType groupType,
+                OTF2_Paradigm paradigm,
+                OTF2_GroupFlag groupFlags,
+                uint32_t numberOfMembers,
+                const uint64_t* members)
+{
+  Group g;
+  ((AllData*)userData)->groups[self] = g;
+  Group &new_g = ((AllData*)userData)->groups[self];
+  new_g.type = groupType;
+  //OTF2_GROUP_TYPE_COMM_SELF is special
+#if VERBOSE_L3
+  printf("Add group %llu with %lu members: ", self, numberOfMembers);
+  fflush(stdout);
+#endif
+  for (uint64_t i = 0; i < numberOfMembers; i++) {
+    new_g.members.push_back(members[i]); 
+#if VERBOSE_L3
+    printf("%llu ", members[i]);
+    fflush(stdout);
+#endif
+  }
+#if VERBOSE_L3
+    printf("\n");
+    fflush(stdout);
+#endif
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackDefComm(void * userData,
+                OTF2_CommRef self,
+                OTF2_StringRef name,
+                OTF2_GroupRef group,
+                OTF2_CommRef parent)
+{
+  ((AllData*)userData)->communicators[self] = group;
+#if VERBOSE_L3
+  printf("Add communication %llu with group %llu\n", self, group);
+  fflush(stdout);
+#endif
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackDefRegion(void * userData,
+                  OTF2_RegionRef self,
+                  OTF2_StringRef name,
+                  OTF2_StringRef canonicalName,
+                  OTF2_StringRef description,
+                  OTF2_RegionRole regionRole,
+                  OTF2_Paradigm paradigm,
+                  OTF2_RegionFlag regionFlag,
+                  OTF2_StringRef sourceFile,
+                  uint32_t beginLineNumber,
+                  uint32_t endLineNumber)
+{
+  Region r;
+  ((AllData*)userData)->regions[self] = r;
+  Region& new_r = ((AllData*)userData)->regions[self];
+  new_r.name = name;
+  new_r.role = regionRole;
+  new_r.paradigm = paradigm;
+  if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_Walltime", 15) == 0) {
+    new_r.isTracerPrintEvt = true;
+  } else {
+    new_r.isTracerPrintEvt = false;
+  }
+  if(regionRole == OTF2_REGION_ROLE_BARRIER ||
+     regionRole == OTF2_REGION_ROLE_IMPLICIT_BARRIER ||
+     regionRole == OTF2_REGION_ROLE_COLL_ONE2ALL ||
+     regionRole == OTF2_REGION_ROLE_COLL_ALL2ONE ||
+     regionRole == OTF2_REGION_ROLE_COLL_ALL2ALL ||
+     regionRole == OTF2_REGION_ROLE_COLL_OTHER ||
+     regionRole == OTF2_REGION_ROLE_POINT2POINT) {
+    new_r.isCommunication = true;
+  }
+#if VERBOSE_L3
+  printf("Add region %llu name %s role %d paradigm %d\n", self, 
+    ((AllData*)userData)->strings[name], regionRole, paradigm);
+  fflush(stdout);
+#endif
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static void 
+addUserEvt(void*               userData,
+           OTF2_TimeStamp      time)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = (time - ld->lastLogTime) * globalData->clockProperties.ticksToSecond;
+  new_task.event_id = TRACER_USER_EVT;
+}
+
+static OTF2_CallbackCode
+callbackEvtBegin( OTF2_LocationRef    location,
+                  OTF2_TimeStamp      time,
+                  uint64_t            evtPos,
+                  void*               userData,
+                  OTF2_AttributeList* attributes,
+                  OTF2_RegionRef      region )
+{
+  if(evtPos != 1) {
+    addUserEvt(userData, time);
+  }
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  if(globalData->regions[region].isTracerPrintEvt) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.event_id = region;
+  }
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode
+callbackEvtEnd( OTF2_LocationRef    location,
+                OTF2_TimeStamp      time,
+                uint64_t            evtPos,
+                void*               userData,
+                OTF2_AttributeList* attributes,
+                OTF2_RegionRef      region )
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  if(globalData->regions[region].isTracerPrintEvt) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.event_id = region;
+  }
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackSendEvt(OTF2_LocationRef locationID,
+                OTF2_TimeStamp time,
+                uint64_t evtPos,
+                void * userData,
+                OTF2_AttributeList * attributeList,
+                uint32_t receiver,
+                OTF2_CommRef communicator,
+                uint32_t msgTag,
+                uint64_t msgLength)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_SEND_EVT;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+  new_task.myEntry.msgId.pe = locationID;
+  new_task.myEntry.msgId.id = msgTag;
+  new_task.myEntry.msgId.size = msgLength;
+  new_task.myEntry.msgId.comm = communicator;
+  new_task.myEntry.msgId.coll_type = -1;
+  new_task.myEntry.node = group.members[receiver];
+  new_task.myEntry.thread = 0;
+  new_task.isNonBlocking = false;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackIsendEvt(OTF2_LocationRef locationID,
+                 OTF2_TimeStamp time,
+                 uint64_t evtPos,
+                 void * userData,
+                 OTF2_AttributeList * attributeList,
+                 uint32_t receiver,
+                 OTF2_CommRef communicator,
+                 uint32_t msgTag,
+                 uint64_t msgLength,
+                 uint64_t requestID)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_SEND_EVT;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+  new_task.myEntry.msgId.pe = locationID;
+  new_task.myEntry.msgId.id = msgTag;
+  new_task.myEntry.msgId.size = msgLength;
+  new_task.myEntry.msgId.comm = communicator;
+  new_task.myEntry.msgId.coll_type = -1;
+  new_task.myEntry.node = group.members[receiver];
+  new_task.myEntry.thread = 0;
+  new_task.isNonBlocking = true;
+  new_task.req_id = requestID;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackIsendCompEvt(OTF2_LocationRef locationID,
+                    OTF2_TimeStamp time,
+                    uint64_t evtPos,
+                    void * userData,
+                    OTF2_AttributeList * attributeList,
+                    uint64_t requestID)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_SEND_COMP_EVT;
+  new_task.req_id = requestID;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackRecvEvt(OTF2_LocationRef locationID,
+                OTF2_TimeStamp time,
+                uint64_t evtPos,
+                void * userData,
+                OTF2_AttributeList * attributeList,
+                uint32_t sender,
+                OTF2_CommRef communicator,
+                uint32_t msgTag,
+                uint64_t msgLength)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_RECV_EVT;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+  new_task.myEntry.msgId.pe = locationID;
+  new_task.myEntry.msgId.id = msgTag;
+  new_task.myEntry.msgId.size = msgLength;
+  new_task.myEntry.msgId.comm = communicator;
+  new_task.myEntry.msgId.coll_type = -1;
+  new_task.myEntry.node = group.members[sender];
+  new_task.myEntry.thread = 0;
+  new_task.isNonBlocking = false;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+
+static OTF2_CallbackCode 
+callbackIrecv(OTF2_LocationRef locationID,
+                 OTF2_TimeStamp time,
+                 uint64_t evtPos,
+                 void * userData,
+                 OTF2_AttributeList * attributeList,
+                 uint64_t requestID)
+{
+  //do nothing for now
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackIrecvCompEvt(OTF2_LocationRef locationID,
+                 OTF2_TimeStamp time,
+                 uint64_t evtPos,
+                 void * userData,
+                 OTF2_AttributeList * attributeList,
+                 uint32_t sender,
+                 OTF2_CommRef communicator,
+                 uint32_t msgTag,
+                 uint64_t msgLength,
+                 uint64_t requestID)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_RECV_EVT;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+  new_task.myEntry.msgId.pe = locationID;
+  new_task.myEntry.msgId.id = msgTag;
+  new_task.myEntry.msgId.size = msgLength;
+  new_task.myEntry.msgId.comm = communicator;
+  new_task.myEntry.msgId.coll_type = -1;
+  new_task.myEntry.node = group.members[sender];
+  new_task.myEntry.thread = 0;
+  new_task.isNonBlocking = false;
+  new_task.req_id = requestID;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackCollectiveBegin(OTF2_LocationRef locationID,
+                        OTF2_TimeStamp time,
+                        uint64_t evtPos,
+                        void * userData,
+                        OTF2_AttributeList * attributeList)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
+callbackCollectiveEnd(OTF2_LocationRef locationID,
+                         OTF2_TimeStamp time,
+                         uint64_t evtPos,
+                         void * userData,
+                         OTF2_AttributeList * attributeList,
+                         OTF2_CollectiveOp collectiveOp,
+                         OTF2_CommRef communicator,
+                         uint32_t root,
+                         uint64_t sizeSent,
+                         uint64_t sizeReceived)
+{
+  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  AllData *globalData = (AllData *)userData;
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_COLL_EVT;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+  new_task.myEntry.msgId.size = sizeSent;
+  new_task.myEntry.msgId.comm = communicator;
+  new_task.myEntry.msgId.coll_type = collectiveOp;
+  if(root < group.members.size())
+    new_task.myEntry.node = group.members[root];
+  new_task.myEntry.thread = 0;
+  new_task.isNonBlocking = false;
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+
+OTF2_Reader * readGlobalDefinitions(int jobID, char* tracefileName, AllData *allData)
+{
+  int size, rank;
+  MPI_Comm_size( MPI_COMM_WORLD, &size );
+  MPI_Comm_rank( MPI_COMM_WORLD, &rank );
+
+  OTF2_Reader* reader = OTF2_Reader_Open(tracefileName);
+  OTF2_MPI_Reader_SetCollectiveCallbacks( reader, MPI_COMM_WORLD );
+  uint64_t number_of_locations;
+  OTF2_Reader_GetNumberOfLocations( reader, &number_of_locations );
+  OTF2_GlobalDefReader* global_def_reader = OTF2_Reader_GetGlobalDefReader( reader );
+  OTF2_GlobalDefReaderCallbacks* global_def_callbacks = OTF2_GlobalDefReaderCallbacks_New();
+  OTF2_GlobalDefReaderCallbacks_SetStringCallback(global_def_callbacks,
+      &callbackDefString);
+  OTF2_GlobalDefReaderCallbacks_SetLocationCallback( global_def_callbacks,
+      &callbackDefLocations );
+  OTF2_GlobalDefReaderCallbacks_SetClockPropertiesCallback(global_def_callbacks,
+      &callbackDefClockProperties);
+  OTF2_GlobalDefReaderCallbacks_SetGroupCallback(global_def_callbacks,
+      &callbackDefGroup);
+  OTF2_GlobalDefReaderCallbacks_SetCommCallback(global_def_callbacks,
+      &callbackDefComm);    
+  OTF2_GlobalDefReaderCallbacks_SetRegionCallback(global_def_callbacks, 
+      &callbackDefRegion);
+  //Unused
+  //OTF2_GlobalDefReaderCallbacks_SetAttributeCallback(global_def_callbacks,
+  //callbackDefAttribute);
+  OTF2_Reader_RegisterGlobalDefCallbacks( reader,
+      global_def_reader,
+      global_def_callbacks,
+      allData );
+  OTF2_GlobalDefReaderCallbacks_Delete( global_def_callbacks );
+
+  uint64_t definitions_read = 0;
+  OTF2_Reader_ReadAllGlobalDefinitions( reader,
+      global_def_reader,
+      &definitions_read );
+
+  assert(number_of_locations == locations.size());
+  std::vector<uint64_t>& locations = allData->locations;
+  for ( size_t i = 0; i < locations.size(); i++ )
+  {
+    if(i == 0 || isPEonThisRank(jobID, i)) {
+      OTF2_Reader_SelectLocation( reader, locations[ i ] );
+    }
+  }
+
+  bool successful_open_def_files =
+    OTF2_Reader_OpenDefFiles( reader ) == OTF2_SUCCESS;
+
+  if(successful_open_def_files) {
+    printf("Failure for opening def files for job %d\n", jobID);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+
+  OTF2_Reader_OpenEvtFiles( reader );
+  return reader;
+}
+
+void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData, 
+    uint32_t loc, LocationData* ld)
+{
+  std::vector<uint64_t>& locations = allData->locations;
+  OTF2_DefReader* def_reader =
+    OTF2_Reader_GetDefReader( reader, locations[ loc ] );
+  if ( def_reader )
+  {
+    uint64_t def_reads = 0;
+    OTF2_Reader_ReadAllLocalDefinitions( reader,
+        def_reader,
+        &def_reads );
+    OTF2_Reader_CloseDefReader( reader, def_reader );
+  } else {
+    printf("Failure for opening def reader for job %d loc %d\n", jobID, loc);
+    MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  OTF2_EvtReader* evt_reader =
+    OTF2_Reader_GetEvtReader( reader, locations[ loc ] );
+  OTF2_EvtReaderCallbacks* event_callbacks = OTF2_EvtReaderCallbacks_New();
+  OTF2_EvtReaderCallbacks_SetEnterCallback( event_callbacks,
+      &callbackEvtBegin);
+  OTF2_EvtReaderCallbacks_SetLeaveCallback( event_callbacks,
+      &callbackEvtEnd );
+  OTF2_EvtReaderCallbacks_SetMpiSendCallback( event_callbacks,
+      &callbackSendEvt );
+  OTF2_EvtReaderCallbacks_SetMpiIsendCallback( event_callbacks,
+      &callbackIsendEvt );
+  OTF2_EvtReaderCallbacks_SetMpiIsendCompleteCallback( event_callbacks,
+      &callbackIsendCompEvt);
+  OTF2_EvtReaderCallbacks_SetMpiRecvCallback( event_callbacks,
+      &callbackRecvEvt);
+  OTF2_EvtReaderCallbacks_SetMpiIrecvRequestCallback( event_callbacks,
+      &callbackIrecv);
+  OTF2_EvtReaderCallbacks_SetMpiIrecvCallback( event_callbacks,
+      &callbackIrecvCompEvt);
+  OTF2_EvtReaderCallbacks_SetMpiCollectiveBeginCallback(
+      event_callbacks, &callbackCollectiveBegin);
+  OTF2_EvtReaderCallbacks_SetMpiCollectiveEndCallback(
+      event_callbacks, &callbackCollectiveEnd);
+  
+  allData->ld = ld;
+  ld->lastLogTime = 0;
+  OTF2_Reader_RegisterEvtCallbacks( reader,
+      evt_reader,
+      event_callbacks,
+      locData );
+  OTF2_EvtReaderCallbacks_Delete( event_callbacks );
+  uint64_t events_read = 0;
+  OTF2_Reader_ReadAllLocalEvents( reader,
+      evt_reader,
+      &events_read );
+  for(int e = 0; e < locData->tasks.size(); e++) {
+    printf("[%d] type: %d, exec time %f\n", e, 
+        locData->tasks[e].event_id, locData->tasks[e].execTime);
+  }
+  OTF2_Reader_CloseEvtReader( reader, evt_reader );
+}
+
+void closeReader(OTF2_Reader *reader) {
+  OTF2_Reader_CloseDefFiles( reader );
+  OTF2_Reader_CloseEvtFiles( reader );
+  OTF2_Reader_Close( reader );
+}

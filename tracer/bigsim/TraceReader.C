@@ -16,8 +16,6 @@
 
 #include "TraceReader.h"
 #include <cstdio>
-//#include <iostream>
-//#include <fstream>
 
 #include "blue.h"
 #include "blue_impl.h"
@@ -46,6 +44,7 @@ void addEventSub(int jobid, char *key, double val, int numjobs) {
   eventSubs[jobid][key] = (double)TIME_MULT * val;
 }
 
+#if TRACER_BIGSIM_TRACES
 TraceReader::TraceReader(char *s) {
   strncpy(tracePath, s, strlen(s) + 1);
   totalTlineLength=0;
@@ -301,3 +300,55 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     }
   }
 }
+
+#elif TRACER_OTF_TRACES
+#include "otf2_reader.h"
+void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startTime) {
+  pe->myNum = my_pe_num;
+  pe->jobNum = my_job;
+  LocationData *ld = new LocationData;
+  
+  readLocationTasks(my_job, jobs[my_job].reader, jobs[my_job].allData,
+      my_pe_num, ld);
+
+  pe->myTasks = &(ld->tasks[0]);
+  pe->tasksCount = allData->tasks.size();
+  pe->taskStatus= new bool*[jobs[pe->jobnum].numIters];
+  pe->msgStatus= new bool*[jobs[pe->jobnum].numIters];
+  pe->allMarked= new bool[jobs[pe->jobnum].numIters];
+  for(int i = 0; i < jobs[pe->jobnum].numIters; i++) {
+    pe->taskStatus[i] = new bool[pe->tasksCount];
+    pe->msgStatus[i] = new bool[pe->tasksCount];
+    pe->allMarked[i] = false;
+  }
+  pe->firstTask = 0;
+  *startTime = 0;
+
+  for(int logInd = 0; logInd  < pe->tasksCount; logInd++)
+  {
+    Task *t = &(myTasks[logInd]);
+    if(time_replace_limit != -1 && t->execTime >= time_replace_limit) {
+      t->execTime = (double)TIME_MULT * time_replace_by;
+    } 
+    
+    if(eventSubs != NULL && t->event_id == TRACER_USER_EVT) {
+      std::map<std::string, double>::iterator loc =
+        eventSubs[pe->jobNum].find("user_code");
+      if(loc != eventSubs[pe->jobNum].end()) {
+        t->execTime = loc->second;
+      }
+    }
+
+    for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
+      pe->taskStatus[i][logInd] = false;
+    }
+  
+    if(t->event_id == TRACER_SEND_EVT) { 
+      if(size_replace_limit[pe->jobNum] != -1 && 
+         t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
+      t->myEntry.msgId.size = size_replace_by[pe->jobNum];
+    } 
+  }
+}
+#endif
+

@@ -39,7 +39,6 @@ struct MsgID {
 struct MsgEntry {
 #ifdef __cplusplus
     MsgEntry();
-    void sendMsg(double startTime);
 #endif
     int node;	// node number in global order
     int thread;

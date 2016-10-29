@@ -39,6 +39,10 @@ extern "C" {
 #include "bigsim/CWrapper.h"
 #include "bigsim/entities/MsgEntry.h"
 
+#if TRACER_OTF_TRACES
+#include "bigsim/otf2_reader.h"
+#endif
+
 static int net_id = 0;
 static int num_routers = 0;
 static int num_servers = 0;
@@ -77,6 +81,7 @@ double time_replace_limit = -1;
 double copy_per_byte = 0.0;
 double eager_limit = 8192;
 int dump_topo_only = 0;
+int rank;
 
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
@@ -270,7 +275,6 @@ void term_handler (int sig) {
 int main(int argc, char **argv)
 {
     int nprocs;
-    int rank;
     int num_nets;
     int *net_ids;
     //printf("\n Config count %d ",(int) config.lpgroups_count);
@@ -294,11 +298,11 @@ int main(int argc, char **argv)
     }
     if(argc < 2 && rank == 0)
     {
-	printf("\nUSAGE: \n");
-        printf("\tSequential: modelnet-test-bigsim --sync=1 -- mapping_file_name.conf (optional --nkp)\n");
-	printf("\tParallel Conservative: mpirun <args> modelnet-test-bigsim --sync=2 -- mapping_file_name.conf (optional --nkp)\n");
-	printf("\tParallel Optimistic: mpirun <args> modelnet-test-bigsim --sync=3 -- mapping_file_name.conf (optional --nkp)\n\n");
-        assert(0);
+      printf("\nUSAGE: \n");
+      printf("\tSequential: modelnet-test-bigsim --sync=1 -- mapping_file_name.conf (optional --nkp)\n");
+      printf("\tParallel Conservative: mpirun <args> modelnet-test-bigsim --sync=2 -- mapping_file_name.conf (optional --nkp)\n");
+      printf("\tParallel Optimistic: mpirun <args> modelnet-test-bigsim --sync=3 -- mapping_file_name.conf (optional --nkp)\n\n");
+      assert(0);
     }
 
     strncpy(tracer_input, argv[2], strlen(argv[2]) + 1);
@@ -452,9 +456,13 @@ int main(int argc, char **argv)
     total_ranks = 0;
 
     for(int i = 0; i < num_jobs; i++) {
+#if TRACER_BIGSIM_TRACES
         char tempTrace[200];
         fscanf(jobIn, "%s", tempTrace);
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
+#else
+        fscanf(jobIn, "%s", jobs[i].traceDir);
+#endif
         fscanf(jobIn, "%s", jobs[i].map_file);
         fscanf(jobIn, "%d", &jobs[i].numRanks);
         fscanf(jobIn, "%d", &jobs[i].numIters);
@@ -465,7 +473,7 @@ int main(int argc, char **argv)
         finalizeTimes[i] = 0;
         if(!rank) {
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
-            i, jobs[i].numRanks, tempTrace, jobs[i].map_file, jobs[i].numIters);
+            i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
     }
 
@@ -512,8 +520,8 @@ int main(int argc, char **argv)
       fscanf(jobIn, "%c", &next);
     }
 
+#if TRACER_BIGSIM_TRACES
     //Load all summaries on proc 0 and bcast
-    int ranks_till_now = 0;
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
         if(!rank) printf("Loading trace summary for job %d from %s\n", i,
                 jobs[i].traceDir);
@@ -528,7 +536,21 @@ int main(int argc, char **argv)
             jobs[i].offsets = (int*) malloc(sizeof(int) * num_workers);
         }
         MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+    }
+#else
+    //Read in global definitions and Open event files
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+        if(!rank) printf("Read global definition for job %d from %s\n", i,
+                jobs[i].traceDir);
+        jobs[i].allData = new AllData;
+        jobs[i].reader = readGlobalDefinitions(i, jobs[i].traceDir, 
+          jobs[i].allData);
+    }
+#endif
 
+    int ranks_till_now = 0;
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+        int num_workers = jobs[i].numRanks;
         jobs[i].rankMap = (int *) malloc(sizeof(int) * num_workers);
         if(default_mapping) {
           for(int local_rank = 0; local_rank < num_workers; local_rank++,
@@ -562,7 +584,6 @@ int main(int argc, char **argv)
     }
 
     tw_run();
-    //model_net_report_stats(net_id);
 
     if(lp_io_flush(handle, MPI_COMM_WORLD) < 0)
     {
@@ -622,6 +643,7 @@ static void proc_init(
     }
 
     ns->my_pe = newPE();
+#if TRACER_BIGSIM_TRACES
     ns->trace_reader = newTraceReader(jobs[ns->my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
     tw_stime startTime=0;
@@ -630,6 +652,9 @@ static void proc_init(
 
     TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth,
                          ns->my_pe, ns->my_pe_num,  ns->my_job, &startTime);
+#else 
+    TraceReader_readOTF2Trace(ns->my_pe, ns->my_pe_num, ns->my_job, &startTime);
+#endif
 
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
@@ -650,29 +675,29 @@ static void proc_event(
     tw_lp * lp)
 {
   fflush(stdout);
-    switch (m->proc_event_type)
-    {
-        case KICKOFF:
-            handle_kickoff_event(ns, b, m, lp);
-            break;
-	case LOCAL:
-	    handle_local_event(ns, b, m, lp); 
-	    break;
-        case RECV_MSG:
-            handle_recv_event(ns, b, m, lp);
-            break;
-        case BCAST:
-            handle_bcast_event(ns, b, m, lp);
-            break;
-        case EXEC_COMP:
-            handle_exec_event(ns, b, m, lp);
-            break;
-        default:
-	    printf("\n Invalid message type %d event %lld ", 
-              m->proc_event_type, m);
-            assert(0);
-            break;
-    }
+  switch (m->proc_event_type)
+  {
+    case KICKOFF:
+      handle_kickoff_event(ns, b, m, lp);
+      break;
+    case LOCAL:
+      handle_local_event(ns, b, m, lp); 
+      break;
+    case RECV_MSG:
+      handle_recv_event(ns, b, m, lp);
+      break;
+    case BCAST:
+      handle_bcast_event(ns, b, m, lp);
+      break;
+    case EXEC_COMP:
+      handle_exec_event(ns, b, m, lp);
+      break;
+    default:
+      printf("\n Invalid message type %d event %lld ", 
+          m->proc_event_type, m);
+      assert(0);
+      break;
+  }
 }
 
 static void proc_rev_event(
@@ -681,28 +706,28 @@ static void proc_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    switch (m->proc_event_type)
-    {
-        case KICKOFF:
-            handle_kickoff_rev_event(ns, b, m, lp);
-            break;
-    	case LOCAL:
-	    handle_local_rev_event(ns, b, m, lp);    
-	    break;
-        case RECV_MSG:
-            handle_recv_rev_event(ns, b, m, lp);
-            break;
-        case BCAST:
-            handle_bcast_rev_event(ns, b, m, lp);
-            break;
-        case EXEC_COMP:
-            handle_exec_rev_event(ns, b, m, lp);
-            break;
-        default:
-            assert(0);
-            break;
-    }
-    return;
+  switch (m->proc_event_type)
+  {
+    case KICKOFF:
+      handle_kickoff_rev_event(ns, b, m, lp);
+      break;
+    case LOCAL:
+      handle_local_rev_event(ns, b, m, lp);    
+      break;
+    case RECV_MSG:
+      handle_recv_rev_event(ns, b, m, lp);
+      break;
+    case BCAST:
+      handle_bcast_rev_event(ns, b, m, lp);
+      break;
+    case EXEC_COMP:
+      handle_exec_rev_event(ns, b, m, lp);
+      break;
+    default:
+      assert(0);
+      break;
+  }
+  return;
 }
 
 static void proc_finalize(
@@ -1365,6 +1390,12 @@ static inline int lpid_to_job(int lp_gid){
 }
 static inline int pe_to_job(int pe){
     return global_rank[pe].jobID;;
+}
+
+bool isPEonThisRank(int jobID, int i) {
+  int lpid = pe_to_lpid(i, jobID);
+  int pe = codes_mapping(lpid);
+  return pe == rank;
 }
 
 

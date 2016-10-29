@@ -17,6 +17,10 @@
 #ifndef _DATATYPES_H_
 #define _DATATYPES_H_
 
+#if TRACER_OTF_TRACES
+#include "bigsim/otf2_reader.h"
+#endif
+
 struct TaskPair {
   int iter;
   int taskid;
@@ -53,6 +57,10 @@ typedef struct JobInf {
     int *offsets;
     int skipMsgId;
     int numIters;
+#if TRACER_OTF_TRACES
+    AllData *allData;
+    OTF2_Reader *reader;
+#endif
 } JobInf;
 
 #endif

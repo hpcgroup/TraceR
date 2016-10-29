@@ -44,12 +44,18 @@ void PE_set_busy(PE* p, bool b){p->busy = b;}
 bool PE_is_busy(PE* p){return p->busy;}
 bool PE_noUnsatDep(PE* p, int iter, int tInd){return p->noUnsatDep(iter, tInd);}
 bool PE_noMsgDep(PE* p, int iter, int tInd){
+#if TRACER_BIGSIM_TRACES
   return p->msgStatus[iter][tInd];
+#else
+  printf("This function should not be called with OTF traces\n");
+  exit(1);
+#endif
 }
 bool PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
 bool PE_isLoopEvent(PE *p, int tInd) { return p->myTasks[tInd].loopEvent; }
 double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
 void PE_addTaskExecTime(PE* p, int tInd, double time){ p->addTaskExecTime(tInd, time);}
+#if TRACER_BIGSIM_TRACES
 int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
   return &(p->myTasks[tInd].myEntries);
@@ -59,10 +65,9 @@ MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd){
 }
 
 void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime) {
-#if TRACER_BIGSIM_TRACES
   p->myTasks[tInd].printEvt(lp, stime, p->myNum, p->jobNum);
-#endif
 }
+#endif
 
 int PE_getFirstTask(PE* p){ return p->firstTask;}
 void PE_set_taskDone(PE* p, int iter, int tInd, bool b){ p->taskStatus[iter][tInd] = b; }
@@ -71,6 +76,7 @@ void PE_mark_all_done(PE *p, int iter, int task_id) {
 }
 
 bool PE_get_taskDone(PE* p, int iter, int tInd){ return p->taskStatus[iter][tInd]; }
+#if TRACER_BIGSIM_TRACES
 int* PE_getTaskFwdDep(PE* p, int tInd){ return p->myTasks[tInd].forwardDep; }
 int PE_getTaskFwdDepSize(PE* p, int tInd){ return p->myTasks[tInd].forwDepSize; }
 void PE_undone_fwd_deps(PE* p, int iter, int tInd){
@@ -86,6 +92,7 @@ void PE_undone_fwd_deps(PE* p, int iter, int tInd){
     }
   }
 }
+#endif
 void PE_set_currentTask(PE* p, int tInd){ p->currentTask=tInd; }
 int PE_get_currentTask(PE* p){ return p->currentTask; }
 int PE_get_myEmPE(PE* p){return p->myEmPE;}
@@ -137,6 +144,7 @@ int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
 void PE_printStat(PE* p){p->check();}
 int PE_get_numWorkThreads(PE* p){return p->numWth;}
 
+#if TRACER_BIGSIM_TRACES
 //TraceReader
 TraceReader* newTraceReader(char* s){return new TraceReader(s);}
 void TraceReader_loadTraceSummary(TraceReader* t){t->loadTraceSummary();}
@@ -148,3 +156,5 @@ void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
   t->readTrace(tot, numnodes, empes, nwth, pe, penum, jobnum, startTime);
 }
 int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
+#endif
+
