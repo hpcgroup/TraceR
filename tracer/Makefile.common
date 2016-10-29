@@ -54,8 +54,16 @@ CODES_CFLAGS = -I${CODES}/install/include -I${ROSS}/include
 SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
 #SELECT_TRACE = -DTRACER_OTF_TRACES=1
 
-CFLAGS = -O3 -g ${SELECT_TRACE}
-CXXFLAGS = -O3 -g ${SELECT_TRACE}
+CFLAGS = -O3 -g
+CXXFLAGS = -O3 -g
 LDFLAGS = -O3 -g
-OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS}
+OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS} ${SELECT_TRACE}
 BASE_INCS= -Ibigsim -I.
+
+ifeq ($(SELECT_TRACE),-DTRACER_OTF_TRACES=1)
+CFLAGS += `otf2-config --cflags`
+CXXFLAGS += `otf2-config --cflags`
+LDFLAGS += `otf2-config --ldflags`
+OTF_LIBS = `otf2-config --libs`
+OPTS += `otf2-config --cflags`
+endif

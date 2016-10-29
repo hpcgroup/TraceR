@@ -19,9 +19,9 @@ include Makefile.common
 TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o 
 
-TRACER_LDADD += ${CODES_LIBS} ${CHARM_LIBS}
+TRACER_LDADD += ${CODES_LIBS} ${CHARM_LIBS} ${OTF_LIBS}
 
-TRACER_CFLAGS = ${CODES_CFLAGS} 
+TRACER_CFLAGS = ${CODES_CFLAGS} ${SELECT_TRACE}
 
 all: traceR
 .PHONY: components
