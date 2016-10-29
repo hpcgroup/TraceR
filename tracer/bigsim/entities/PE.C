@@ -23,7 +23,6 @@ extern JobInf *jobs;
 PE::PE() {
   busy = false;
   currentTask = 0;
-  windowOffset = 0;
   beforeTask = 0;
   currIter = 0;
 }

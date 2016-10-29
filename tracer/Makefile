@@ -16,7 +16,7 @@
 
 include Makefile.common
 
-TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o \
+TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o bigsim/otf2_reader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o 
 
 TRACER_LDADD += ${CODES_LIBS} ${CHARM_LIBS} ${OTF_LIBS}

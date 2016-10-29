@@ -17,7 +17,8 @@
 #ifndef __CWRAPPER_H
 #define __CWRAPPER_H
 
- #include <ross.h>
+#include <ross.h>
+#include "datatypes.h"
 
 //MsgID
 typedef struct MsgID MsgID;
@@ -47,16 +48,20 @@ void PE_inc_iter(PE* p);
 void PE_dec_iter(PE* p);
 double PE_getTaskExecTime(PE* p, int tInd);
 void PE_addTaskExecTime(PE* p, int tInd, double time);
+#if TRACER_BIGSIM_TRACES
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
 MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
 void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime);
+#endif
 void PE_set_taskDone(PE* p, int, int tInd, bool b);
 void PE_mark_all_done(PE *p, int iter, int task_id);
 bool PE_get_taskDone(PE* p, int, int tInd);
+#if TRACER_BIGSIM_TRACES
 int* PE_getTaskFwdDep(PE* p, int tInd);
 int PE_getTaskFwdDepSize(PE* p, int tInd);
 void PE_undone_fwd_deps(PE* p, int iter, int tInd);
+#endif
 void PE_set_currentTask(PE* p, int tInd);
 int PE_get_currentTask(PE* p);
 int PE_get_myEmPE(PE* p);
@@ -80,6 +85,7 @@ int PE_get_totalTasksCount(PE* p);
 void PE_printStat(PE* p);
 int PE_get_numWorkThreads(PE* p);
 
+#if TRACER_BIGSIM_TRACES
 //TraceReader
 typedef struct TraceReader TraceReader;
 TraceReader* newTraceReader(char*);
@@ -90,6 +96,7 @@ void TraceReader_setOffsets(TraceReader* t, int** offsets);
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
     int* nwth, PE* pe, int penum, int jobnum, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
+#endif
 void addEventSub(int job, char *key, double val, int numjobs);
 
 bool isPEonThisRank(int jobID, int i);

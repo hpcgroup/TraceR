@@ -17,8 +17,6 @@
 #include "TraceReader.h"
 #include <cstdio>
 
-#include "blue.h"
-#include "blue_impl.h"
 #include "datatypes.h"
 #include <cmath>
 
@@ -312,11 +310,12 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
       my_pe_num, ld);
 
   pe->myTasks = &(ld->tasks[0]);
-  pe->tasksCount = allData->tasks.size();
-  pe->taskStatus= new bool*[jobs[pe->jobnum].numIters];
-  pe->msgStatus= new bool*[jobs[pe->jobnum].numIters];
-  pe->allMarked= new bool[jobs[pe->jobnum].numIters];
-  for(int i = 0; i < jobs[pe->jobnum].numIters; i++) {
+  pe->tasksCount = ld->tasks.size();
+  pe->totalTasksCount = pe->tasksCount;
+  pe->taskStatus= new bool*[jobs[pe->jobNum].numIters];
+  pe->msgStatus= new bool*[jobs[pe->jobNum].numIters];
+  pe->allMarked= new bool[jobs[pe->jobNum].numIters];
+  for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
     pe->taskStatus[i] = new bool[pe->tasksCount];
     pe->msgStatus[i] = new bool[pe->tasksCount];
     pe->allMarked[i] = false;
@@ -326,7 +325,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
 
   for(int logInd = 0; logInd  < pe->tasksCount; logInd++)
   {
-    Task *t = &(myTasks[logInd]);
+    Task *t = &(ld->tasks[logInd]);
     if(time_replace_limit != -1 && t->execTime >= time_replace_limit) {
       t->execTime = (double)TIME_MULT * time_replace_by;
     } 
@@ -345,9 +344,10 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   
     if(t->event_id == TRACER_SEND_EVT) { 
       if(size_replace_limit[pe->jobNum] != -1 && 
-         t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
-      t->myEntry.msgId.size = size_replace_by[pe->jobNum];
-    } 
+          t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
+        t->myEntry.msgId.size = size_replace_by[pe->jobNum];
+      }
+    }
   }
 }
 #endif

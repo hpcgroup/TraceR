@@ -22,12 +22,12 @@
 #include "Task.h"
 #include <list>
 #include <map>
-#include <vector>
 #include "datatypes.h"
 
 class Task;
 
 class MsgKey {
+  public:
   uint32_t rank, comm, tag;
   MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm) {
     rank = _rank; tag = _tag; comm = _comm;
@@ -37,7 +37,9 @@ class MsgKey {
     else if(tag != rhs.tag) return tag < rhs.tag;
     else return comm < rhs.comm;
   }
+  ~MsgKey() { }
 };
+typedef std::map< MsgKey, std::list<int> > KeyType;
 
 class PE {
   public:
@@ -50,7 +52,6 @@ class PE {
     bool *allMarked;
     double currTime;
     bool busy;
-    int windowOffset;
     int beforeTask, totalTasksCount;
     int myNum, myEmPE, jobNum;
     int tasksCount;	//total number of tasks
@@ -72,7 +73,7 @@ class PE {
     std::map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
-    std::map< MsgKey, std::vector<int> > pendingMsgs;
+    KeyType pendingMsgs;
 };
 
 #endif /* PE_H_ */

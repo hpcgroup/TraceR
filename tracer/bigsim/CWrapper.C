@@ -137,7 +137,9 @@ int PE_findTaskFromMsg(PE* p, MsgID* msgId){
   return p->findTaskFromMsg(msgId);
 }
 void PE_invertMsgPe(PE* p, int iter, int tInd){
+#if TRACER_BIGSIM_TRACES
   p->invertMsgPe(iter, tInd);
+#endif
 }
 int PE_get_tasksCount(PE* p){return p->tasksCount;}
 int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}

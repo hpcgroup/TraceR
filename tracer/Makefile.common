@@ -28,6 +28,7 @@ CXX = mpicxx
 SEQ_CXX = icpc
 endif
 
+#needed if using bigsim logs
 #CHARMPATH = /p/lscratchf/jain6/network-sim/charm/verbs-linux-x86_64-bigemulator-icc
 CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator
 
@@ -39,9 +40,6 @@ CODES = ${BASE_DIR}/codes
 CODES_LIBS = -L${CODES}/install/lib -Wl,-rpath=${CODES}/install/lib
 CODES_LIBS += -L${ROSS}/lib -Wl,-rpath=${ROSS}/lib
 CODES_LIBS += -lcodes -lROSS -lm
-
-CHARM_LIBS = -L$(CHARMPATH)/lib -Wl,-rpath=$(CHARMPATH)/lib
-CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
 
 ifeq ($(ARCH),bgq)
 ARCH_FLAGS = -I/bgsys/drivers/ppcfloor
@@ -60,10 +58,18 @@ LDFLAGS = -O3 -g
 OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS} ${SELECT_TRACE}
 BASE_INCS= -Ibigsim -I.
 
+ifeq ($(SELECT_TRACE),-DTRACER_BIGSIM_TRACES=1)
+CHARM_LIBS = -L$(CHARMPATH)/lib
+CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
+OPTS += -I$(CHARMPATH)/include
+endif
+
 ifeq ($(SELECT_TRACE),-DTRACER_OTF_TRACES=1)
 CFLAGS += `otf2-config --cflags`
 CXXFLAGS += `otf2-config --cflags`
 LDFLAGS += `otf2-config --ldflags`
 OTF_LIBS = `otf2-config --libs`
 OPTS += `otf2-config --cflags`
+SEQ_CXX = ${CXX}
 endif
+

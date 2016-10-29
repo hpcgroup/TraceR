@@ -1,5 +1,7 @@
 #ifndef _OTF2_READER_H_
 #define _OTF2_READER_H_
+#if TRACER_OTF_TRACES
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -67,4 +69,5 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
   uint32_t loc, LocationData* ld);
 
 void closeReader(OTF2_Reader *reader);
+#endif
 #endif

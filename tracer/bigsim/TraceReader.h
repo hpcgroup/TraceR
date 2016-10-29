@@ -17,8 +17,10 @@
 #ifndef TRACEFILEREADER_H_
 #define TRACEFILEREADER_H_
 #include "assert.h"
+#if TRACER_BIGSIM_TRACES
 #include "blue.h"
 #include "blue_impl.h"
+#endif
 #include "entities/PE.h"
 #include "entities/Task.h"
 class PE;

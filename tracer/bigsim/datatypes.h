@@ -18,8 +18,11 @@
 #define _DATATYPES_H_
 
 #if TRACER_OTF_TRACES
-#include "bigsim/otf2_reader.h"
+#include "otf2_reader.h"
 #endif
+
+#include <map>
+#include <list>
 
 struct TaskPair {
   int iter;

@@ -1,3 +1,4 @@
+#if TRACER_OTF_TRACES
 #include "otf2_reader.h"
 #include "CWrapper.h"
 #include <cassert>
@@ -139,7 +140,7 @@ static void
 addUserEvt(void*               userData,
            OTF2_TimeStamp      time)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -158,7 +159,7 @@ callbackEvtBegin( OTF2_LocationRef    location,
   if(evtPos != 1) {
     addUserEvt(userData, time);
   }
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   if(globalData->regions[region].isTracerPrintEvt) {
     ld->tasks.push_back(Task());
@@ -178,7 +179,7 @@ callbackEvtEnd( OTF2_LocationRef    location,
                 OTF2_AttributeList* attributes,
                 OTF2_RegionRef      region )
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   if(globalData->regions[region].isTracerPrintEvt) {
     ld->tasks.push_back(Task());
@@ -201,7 +202,7 @@ callbackSendEvt(OTF2_LocationRef locationID,
                 uint32_t msgTag,
                 uint64_t msgLength)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -232,7 +233,7 @@ callbackIsendEvt(OTF2_LocationRef locationID,
                  uint64_t msgLength,
                  uint64_t requestID)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -260,7 +261,7 @@ callbackIsendCompEvt(OTF2_LocationRef locationID,
                     OTF2_AttributeList * attributeList,
                     uint64_t requestID)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = 0;
@@ -281,7 +282,7 @@ callbackRecvEvt(OTF2_LocationRef locationID,
                 uint32_t msgTag,
                 uint64_t msgLength)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -325,7 +326,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
                  uint64_t msgLength,
                  uint64_t requestID)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -352,7 +353,7 @@ callbackCollectiveBegin(OTF2_LocationRef locationID,
                         void * userData,
                         OTF2_AttributeList * attributeList)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -369,7 +370,7 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
                          uint64_t sizeSent,
                          uint64_t sizeReceived)
 {
-  LocationData* ld = (LocationData*)((AllData *)userData->ld);
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -426,8 +427,8 @@ OTF2_Reader * readGlobalDefinitions(int jobID, char* tracefileName, AllData *all
       global_def_reader,
       &definitions_read );
 
-  assert(number_of_locations == locations.size());
   std::vector<uint64_t>& locations = allData->locations;
+  assert(number_of_locations == locations.size());
   for ( size_t i = 0; i < locations.size(); i++ )
   {
     if(i == 0 || isPEonThisRank(jobID, i)) {
@@ -493,15 +494,15 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
   OTF2_Reader_RegisterEvtCallbacks( reader,
       evt_reader,
       event_callbacks,
-      locData );
+      allData );
   OTF2_EvtReaderCallbacks_Delete( event_callbacks );
   uint64_t events_read = 0;
   OTF2_Reader_ReadAllLocalEvents( reader,
       evt_reader,
       &events_read );
-  for(int e = 0; e < locData->tasks.size(); e++) {
+  for(int e = 0; e < ld->tasks.size(); e++) {
     printf("[%d] type: %d, exec time %f\n", e, 
-        locData->tasks[e].event_id, locData->tasks[e].execTime);
+        ld->tasks[e].event_id, ld->tasks[e].execTime);
   }
   OTF2_Reader_CloseEvtReader( reader, evt_reader );
 }
@@ -511,3 +512,4 @@ void closeReader(OTF2_Reader *reader) {
   OTF2_Reader_CloseEvtFiles( reader );
   OTF2_Reader_Close( reader );
 }
+#endif

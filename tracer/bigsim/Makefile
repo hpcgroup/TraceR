@@ -6,9 +6,9 @@ USER_OBJS :=
 LIBS := -lconv-bigsim-logs -lblue-standalone -lconv-util
 SUBDIRS := . events entities
 
-CPP_SRCS = TraceReader.C CWrapper.C
-OBJS = TraceReader.o CWrapper.o
-CPP_DEPS = TraceReader.d CWrapper.d
+CPP_SRCS = TraceReader.C CWrapper.C otf2_reader.C
+OBJS = TraceReader.o CWrapper.o otf2_reader.o
+CPP_DEPS = TraceReader.d CWrapper.d otf2_reader.d
 
 CPP_SRCS += entities/MsgEntry.C entities/PE.C entities/Task.C
 OBJS += entities/MsgEntry.o entities/PE.o entities/Task.o
@@ -17,9 +17,9 @@ CPP_DEPS += entities/MsgEntry.d entities/PE.d entities/Task.d
 events/%.o: events/%.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -27,9 +27,9 @@ endif
 entities/%.o: entities/%.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -37,9 +37,9 @@ endif
 %.o: %.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) -I$(CHARMPATH)/include ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
