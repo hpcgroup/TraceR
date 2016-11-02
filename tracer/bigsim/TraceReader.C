@@ -340,6 +340,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
 
     for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
       pe->taskStatus[i][logInd] = false;
+      pe->msgStatus[i][logInd] = false;
     }
   
     if(t->event_id == TRACER_SEND_EVT) { 

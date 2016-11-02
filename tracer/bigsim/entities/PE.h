@@ -29,13 +29,15 @@ class Task;
 class MsgKey {
   public:
   uint32_t rank, comm, tag;
-  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm) {
-    rank = _rank; tag = _tag; comm = _comm;
+  uint64_t seq;
+  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm, uint64_t _seq) {
+    rank = _rank; tag = _tag; comm = _comm; seq = _seq;
   }
   bool operator< (const MsgKey &rhs) const {
     if(rank != rhs.rank) return rank < rhs.rank;
     else if(tag != rhs.tag) return tag < rhs.tag;
-    else return comm < rhs.comm;
+    else if(comm != rhs.comm) return comm < rhs.comm;
+    else return seq < rhs.seq;
   }
   ~MsgKey() { }
 };
@@ -74,6 +76,7 @@ class PE {
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
     KeyType pendingMsgs;
+    int64_t *sendSeq, *recvSeq;
 };
 
 #endif /* PE_H_ */

@@ -54,7 +54,9 @@ bool PE::noUnsatDep(int iter, int tInd)
   }
   return true;
 #else
-  return taskStatus[iter][tInd - 1];
+  if(tInd != 0) {
+    return taskStatus[iter][tInd - 1];
+  } else return true;
 #endif
 }
 
@@ -71,13 +73,12 @@ void PE::printStat()
     {
       if(!taskStatus[j][i])
       {
-        printf("PE: %d not done:%d,%d\n", myNum, j, i);
         countTask++;
       }
     }
   }
   if(countTask != 0) {
-    printf("PE%d: not done count:%d \n ",myNum, countTask);
+    printf("PE%d: not done count:%d out of %d \n ",myNum, countTask, tasksCount);
   }
 }
 

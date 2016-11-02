@@ -238,6 +238,7 @@ static int send_msg(
     int size,
     int iter,
     MsgID *msgId,
+    uint64_t seq,
     int dest_id,
     tw_stime timeOffset,
     enum proc_event evt_type,
@@ -423,6 +424,7 @@ int main(int argc, char **argv)
         global_rank[i].mapsTo = -1;
         global_rank[i].jobID = -1;
     }
+
     if(dump_topo_only || strcmp("NA", globalIn) == 0) {
       if(!rank) printf("Using default linear mapping of jobs\n");
       default_mapping = 1;
@@ -522,34 +524,6 @@ int main(int argc, char **argv)
       fscanf(jobIn, "%c", &next);
     }
 
-#if TRACER_BIGSIM_TRACES
-    //Load all summaries on proc 0 and bcast
-    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
-        if(!rank) printf("Loading trace summary for job %d from %s\n", i,
-                jobs[i].traceDir);
-        TraceReader* t = newTraceReader(jobs[i].traceDir);
-        TraceReader_loadTraceSummary(t);
-        int num_workers = TraceReader_totalWorkerProcs(t);
-        assert(num_workers == jobs[i].numRanks);
-        if(rank == 0){ //only rank 0 loads the offsets and broadcasts
-            TraceReader_loadOffsets(t);
-            jobs[i].offsets = TraceReader_getOffsets(t);
-        } else {
-            jobs[i].offsets = (int*) malloc(sizeof(int) * num_workers);
-        }
-        MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
-    }
-#else
-    //Read in global definitions and Open event files
-    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
-        if(!rank) printf("Read global definition for job %d from %s\n", i,
-                jobs[i].traceDir);
-        jobs[i].allData = new AllData;
-        jobs[i].reader = readGlobalDefinitions(i, jobs[i].traceDir, 
-          jobs[i].allData);
-    }
-#endif
-
     int ranks_till_now = 0;
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
         int num_workers = jobs[i].numRanks;
@@ -584,6 +558,35 @@ int main(int argc, char **argv)
         }
 #endif
     }
+
+#if TRACER_BIGSIM_TRACES
+    //Load all summaries on proc 0 and bcast
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+        if(!rank) printf("Loading trace summary for job %d from %s\n", i,
+                jobs[i].traceDir);
+        TraceReader* t = newTraceReader(jobs[i].traceDir);
+        TraceReader_loadTraceSummary(t);
+        int num_workers = TraceReader_totalWorkerProcs(t);
+        assert(num_workers == jobs[i].numRanks);
+        if(rank == 0){ //only rank 0 loads the offsets and broadcasts
+            TraceReader_loadOffsets(t);
+            jobs[i].offsets = TraceReader_getOffsets(t);
+        } else {
+            jobs[i].offsets = (int*) malloc(sizeof(int) * num_workers);
+        }
+        MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+    }
+#else
+    //Read in global definitions and Open event files
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+        if(!rank) printf("Read global definition for job %d from %s\n", i,
+                jobs[i].traceDir);
+        jobs[i].allData = new AllData;
+        jobs[i].reader = readGlobalDefinitions(i, jobs[i].traceDir, 
+          jobs[i].allData);
+    }
+#endif
+
 
     tw_run();
 
@@ -661,6 +664,11 @@ static void proc_init(
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
     ns->end_ts = 0;
+    ns->my_pe->sendSeq = new int64_t[jobs[ns->my_job].numRanks];
+    ns->my_pe->recvSeq = new int64_t[jobs[ns->my_job].numRanks];
+    for(int i = 0; i < jobs[ns->my_job].numRanks; i++) {
+      ns->my_pe->sendSeq[i] = ns->my_pe->recvSeq[i] = 0;
+    }
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
     m =  (proc_msg*)tw_event_data(e);
@@ -743,10 +751,10 @@ static void proc_finalize(
     tw_stime finalTime = tw_now(lp);
 
     if(lpid_to_pe(lp->gid) == 0)
-        printf("Job[%d]PE[%d]: FINALIZE in %f (tw_now %f) seconds.\n", ns->my_job,
-          ns->my_pe_num, ns_to_s(jobTime), ns_to_s(tw_now(lp)-ns->start_ts));
+        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
+          ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
 
-    //PE_printStat(ns->my_pe);
+    PE_printStat(ns->my_pe);
 
     if(jobTime > jobTimes[ns->my_job]) {
         jobTimes[ns->my_job] = jobTime;
@@ -839,7 +847,12 @@ static void handle_recv_event(
 #if TRACER_BIGSIM_TRACES
     task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
 #else
-    MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm);
+#if DEBUG_PRINT
+    printf("[%d:%d] RECD MSG: %d %d %d %d\n", ns->my_job,
+        ns->my_pe_num, m->msg_id.pe, m->msg_id.id, m->msg_id.comm, 
+        m->msg_id.seq);
+#endif
+    MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
     if(it == ns->my_pe->pendingMsgs.end()) {
       task_id = -1;
@@ -847,7 +860,17 @@ static void handle_recv_event(
       b->c2 = 1;
       return;
     } else {
+      b->c3 = 1;
       task_id = it->second.front();
+      it->second.pop_front();
+      if(it->second.size() == 0) {
+        ns->my_pe->pendingMsgs.erase(it);
+      }
+#if DEBUG_PRINT
+      printf("[%d:%d] RECD MSG FOUND TASK: %d %d %d %d - %d\n", ns->my_job,
+          ns->my_pe_num, m->msg_id.pe, m->msg_id.id, m->msg_id.comm, 
+          ns->my_pe->recvSeq[m->msg_id.pe], task_id);
+#endif
     }
 #endif
     int iter = m->iteration;
@@ -865,11 +888,19 @@ static void handle_recv_event(
       return;
     }
 #endif
+#if TRACER_OTF_TRACES
+    if(task_id == -1) {
+      b->c4 = 1;
+      return;
+    }
+#endif
     m->incremented_flag = isBusy;
     m->executed.taskid = -1;
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,iter,task_id)){ //TODO: check this
+          printf("[%d:%d] WARNING: MSG RECV TASK IS DONE: %d\n", ns->my_job,
+              ns->my_pe_num, task_id);
             assert(0);
         }
         PE_invertMsgPe(ns->my_pe, iter, task_id);
@@ -989,11 +1020,18 @@ static void handle_recv_rev_event(
 		tw_lp * lp)
 {
 #if TRACER_OTF_TRACES
-    if(b->c2) {
-      MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm);
+    if(b->c2 || b->c4) {
+      MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
-      assert(it != ns->my_pe->pendingMsgs.end());
-      it->second.pop_back();
+      if(b->c2) {
+        assert(it != ns->my_pe->pendingMsgs.end());
+        it->second.pop_back();
+        if(it->second.size() == 0) {
+          ns->my_pe->pendingMsgs.erase(it);
+        }
+      } else if(b->c4) {
+        ns->my_pe->pendingMsgs[key].push_front(-1);
+      }
       return;
     }
 #endif
@@ -1008,6 +1046,10 @@ static void handle_recv_rev_event(
     int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
 #else
     int task_id =  m->executed.taskid;
+    if(b->c3) {
+      MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
+      ns->my_pe->pendingMsgs[key].push_front(task_id);
+    }
 #endif
     PE_invertMsgPe(ns->my_pe, iter, task_id);
 
@@ -1128,16 +1170,25 @@ static tw_stime exec_task(
 
 #if TRACER_OTF_TRACES
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
-    if(t->event_id == TRACER_RECV_EVT) {
-      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm);
+    if(t->event_id == TRACER_RECV_EVT && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
+      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
+      ns->my_pe->recvSeq[t->myEntry.node]++;
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
       if(it == ns->my_pe->pendingMsgs.end()) {
         ns->my_pe->pendingMsgs[key].push_back(task_id.taskid);
+#if DEBUG_PRINT
+        printf("[%d:%d] PUSH TASK: %d - %d %d %d %d\n", ns->my_job,
+          ns->my_pe_num, task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
+            t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
+#endif
         b->c21 = 1;
         return;
       } else {
         b->c22 = 1;
-        it->second.pop_front();
+        ns->my_pe->pendingMsgs[key].pop_front();
+        if(it->second.size() == 0) {
+          ns->my_pe->pendingMsgs.erase(it);
+        }
       }
     }
 #endif
@@ -1186,7 +1237,7 @@ static tw_stime exec_task(
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
-                    task_id.iter, &taskEntry->msgId, 
+                    task_id.iter, &taskEntry->msgId, 0 /*not used */,
                     pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
                     lp);
               }
@@ -1202,7 +1253,7 @@ static tw_stime exec_task(
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
-                    task_id.iter, &taskEntry->msgId,
+                    task_id.iter, &taskEntry->msgId,  0 /*not used */,
                     pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
                     lp);
               }
@@ -1215,7 +1266,7 @@ static tw_stime exec_task(
             }else{
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
-                  task_id.iter, &taskEntry->msgId,
+                  task_id.iter, &taskEntry->msgId,  0 /*not used */,
                   pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
                   lp);
             }
@@ -1230,7 +1281,7 @@ static tw_stime exec_task(
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
-                    task_id.iter, &taskEntry->msgId,
+                    task_id.iter, &taskEntry->msgId,  0 /*not used */,
                     pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
                     lp);
               }
@@ -1244,7 +1295,7 @@ static tw_stime exec_task(
           if(node >= 0){
             m->model_net_calls++;
             send_msg(ns, MsgEntry_getSize(taskEntry),
-                task_id.iter, &taskEntry->msgId,
+                task_id.iter, &taskEntry->msgId,  0 /*not used */,
                 pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
           }
           else if(node == -1){
@@ -1258,7 +1309,7 @@ static tw_stime exec_task(
               delay += copyTime;
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
-                  task_id.iter, &taskEntry->msgId,
+                  task_id.iter, &taskEntry->msgId,  0 /*not used */,
                   pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
             }
 
@@ -1269,7 +1320,7 @@ static tw_stime exec_task(
               delay += copyTime;
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
-                  task_id.iter, &taskEntry->msgId,
+                  task_id.iter, &taskEntry->msgId,  0 /*not used */,
                   pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
             }
           }
@@ -1287,6 +1338,7 @@ static tw_stime exec_task(
     double sendFinishTime = 0;
 
     if(t->event_id == TRACER_SEND_EVT) {
+      b->c23 = 1;
       MsgEntry *taskEntry = &t->myEntry;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
       if(MsgEntry_getSize(taskEntry) > eager_limit) {
@@ -1300,8 +1352,13 @@ static tw_stime exec_task(
           taskEntry->msgId.comm, sendOffset+delay, 1, lp);
       } else {
         m->model_net_calls++;
+#if DEBUG_PRINT
+        printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
+          node, taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
+#endif
+          
         send_msg(ns, MsgEntry_getSize(taskEntry),
-            task_id.iter, &taskEntry->msgId,
+            task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
             pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
       }
       sendFinishTime = delay;
@@ -1339,15 +1396,19 @@ static void exec_task_rev(
 #if TRACER_OTF_TRACES
   if(b->c21 || b->c22) {
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
+    ns->my_pe->recvSeq[t->myEntry.node]--;
     MsgKey key(t->myEntry.node, t->myEntry.msgId.id, 
-        t->myEntry.msgId.comm);
+        t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
     if(b->c21) {
       assert(it != ns->my_pe->pendingMsgs.end());
       it->second.pop_back();
+      if(it->second.size() == 0) {
+        ns->my_pe->pendingMsgs.erase(it);
+      }
       return;
     } else if(b->c22) {
-      ns->my_pe->pendingMsgs[key].push_front(task_id.taskid);
+      ns->my_pe->pendingMsgs[key].push_front(-1);
     }
   }
 #endif
@@ -1357,6 +1418,13 @@ static void exec_task_rev(
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
   }
+#if TRACER_OTF_TRACES
+  if(b->c23) {
+    Task *t = &ns->my_pe->myTasks[task_id.taskid];
+    MsgEntry *taskEntry = &t->myEntry;
+    ns->my_pe->sendSeq[MsgEntry_getNode(taskEntry)]--;
+  }
+#endif
   codes_local_latency_reverse(lp);
 }
 
@@ -1366,6 +1434,7 @@ static int send_msg(
         int size,
         int iter,
         MsgID *msgId,
+        uint64_t seq,
         int dest_id,
         tw_stime sendOffset,
         enum proc_event evt_type,
@@ -1379,6 +1448,7 @@ static int send_msg(
         m_remote->msg_id.id = msgId->id;
 #if TRACER_OTF_TRACES
         m_remote->msg_id.comm = msgId->comm;
+        m_remote->msg_id.seq = seq;
 #endif
         m_remote->iteration = iter;
 
@@ -1424,8 +1494,8 @@ static int bcast_msg(
     tw_stime delay = copyTime;
 
     for(int i = 0; i < numValidChildren; i++) {
-      send_msg(ns, size, iter, msgId, pe_to_lpid(myChildren[i], ns->my_job),
-        sendOffset + delay, BCAST, lp);
+      send_msg(ns, size, iter, msgId,  0 /*not used */, 
+        pe_to_lpid(myChildren[i], ns->my_job), sendOffset + delay, BCAST, lp);
       delay += copyTime;
       m->model_net_calls++;
     }
@@ -1455,6 +1525,7 @@ static int exec_comp(
     m->msg_id.id = task_id;
 #if TRACER_OTF_TRACES
     m->msg_id.comm = comm_id;
+    m->msg_id.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
 #endif
     m->iteration = iter;
     if(recv) {

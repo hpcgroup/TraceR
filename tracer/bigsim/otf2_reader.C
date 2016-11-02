@@ -2,9 +2,11 @@
 #include "otf2_reader.h"
 #include "CWrapper.h"
 #include <cassert>
-#define VERBOSE_L1 1
+#define VERBOSE_L1 0
 #define VERBOSE_L2 0
 #define VERBOSE_L3 0
+
+extern JobInf *jobs;
 
 static OTF2_CallbackCode
 callbackDefLocations(void*                 userData,
@@ -429,21 +431,22 @@ OTF2_Reader * readGlobalDefinitions(int jobID, char* tracefileName, AllData *all
 
   std::vector<uint64_t>& locations = allData->locations;
   assert(number_of_locations == locations.size());
+  int count_local_loc = 0;
   for ( size_t i = 0; i < locations.size(); i++ )
   {
-    if(i == 0 || isPEonThisRank(jobID, i)) {
+    if(isPEonThisRank(jobID, i)) {
       OTF2_Reader_SelectLocation( reader, locations[ i ] );
+      count_local_loc++;
     }
   }
 
-  bool successful_open_def_files =
+#if VERBOSE_L3
+  printf("Processor %d files %d\n", rank, count_local_loc);
+#endif
+
+  jobs[jobID].localDefs = 
     OTF2_Reader_OpenDefFiles( reader ) == OTF2_SUCCESS;
-
-  if(successful_open_def_files) {
-    printf("Failure for opening def files for job %d\n", jobID);
-    MPI_Abort(MPI_COMM_WORLD, 1);
-  }
-
+  
   OTF2_Reader_OpenEvtFiles( reader );
   return reader;
 }
@@ -452,18 +455,17 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
     uint32_t loc, LocationData* ld)
 {
   std::vector<uint64_t>& locations = allData->locations;
-  OTF2_DefReader* def_reader =
-    OTF2_Reader_GetDefReader( reader, locations[ loc ] );
-  if ( def_reader )
-  {
-    uint64_t def_reads = 0;
-    OTF2_Reader_ReadAllLocalDefinitions( reader,
-        def_reader,
-        &def_reads );
-    OTF2_Reader_CloseDefReader( reader, def_reader );
-  } else {
-    printf("Failure for opening def reader for job %d loc %d\n", jobID, loc);
-    MPI_Abort(MPI_COMM_WORLD, 1);
+  if(jobs[jobID].localDefs) {
+    OTF2_DefReader* def_reader =
+      OTF2_Reader_GetDefReader( reader, locations[ loc ] );
+    if ( def_reader )
+    {
+      uint64_t def_reads = 0;
+      OTF2_Reader_ReadAllLocalDefinitions( reader,
+          def_reader,
+          &def_reads );
+      OTF2_Reader_CloseDefReader( reader, def_reader );
+    }
   }
   OTF2_EvtReader* evt_reader =
     OTF2_Reader_GetEvtReader( reader, locations[ loc ] );
@@ -500,10 +502,12 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
   OTF2_Reader_ReadAllLocalEvents( reader,
       evt_reader,
       &events_read );
+#if VERBOSE_L3
   for(int e = 0; e < ld->tasks.size(); e++) {
     printf("[%d] type: %d, exec time %f\n", e, 
         ld->tasks[e].event_id, ld->tasks[e].execTime);
   }
+#endif
   OTF2_Reader_CloseEvtReader( reader, evt_reader );
 }
 

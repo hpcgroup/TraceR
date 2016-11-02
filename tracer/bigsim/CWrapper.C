@@ -44,12 +44,7 @@ void PE_set_busy(PE* p, bool b){p->busy = b;}
 bool PE_is_busy(PE* p){return p->busy;}
 bool PE_noUnsatDep(PE* p, int iter, int tInd){return p->noUnsatDep(iter, tInd);}
 bool PE_noMsgDep(PE* p, int iter, int tInd){
-#if TRACER_BIGSIM_TRACES
   return p->msgStatus[iter][tInd];
-#else
-  printf("This function should not be called with OTF traces\n");
-  exit(1);
-#endif
 }
 bool PE_isEndEvent(PE *p, int tInd) { return p->myTasks[tInd].endEvent; }
 bool PE_isLoopEvent(PE *p, int tInd) { return p->myTasks[tInd].loopEvent; }
@@ -137,9 +132,7 @@ int PE_findTaskFromMsg(PE* p, MsgID* msgId){
   return p->findTaskFromMsg(msgId);
 }
 void PE_invertMsgPe(PE* p, int iter, int tInd){
-#if TRACER_BIGSIM_TRACES
   p->invertMsgPe(iter, tInd);
-#endif
 }
 int PE_get_tasksCount(PE* p){return p->tasksCount;}
 int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}

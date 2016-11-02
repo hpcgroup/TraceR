@@ -63,6 +63,7 @@ typedef struct JobInf {
 #if TRACER_OTF_TRACES
     AllData *allData;
     OTF2_Reader *reader;
+    bool localDefs;
 #endif
 } JobInf;
 
