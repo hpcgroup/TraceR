@@ -68,7 +68,7 @@ class Task {
 #error Either TRACER_BIGSIM_TRACES or TRACER_OTF_TRACES should be 1
 #endif
     bool endEvent;
-    bool loopEvent;
+    bool loopEvent, loopStartEvent;
     double execTime;	//execution time of the task
 };
 

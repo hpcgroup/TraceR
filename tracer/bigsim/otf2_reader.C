@@ -122,6 +122,11 @@ callbackDefRegion(void * userData,
   } else {
     new_r.isTracerPrintEvt = false;
   }
+  if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_Loop", 11) == 0) {
+    new_r.isLoopEvt = true;
+  } else {
+    new_r.isLoopEvt = false;
+  }
   if(regionRole == OTF2_REGION_ROLE_BARRIER ||
      regionRole == OTF2_REGION_ROLE_IMPLICIT_BARRIER ||
      regionRole == OTF2_REGION_ROLE_COLL_ONE2ALL ||
@@ -170,6 +175,13 @@ callbackEvtBegin( OTF2_LocationRef    location,
     new_task.execTime = 0;
     new_task.event_id = region;
   }
+  if(globalData->regions[region].isLoopEvt) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.loopStartEvent = true;
+    new_task.event_id = TRACER_LOOP_EVT;
+  }
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -189,6 +201,13 @@ callbackEvtEnd( OTF2_LocationRef    location,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = region;
+  }
+  if(globalData->regions[region].isLoopEvt) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.loopEvent = true;
+    new_task.event_id = TRACER_LOOP_EVT;
   }
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;

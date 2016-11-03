@@ -60,6 +60,7 @@ class PE {
     int currentTask; // index of first not-executed task (helps searching messages)
     int firstTask;
     int currIter;
+    int loop_start_task;
 
     bool noUnsatDep(int iter, int tInd);	// there is no unsatisfied dependency for task
     void mark_all_done(int iter, int tInd);

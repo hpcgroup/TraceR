@@ -25,6 +25,7 @@ PE::PE() {
   currentTask = 0;
   beforeTask = 0;
   currIter = 0;
+  loop_start_task = -1; 
 }
 
 PE::~PE() {
@@ -40,7 +41,12 @@ void PE::mark_all_done(int iter, int tInd) {
   for(int i = tInd + 1; i < tasksCount; i++) {
     taskStatus[iter][i] = true;
   }
-  if(allMarked[iter]) true;
+#if TRACER_OTF_TRACES
+  for(int i = 0; i < loop_start_task; i++) {
+    taskStatus[iter+1][i] = true;
+  }
+#endif
+  allMarked[iter] =  true;
 }
 
 bool PE::noUnsatDep(int iter, int tInd)

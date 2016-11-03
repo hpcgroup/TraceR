@@ -997,11 +997,24 @@ static void handle_exec_event(
       }
     }
 #else 
-    if(task_id != PE_get_tasksCount(ns->my_pe) - 1) {
+    if(ns->my_pe->loop_start_task != -1 && 
+       PE_isLoopEvent(ns->my_pe, task_id) && 
+       (PE_get_iter(ns->my_pe) != (jobs[ns->my_job].numIters - 1))) {
+      b->c1 = 1;
+      PE_mark_all_done(ns->my_pe, iter, task_id);
+      PE_inc_iter(ns->my_pe);
       TaskPair pair;
-      pair.iter = iter; pair.taskid = task_id + 1;
+      pair.iter = PE_get_iter(ns->my_pe); 
+      pair.taskid = ns->my_pe->loop_start_task;
       PE_addToBuffer(ns->my_pe, &pair);
       counter = 1;
+    } else {
+      if(task_id != PE_get_tasksCount(ns->my_pe) - 1) {
+        TaskPair pair;
+        pair.iter = iter; pair.taskid = task_id + 1;
+        PE_addToBuffer(ns->my_pe, &pair);
+        counter = 1;
+      }
     }
 #endif
 
@@ -1121,11 +1134,9 @@ static void handle_exec_rev_event(
     int iter = m->iteration;
     PE_set_taskDone(ns->my_pe, iter, task_id, false);
      
-#if TRACER_BIGSIM_TRACES
     if(b->c1) {
       PE_dec_iter(ns->my_pe);
     }
-#endif
     
     if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
         PE_clearMsgBuffer(ns->my_pe);
@@ -1393,6 +1404,10 @@ static tw_stime exec_task(
     }
 
 #endif
+
+    if(t->loopStartEvent) {
+      ns->my_pe->loop_start_task = task_id.taskid;
+    }
 
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + 

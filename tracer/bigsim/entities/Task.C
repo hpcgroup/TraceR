@@ -21,6 +21,7 @@ Task::Task() {
   execTime = -1;
   endEvent = false;
   loopEvent = false;
+  loopStartEvent = false;
 #if TRACER_BIGSIM_TRACES
   backwDepSize = 0;
   forwDepSize = 0;

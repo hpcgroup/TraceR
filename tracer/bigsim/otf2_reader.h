@@ -25,7 +25,8 @@ enum Tracer_evt_type {
   TRACER_RECV_EVT = -4,
   TRACER_COLL_EVT = -5,
   TRACER_SEND_COMP_EVT = -6,
-  TRACER_RECV_COMP_EVT = -7
+  TRACER_RECV_COMP_EVT = -7,
+  TRACER_LOOP_EVT = -8
 };
 
 struct ClockProperties {
@@ -39,6 +40,7 @@ struct Region {
   OTF2_RegionRole role;
   OTF2_Paradigm paradigm;
   bool isTracerPrintEvt;
+  bool isLoopEvt;
   bool isCommunication;
 };
 
