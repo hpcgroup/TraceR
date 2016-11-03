@@ -117,7 +117,7 @@ callbackDefRegion(void * userData,
   new_r.name = name;
   new_r.role = regionRole;
   new_r.paradigm = paradigm;
-  if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_Walltime", 15) == 0) {
+  if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_WallTime", 15) == 0) {
     new_r.isTracerPrintEvt = true;
   } else {
     new_r.isTracerPrintEvt = false;
