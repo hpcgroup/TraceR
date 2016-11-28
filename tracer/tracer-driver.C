@@ -25,7 +25,6 @@
 #include <stdbool.h>
 #include <time.h>
 #include <signal.h>
-#include <algorithm> 
 
 extern "C" {
 #include "codes/model-net.h"
@@ -85,7 +84,6 @@ double eager_limit = 8192;
 int dump_topo_only = 0;
 int rank;
 
-int bcast_tag = -1;
 #define BCAST_DEGREE  4
 #define DEBUG_PRINT 0
 
@@ -261,7 +259,6 @@ static int exec_comp(
     int iter,
     int task_id,
     int comm_id,
-    uint64_t seq,
     tw_stime sendOffset,
     int recv,
     tw_lp * lp);
@@ -1184,21 +1181,16 @@ static tw_stime exec_task(
 
 #if TRACER_OTF_TRACES
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
-    if((t->event_id == TRACER_RECV_EVT || 
-       t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) && 
-       !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
-      int seq = 0;
-      if(t->event_id == TRACER_RECV_EVT) {
-        seq = ns->my_pe->recvSeq[t->myEntry.node]++;
-      }
-      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
+    if(t->event_id == TRACER_RECV_EVT && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
+      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
+      ns->my_pe->recvSeq[t->myEntry.node]++;
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
       if(it == ns->my_pe->pendingMsgs.end()) {
         ns->my_pe->pendingMsgs[key].push_back(task_id.taskid);
 #if DEBUG_PRINT
         printf("[%d:%d] PUSH TASK: %d - %d %d %d %d\n", ns->my_job,
           ns->my_pe_num, task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
-            t->myEntry.msgId.comm, seq);
+            t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
 #endif
         b->c21 = 1;
         return;
@@ -1252,7 +1244,7 @@ static tw_stime exec_task(
               if(i == thread) continue;
               delay += copyTime;
               if(destPE == ns->my_pe_num) {
-                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, 0, sendOffset+delay, 1, lp);
+                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -1268,7 +1260,7 @@ static tw_stime exec_task(
               destPE++;
               delay += copyTime;
               if(destPE == ns->my_pe_num){
-                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, 0, sendOffset+delay, 1, lp);
+                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -1281,7 +1273,7 @@ static tw_stime exec_task(
             int destPE = myNode*nWth + thread;
             delay += copyTime;
             if(destPE == ns->my_pe_num){
-              exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, 0, sendOffset+delay, 1, lp);
+              exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
             }else{
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
@@ -1296,7 +1288,7 @@ static tw_stime exec_task(
               destPE++;
               delay += copyTime;
               if(destPE == ns->my_pe_num){
-                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, 0, sendOffset+delay, 1, lp);
+                exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
@@ -1356,8 +1348,7 @@ static tw_stime exec_task(
     tw_stime delay = soft_latency; //intra node latency
     double sendFinishTime = 0;
 
-    if(t->event_id == TRACER_SEND_EVT || 
-       t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
+    if(t->event_id == TRACER_SEND_EVT) {
       b->c23 = 1;
       MsgEntry *taskEntry = &t->myEntry;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
@@ -1367,15 +1358,10 @@ static tw_stime exec_task(
       int node = MsgEntry_getNode(taskEntry);
       tw_stime sendOffset = soft_delay_mpi;
 
-      int seq = 0;
-      if(t->event_id == TRACER_SEND_EVT) {
-        seq = ns->my_pe->sendSeq[node]++;
-      }
-
       if(node == ns->my_pe_num) {
         exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 
-          taskEntry->msgId.comm, seq, sendOffset+delay, 1, lp);
-      } else if(t->event_id == TRACER_SEND_EVT) {
+          taskEntry->msgId.comm, sendOffset+delay, 1, lp);
+      } else {
         m->model_net_calls++;
 #if DEBUG_PRINT
         printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
@@ -1383,17 +1369,12 @@ static tw_stime exec_task(
 #endif
           
         send_msg(ns, MsgEntry_getSize(taskEntry),
-            task_id.iter, &taskEntry->msgId, seq,
+            task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
             pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
-      }
-
-      if(taskEntry->msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
-        bcast_msg(ns, MsgEntry_getSize(taskEntry), task_id.iter, 
-          &taskEntry->msgId, sendOffset+delay, copyTime, lp, m);
       }
       sendFinishTime = delay;
     }
-
+   
     //print event
     if(t->event_id >= 0) {
       char str[1000];
@@ -1412,7 +1393,7 @@ static tw_stime exec_task(
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + 
                               ((sendFinishTime > time) ? sendFinishTime : time);
-    exec_comp(ns, task_id.iter, task_id.taskid, 0, 0, finish_time, 0, lp);
+    exec_comp(ns, task_id.iter, task_id.taskid, 0, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
       ns->end_ts = tw_now(lp);
     }
@@ -1430,12 +1411,9 @@ static void exec_task_rev(
 #if TRACER_OTF_TRACES
   if(b->c21 || b->c22) {
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
-    int seq = 0;
-    if(t->event_id == TRACER_RECV_EVT) {
-      seq = --ns->my_pe->recvSeq[t->myEntry.node];
-    }
+    ns->my_pe->recvSeq[t->myEntry.node]--;
     MsgKey key(t->myEntry.node, t->myEntry.msgId.id, 
-        t->myEntry.msgId.comm, seq);
+        t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
     if(b->c21) {
       assert(it != ns->my_pe->pendingMsgs.end());
@@ -1459,9 +1437,7 @@ static void exec_task_rev(
   if(b->c23) {
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
     MsgEntry *taskEntry = &t->myEntry;
-    if(t->event_id == TRACER_SEND_EVT) {
-      ns->my_pe->sendSeq[MsgEntry_getNode(taskEntry)]--;
-    }
+    ns->my_pe->sendSeq[MsgEntry_getNode(taskEntry)]--;
   }
 #endif
   codes_local_latency_reverse(lp);
@@ -1518,38 +1494,23 @@ static int bcast_msg(
 
     int numValidChildren = 0;
     int myChildren[BCAST_DEGREE];
-    int thisTreePe, index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
-   
-#if TRACER_OTF_TRACES
-    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[msgId->comm]];
-    if(jobs[ns->my_job].numRanks != g.members.size()) {  
-      index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num) 
-                  - g.members.begin();
-      maxSize = g.members.size();
-    }
-#endif
+    int thisTreePe = (ns->my_pe_num - msgId->pe + jobs[ns->my_job].numRanks) %
+                      jobs[ns->my_job].numRanks;
 
-    thisTreePe = (index - msgId->pe + maxSize) % maxSize;
     for(int i = 0; i < BCAST_DEGREE; i++) {
       int next_child = BCAST_DEGREE * thisTreePe + i + 1;
-      if(next_child >= maxSize) {
+      if(next_child >= jobs[ns->my_job].numRanks) {
         break;
       }
-      myChildren[i] = (msgId->pe + next_child) % maxSize;
+      myChildren[i] = (msgId->pe + next_child) % jobs[ns->my_job].numRanks;
       numValidChildren++;
     }
     
     tw_stime delay = copyTime;
 
     for(int i = 0; i < numValidChildren; i++) {
-      int dest = myChildren[i];
-#if TRACER_OTF_TRACES
-      if(jobs[ns->my_job].numRanks != g.members.size()) {
-        dest = g.members[dest];
-      }
-#endif
-      send_msg(ns, size, iter, msgId,  0, pe_to_lpid(dest, ns->my_job), 
-        sendOffset + delay, BCAST, lp);
+      send_msg(ns, size, iter, msgId,  0 /*not used */, 
+        pe_to_lpid(myChildren[i], ns->my_job), sendOffset + delay, BCAST, lp);
       delay += copyTime;
       m->model_net_calls++;
     }
@@ -1561,7 +1522,6 @@ static int exec_comp(
     int iter,
     int task_id,
     int comm_id,
-    uint64_t seq,
     tw_stime sendOffset,
     int recv,
     tw_lp * lp)
@@ -1580,7 +1540,7 @@ static int exec_comp(
     m->msg_id.id = task_id;
 #if TRACER_OTF_TRACES
     m->msg_id.comm = comm_id;
-    m->msg_id.seq = seq;
+    m->msg_id.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
 #endif
     m->iteration = iter;
     if(recv) {

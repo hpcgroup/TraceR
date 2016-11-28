@@ -7,7 +7,6 @@
 #define VERBOSE_L3 0
 
 extern JobInf *jobs;
-extern int bcast_tag;
 
 static OTF2_CallbackCode
 callbackDefLocations(void*                 userData,
@@ -402,20 +401,8 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
   new_task.myEntry.msgId.size = sizeSent;
   new_task.myEntry.msgId.comm = communicator;
   new_task.myEntry.msgId.coll_type = collectiveOp;
-  if(collectiveOp != OTF2_COLLECTIVE_OP_BARRIER && 
-     collectiveOp != OTF2_COLLECTIVE_OP_BCAST &&
-     collectiveOp != OTF2_COLLECTIVE_OP_ALLTOALL &&
-     collectiveOp != OTF2_COLLECTIVE_OP_ALLTOALLV &&
-     collectiveOp != OTF2_COLLECTIVE_OP_ALLREDUCE &&
-     collectiveOp != OTF2_COLLECTIVE_OP_REDUCE) {
-    printf("Unhandled collective in trace %d\n", collectiveOp);
-  }
   if(root < group.members.size())
     new_task.myEntry.node = group.members[root];
-  if(collectiveOp == OTF2_COLLECTIVE_OP_BCAST) {
-    new_task.myEntry.msgId.pe = root;
-    new_task.myEntry.msgId.id = bcast_tag;
-  }
   new_task.myEntry.thread = 0;
   new_task.isNonBlocking = false;
   ld->lastLogTime = time;

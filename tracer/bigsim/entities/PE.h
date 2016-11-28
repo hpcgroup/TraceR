@@ -28,9 +28,9 @@ class Task;
 
 class MsgKey {
   public:
-  int rank, comm, tag;
+  uint32_t rank, comm, tag;
   uint64_t seq;
-  MsgKey(int _rank, int _tag, int _comm, uint64_t _seq) {
+  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm, uint64_t _seq) {
     rank = _rank; tag = _tag; comm = _comm; seq = _seq;
   }
   bool operator< (const MsgKey &rhs) const {
