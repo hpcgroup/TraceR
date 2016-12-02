@@ -173,6 +173,7 @@ callbackEvtBegin( OTF2_LocationRef    location,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = region;
+    new_task.beginEvent = true;
   }
   if(globalData->regions[region].isLoopEvt) {
     ld->tasks.push_back(Task());

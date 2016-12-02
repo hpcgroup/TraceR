@@ -64,6 +64,7 @@ class Task {
     int64_t req_id;
     bool isNonBlocking;
     MsgEntry myEntry;
+    bool beginEvent;
 #else
 #error Either TRACER_BIGSIM_TRACES or TRACER_OTF_TRACES should be 1
 #endif

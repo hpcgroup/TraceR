@@ -1378,7 +1378,11 @@ static tw_stime exec_task(
     //print event
     if(t->event_id >= 0) {
       char str[1000];
-      strcpy(str, "[%d %d : %s %f]\n");
+      if(t->beginEvent) {
+        strcpy(str, "[%d %d : Begin %s %f]\n");
+      } else {
+        strcpy(str, "[%d %d : End %s %f]\n");
+      }
       tw_output(lp, str, ns->my_job, ns->my_pe_num, 
           jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name], 
           tw_now(lp)/((double)TIME_MULT));

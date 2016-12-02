@@ -30,6 +30,8 @@ Task::Task() {
   myEntries = 0;
   msgEntCount = 0;
   bgPrintCount = 0;
+#else
+  beginEvent = false;
 #endif
 }
 
