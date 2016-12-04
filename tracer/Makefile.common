@@ -36,11 +36,11 @@ ROSS = /p/lscratchf/jain6/migrate-tracer/ROSS/install
 #base directory of this code
 BASE_DIR = /p/lscratchf/jain6/migrate-tracer
 CODES = ${BASE_DIR}/codes
-CODES_LIBS = -L${CODES}/install/lib
-CODES_LIBS += -L${ROSS}/lib
+CODES_LIBS = -L${CODES}/install/lib -Wl,-rpath=${CODES}/install/lib
+CODES_LIBS += -L${ROSS}/lib -Wl,-rpath=${ROSS}/lib
 CODES_LIBS += -lcodes -lROSS -lm
 
-CHARM_LIBS = -L$(CHARMPATH)/lib
+CHARM_LIBS = -L$(CHARMPATH)/lib -Wl,-rpath=$(CHARMPATH)/lib
 CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
 
 ifeq ($(ARCH),bgq)
