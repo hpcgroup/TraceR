@@ -151,7 +151,10 @@ num_levels - number of levels in the fat-tree (2 or 3)
 switch_radix -  radix of the switch being used
 switch_count - number of switches at leaf level.
 
-Publication that describes implementation of TraceR in detail:
+Publications that describe implementation of TraceR in detail:
+Nikhil Jain, Abhinav Bhatele, Sam White, Todd Gamblin, and Laxmikant Kale.
+Evaluating HPC Networks via Simulation of Parallel Workloads. SC 2016.
+
 Bilge Acun, Nikhil Jain, Abhinav Bhatele, Misbah Mubarak, Christopher Carothers,
 Laxmikant Kale. Preliminary Evaluation of a Parallel Trace Replay Tool for HPC
 Network Simulations. Workshop on Parallel and Distributed Agent-Based
