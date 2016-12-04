@@ -1388,11 +1388,10 @@ static tw_stime exec_task(
           tw_now(lp)/((double)TIME_MULT));
     }
 
-#endif
-
     if(t->loopStartEvent) {
       ns->my_pe->loop_start_task = task_id.taskid;
     }
+#endif
 
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + 
