@@ -1193,7 +1193,7 @@ static tw_stime exec_task(
             t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
 #endif
         b->c21 = 1;
-        return;
+        return 0;
       } else {
         b->c22 = 1;
         ns->my_pe->pendingMsgs[key].pop_front();
@@ -1384,7 +1384,7 @@ static tw_stime exec_task(
         strcpy(str, "[%d %d : End %s %f]\n");
       }
       tw_output(lp, str, ns->my_job, ns->my_pe_num, 
-          jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name], 
+          jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
           tw_now(lp)/((double)TIME_MULT));
     }
 
