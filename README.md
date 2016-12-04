@@ -49,7 +49,8 @@ Format of trace_config:
 ```
 If "global map file" is not needed, use NA for it and "map file for job*".
 For generating simple global and job map file, use the code in utils.
-More information on how to set up network config files can be found in CODES:codes/src/networks/model-net/doc
+More information on how to set up network config files can be found at
+docs/UserWriteUp.txt and in CODES:codes/src/networks/model-net/doc
 
 Example files are in jacobi2d. Sample run command:
 ```
