@@ -330,17 +330,6 @@ int main(int argc, char **argv)
                 "modelnet_torus", NULL, 1);
     }
 
-    if(net_id == HYPER_TORUS) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_hyper_torus", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_hyper_torus_router", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_hyper_torus", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_hyper_torus_router", NULL, 1);
-    }
-    
     if(net_id == DRAGONFLY) {
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
                 "modelnet_dragonfly", NULL, 1);
