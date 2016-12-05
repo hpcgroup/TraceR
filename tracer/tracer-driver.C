@@ -1615,6 +1615,7 @@ static void perform_bcast(
       if(cIt == it->second.end()) {
         recvCount = 0;
       } else {
+        assert(cIt->second.size() > 0);
         recvCount = cIt->second[0];
       }
     }
@@ -1623,18 +1624,31 @@ static void perform_bcast(
     int64_t collSeq = m->msgId.seq;
     if(comm != ns->my_pe->currentCollComm ||
        collSeq != ns->my_pe->currentCollSeq) {
-      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+      if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
+        ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
+      } else {
+        ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+      }
       b->c12 = 1;
       return;
     }
     t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+    recvCount = 1;
   }
 
-  int amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
+  bool amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
 
   if(recvCount == 0 && !amIroot) {
     b->c13 = 1;
     return;
+  }
+ 
+  if(!isEvent && !amIroot) {
+    b->c14 = 1;
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][0]--;
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][0] == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
+    }
   }
 
   int numValidChildren = 0;
@@ -1683,6 +1697,8 @@ static void perform_bcast_rev(
     tw_bf * b,
     int isEvent) {
   Task *t;
+  int comm = ns->my_pe->currentCollComm;
+  int64_t collSeq = ns->my_pe->currentCollSeq;
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
@@ -1690,12 +1706,23 @@ static void perform_bcast_rev(
     ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
   } else {
     if(b->c12) {
-      ns->my_pe->pendingCollMsgs[m->msgId.comm].erase(m->msgId.seq);
+      ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0]--;
+      if(ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0] == 0) {
+        ns->my_pe->pendingCollMsgs[m->msgId.comm].erase(m->msgId.seq);
+      }
       return;
     }
   }
 
   if(b->c13) return;
+ 
+  if(b->c14) {
+    if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
+    } else {
+      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+    }
+  }
   
   codes_local_latency_reverse(lp);
   for(int i = 0; i < m->model_net_calls; i++) {
@@ -1730,6 +1757,7 @@ static void handle_coll_complete_rev_event(
   ns->my_pe->currentCollTask = m->executed.taskid;
   ns->my_pe->currentCollSeq = m->msgId.seq;
   ns->my_pe->currentCollComm = m->msgId.comm;
+  codes_local_latency_reverse(lp);
 }
 
 //Creates and initiates bcast_msg
