@@ -394,18 +394,20 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
-  ld->tasks.push_back(Task());
-  Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
-  new_task.event_id = TRACER_COLL_EVT;
-  Group& group = globalData->groups[globalData->communicators[communicator]];
-  new_task.myEntry.msgId.size = sizeSent;
-  new_task.myEntry.msgId.comm = communicator;
-  new_task.myEntry.msgId.coll_type = collectiveOp;
-  if(root < group.members.size())
-    new_task.myEntry.node = group.members[root];
-  new_task.myEntry.thread = 0;
-  new_task.isNonBlocking = false;
+  if(collectiveOp == OTF2_COLLECTIVE_OP_BCAST) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.event_id = TRACER_COLL_EVT;
+    Group& group = globalData->groups[globalData->communicators[communicator]];
+    new_task.myEntry.msgId.pe = group.members[root];
+    new_task.myEntry.msgId.size = sizeSent;
+    new_task.myEntry.msgId.comm = communicator;
+    new_task.myEntry.msgId.coll_type = collectiveOp;
+    new_task.myEntry.node = root;
+    new_task.myEntry.thread = 0;
+    new_task.isNonBlocking = false;
+  }
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }

@@ -323,6 +323,10 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->firstTask = 0;
   *startTime = 0;
 
+  int num_communicators = jobs[my_job].allData->communicators.size();
+  pe->collectiveSeq.resize(num_communicators, 0);
+  pe->currentCollComm = pe->currentCollSeq = pe->currentCollTask = -1;
+
   for(int logInd = 0; logInd  < pe->tasksCount; logInd++)
   {
     Task *t = &(ld->tasks[logInd]);

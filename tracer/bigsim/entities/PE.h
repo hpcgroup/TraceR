@@ -69,15 +69,20 @@ class PE {
     void check();
     void printState();
 
-    //functions added by Bilge for codes-tracing
     void invertMsgPe(int iter, int tInd);
     double getTaskExecTime(int tInd);
     void addTaskExecTime(int tInd, double time);
     std::map<int, int>* msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
+
     KeyType pendingMsgs;
     int64_t *sendSeq, *recvSeq;
+
+    //handling collectives
+    std::vector<int64_t> collectiveSeq;
+    std::map<int64_t, std::map<int64_t, std::vector<int> > > pendingCollMsgs;
+    int64_t currentCollComm, currentCollSeq, currentCollTask;
 };
 
 #endif /* PE_H_ */

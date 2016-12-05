@@ -93,8 +93,10 @@ enum proc_event
     KICKOFF=1,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
-    BCAST,      /* broadcast */
-    EXEC_COMP   /* bigsim, when completed an execution */
+    BCAST,      /* broadcast --> to be deprecated */
+    EXEC_COMP,   /* bigsim, when completed an execution */
+    COLL_BCAST, /* Collective impl for bcast */
+    COLL_COMPLETE
 };
 
 struct proc_state
@@ -119,7 +121,7 @@ struct proc_msg
     int iteration;
     TaskPair executed;
     int fwd_dep_count;
-    MsgID msg_id;
+    MsgID msgId;
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
 };
@@ -173,7 +175,7 @@ static void handle_recv_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-static void handle_bcast_event(
+static void handle_bcast_event( /* to be deprecated */
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -262,7 +264,34 @@ static int exec_comp(
     tw_stime sendOffset,
     int recv,
     tw_lp * lp);
-              
+
+static void perform_collective(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b);
+
+static void perform_bcast(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void handle_coll_complete_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+
+static int send_coll_comp(
+    proc_state * ns,
+    tw_stime sendOffset,
+    int collType,
+    tw_lp * lp);
+
 static inline int pe_to_lpid(int pe, int job);
 static inline int pe_to_job(int pe);
 static inline int lpid_to_pe(int lp_gid);
@@ -845,14 +874,14 @@ static void handle_recv_event(
 {
     int task_id;
 #if TRACER_BIGSIM_TRACES
-    task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
+    task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
 #else
 #if DEBUG_PRINT
     printf("[%d:%d] RECD MSG: %d %d %d %d\n", ns->my_job,
-        ns->my_pe_num, m->msg_id.pe, m->msg_id.id, m->msg_id.comm, 
-        m->msg_id.seq);
+        ns->my_pe_num, m->msgId.pe, m->msgId.id, m->msgId.comm,
+        m->msgId.seq);
 #endif
-    MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
+    MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
     if(it == ns->my_pe->pendingMsgs.end()) {
       task_id = -1;
@@ -868,8 +897,8 @@ static void handle_recv_event(
       }
 #if DEBUG_PRINT
       printf("[%d:%d] RECD MSG FOUND TASK: %d %d %d %d - %d\n", ns->my_job,
-          ns->my_pe_num, m->msg_id.pe, m->msg_id.id, m->msg_id.comm, 
-          ns->my_pe->recvSeq[m->msg_id.pe], task_id);
+          ns->my_pe_num, m->msgId.pe, m->msgId.id, m->msgId.comm,
+          ns->my_pe->recvSeq[m->msgId.pe], task_id);
 #endif
     }
 #endif
@@ -877,7 +906,7 @@ static void handle_recv_event(
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: "
-        "%d. TIME now:%f.\n", ns->my_pe_num, m->msg_id.pe, m->msg_id.id,
+        "%d. TIME now:%f.\n", ns->my_pe_num, m->msgId.pe, m->msgId.id,
         task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
@@ -904,9 +933,9 @@ static void handle_recv_event(
             assert(0);
         }
         PE_invertMsgPe(ns->my_pe, iter, task_id);
-        if(m->msg_id.size <= eager_limit) {
+        if(m->msgId.size <= eager_limit) {
           b->c1 = 1;
-          PE_addTaskExecTime(ns->my_pe, task_id, m->msg_id.size * copy_per_byte);
+          PE_addTaskExecTime(ns->my_pe, task_id, m->msgId.size * copy_per_byte);
         }
         //Add task to the task buffer
         TaskPair pair;
@@ -932,7 +961,7 @@ static void handle_recv_event(
         return;
     }
     printf("PE%d: Going beyond hash look up on receiving a message %d:%d\n",
-      lpid_to_pe(lp->gid), m->msg_id.pe, m->msg_id.id);
+      lpid_to_pe(lp->gid), m->msgId.pe, m->msgId.id);
     assert(0);
 }
 
@@ -944,14 +973,14 @@ static void handle_bcast_event(
 
   tw_stime soft_latency = codes_local_latency(lp);
   m->model_net_calls = 0;
-  int num_sends = bcast_msg(ns, m->msg_id.size, m->iteration, &m->msg_id,
+  int num_sends = bcast_msg(ns, m->msgId.size, m->iteration, &m->msgId,
       0, soft_latency, lp, m);
 
   if(!num_sends) num_sends++;
 
   tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency + codes_local_latency(lp), lp);
   proc_msg * msg = (proc_msg*)tw_event_data(e);
-  memcpy(&msg->msg_id, &m->msg_id, sizeof(m->msg_id));
+  memcpy(&msg->msgId, &m->msgId, sizeof(m->msgId));
   msg->iteration = m->iteration;
   msg->proc_event_type = RECV_MSG;
   tw_event_send(e);
@@ -963,8 +992,8 @@ static void handle_exec_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    //For exec complete event msg_id contains the task_id for convenience
-    int task_id = m->msg_id.id; 
+    //For exec complete event msgId contains the task_id for convenience
+    int task_id = m->msgId.id;
     int iter = m->iteration;
     PE_set_busy(ns->my_pe, false);
     //Mark the task as done
@@ -1034,7 +1063,7 @@ static void handle_recv_rev_event(
 {
 #if TRACER_OTF_TRACES
     if(b->c2 || b->c4) {
-      MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
+      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
       if(b->c2) {
         assert(it != ns->my_pe->pendingMsgs.end());
@@ -1056,11 +1085,11 @@ static void handle_recv_rev_event(
     PE_set_busy(ns->my_pe, wasBusy);
 
 #if TRACER_BIGSIM_TRACES
-    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msg_id);
+    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
 #else
     int task_id =  m->executed.taskid;
     if(b->c3) {
-      MsgKey key(m->msg_id.pe, m->msg_id.id, m->msg_id.comm, m->msg_id.seq);
+      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
       ns->my_pe->pendingMsgs[key].push_front(task_id);
     }
 #endif
@@ -1069,11 +1098,11 @@ static void handle_recv_rev_event(
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d."
-    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msg_id.id, task_id,
+    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msgId.id, task_id,
     wasBusy, now);
 #endif
     if(b->c1) {
-      PE_addTaskExecTime(ns->my_pe, task_id, -1 * m->msg_id.size * copy_per_byte);
+      PE_addTaskExecTime(ns->my_pe, task_id, -1 * m->msgId.size * copy_per_byte);
     }
 
     if(!wasBusy){
@@ -1117,7 +1146,7 @@ static void handle_exec_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-    int task_id = m->msg_id.id;
+    int task_id = m->msgId.id;
 
     //Reverse the state: set the PE as busy, task is not completed yet
     PE_set_busy(ns->my_pe, true);
@@ -1179,8 +1208,18 @@ static tw_stime exec_task(
     }
 #endif
 
+    m->model_net_calls = 0;
 #if TRACER_OTF_TRACES
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
+
+    //delegate to routine that handles collectives
+    if(t->event_id == TRACER_COLL_EVT) {
+      b->c11 = 1;
+      perform_collective(ns, task_id.taskid, lp, m, b);
+      return;
+    }
+
+    //else continue
     if(t->event_id == TRACER_RECV_EVT && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
       MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
       ns->my_pe->recvSeq[t->myEntry.node]++;
@@ -1204,10 +1243,8 @@ static tw_stime exec_task(
     }
 #endif
 
-    m->model_net_calls = 0;
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
-
     //Mark the execution time of the task
     tw_stime time = PE_getTaskExecTime(ns->my_pe, task_id.taskid);
 
@@ -1461,12 +1498,12 @@ static int send_msg(
 
         m_remote->proc_event_type = evt_type;
         m_remote->src = lp->gid;
-        m_remote->msg_id.size = size;
-        m_remote->msg_id.pe = msgId->pe;
-        m_remote->msg_id.id = msgId->id;
+        m_remote->msgId.size = size;
+        m_remote->msgId.pe = msgId->pe;
+        m_remote->msgId.id = msgId->id;
 #if TRACER_OTF_TRACES
-        m_remote->msg_id.comm = msgId->comm;
-        m_remote->msg_id.seq = seq;
+        m_remote->msgId.comm = msgId->comm;
+        m_remote->msgId.seq = seq;
 #endif
         m_remote->iteration = iter;
 
@@ -1483,6 +1520,122 @@ static int send_msg(
     
     return 0;
 }
+
+static void perform_collective(
+            proc_state * ns,
+            int taskid,
+            tw_lp * lp,
+            proc_msg *m,
+            tw_bf * b) {
+  Task *t = &ns->my_pe->myTasks[taskid];
+  assert(t->event_id == TRACER_COLL_EVT);
+  if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
+    perform_bcast(ns, taskid, lp, m, b, 0);
+  } else {
+    assert(0);
+  }
+}
+
+static void perform_bcast(
+            proc_state * ns,
+            int taskid,
+            tw_lp * lp,
+            proc_msg *m,
+            tw_bf * b,
+            int isEvent) {
+  Task *t;
+  int recvCount;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
+    ns->my_pe->currentCollSeq = collSeq;
+    std::map<int64_t, std::map<int64_t, std::vector<int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.find(t->myEntry.msgId.comm);
+    if(it == ns->my_pe->pendingCollMsgs.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int64_t, std::vector<int> >::iterator cIt =
+        it->second.find(collSeq);
+      if(cIt == it->second.end()) {
+        recvCount = 0;
+      } else {
+        recvCount = cIt->second[0];
+      }
+    }
+  } else {
+    int comm = m->msgId.comm;
+    int64_t collSeq = m->msgId.seq;
+    if(comm != ns->my_pe->currentCollComm ||
+       collSeq != ns->my_pe->currentCollSeq) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
+      return;
+    }
+    t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+  }
+
+  int amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
+
+  if(recvCount == 0 && !amIroot) {
+    return;
+  }
+
+  int numValidChildren = 0;
+  int myChildren[BCAST_DEGREE];
+  int thisTreePe, index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+
+  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  if(jobs[ns->my_job].numRanks != g.members.size()) {
+    index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
+      - g.members.begin();
+    maxSize = g.members.size();
+  }
+
+  thisTreePe = (index - t->myEntry.msgId.pe + maxSize) % maxSize;
+
+  for(int i = 0; i < BCAST_DEGREE; i++) {
+    int next_child = BCAST_DEGREE * thisTreePe + i + 1;
+    if(next_child >= maxSize) {
+      break;
+    }
+    myChildren[i] = (t->myEntry.msgId.pe + next_child) % maxSize;
+    numValidChildren++;
+  }
+
+  tw_stime delay = 0, copyTime = codes_local_latency(lp);
+  m->model_net_calls = 0;
+  for(int i = 0; i < numValidChildren; i++) {
+    int dest = myChildren[i];
+    if(jobs[ns->my_job].numRanks != g.members.size()) {
+      dest = g.members[dest];
+    }
+    send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
+      t->myEntry.msgId,  0, pe_to_lpid(dest, ns->my_job),
+      soft_delay_mpi + delay, COLL_BCAST, lp);
+    delay += copyTime;
+    m->model_net_calls++;
+  }
+  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_BCAST, lp);
+}
+
+static void handle_coll_complete_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp) {
+  Task *t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+  m->executed.taskid = ns->my_pe->currentCollTask;
+  m->msgId.seq = ns->my_pe->currentCollSeq;
+  m->msgId.comm = ns->my_pe->currentCollComm;
+  if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST &&
+     m->msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
+    exec_comp(ns, ns->my_pe->currIter, ns->my_pe->currentCollTask, 0,
+      codes_local_latency(lp), 0, lp);
+    ns->my_pe->currentCollTask = ns->my_pe->currentCollComm =
+      ns->my_pe->currentCollSeq = -1;
+  }
+}
+
 
 //Creates and initiates bcast_msg
 static int bcast_msg(
@@ -1538,12 +1691,12 @@ static int exec_comp(
     }
     e = codes_event_new(lp->gid, sendOffset, lp);
     m = (proc_msg*)tw_event_data(e);
-    m->msg_id.size = 0;
-    m->msg_id.pe = ns->my_pe_num;
-    m->msg_id.id = task_id;
+    m->msgId.size = 0;
+    m->msgId.pe = ns->my_pe_num;
+    m->msgId.id = task_id;
 #if TRACER_OTF_TRACES
-    m->msg_id.comm = comm_id;
-    m->msg_id.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
+    m->msgId.comm = comm_id;
+    m->msgId.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
 #endif
     m->iteration = iter;
     if(recv) {
@@ -1553,6 +1706,26 @@ static int exec_comp(
         m->proc_event_type = EXEC_COMP;
     tw_event_send(e);
 
+    return 0;
+}
+
+static int send_coll_comp(
+    proc_state * ns,
+    tw_stime sendOffset,
+    int collType,
+    tw_lp * lp)
+{
+    tw_event *e;
+    proc_msg *m;
+
+    if(sendOffset < g_tw_lookahead) {
+      sendOffset += g_tw_lookahead;
+    }
+    e = codes_event_new(lp->gid, sendOffset, lp);
+    m = (proc_msg*)tw_event_data(e);
+    m->msgId.coll_type = collType;
+    m->proc_event_type = COLL_COMPLETE;
+    tw_event_send(e);
     return 0;
 }
 
