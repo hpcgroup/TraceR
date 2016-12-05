@@ -51,6 +51,7 @@ struct Group {
 
 struct LocationData {
   uint64_t lastLogTime;
+  bool firstEnter;
   std::vector<Task> tasks;
 };
 

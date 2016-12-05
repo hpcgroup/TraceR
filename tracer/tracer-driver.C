@@ -293,6 +293,27 @@ static int send_coll_comp(
     int collType,
     tw_lp * lp);
 
+static void perform_collective_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b);
+
+static void perform_bcast_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void handle_coll_complete_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+
 static inline int pe_to_lpid(int pe, int job);
 static inline int pe_to_job(int pe);
 static inline int lpid_to_pe(int lp_gid);
@@ -768,6 +789,12 @@ static void proc_rev_event(
       break;
     case EXEC_COMP:
       handle_exec_rev_event(ns, b, m, lp);
+      break;
+    case COLL_BCAST:
+      perform_bcast_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_COMPLETE:
+      handle_coll_complete_rev_event(ns, b, m, lp);
       break;
     default:
       assert(0);
@@ -1456,6 +1483,11 @@ static void exec_task_rev(
     tw_bf * b) {
 
 #if TRACER_OTF_TRACES
+  if(b->c11) {
+    perform_collective_rev(ns, task_id.taskid, lp, m, b);
+    return;
+  }
+
   if(b->c21 || b->c22) {
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
     ns->my_pe->recvSeq[t->myEntry.node]--;
@@ -1543,6 +1575,20 @@ static void perform_collective(
   }
 }
 
+static void perform_collective_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b) {
+  Task *t = &ns->my_pe->myTasks[taskid];
+  if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
+    perform_bcast_rev(ns, taskid, lp, m, b, 0);
+  } else {
+    assert(0);
+  }
+}
+
 static void perform_bcast(
             proc_state * ns,
             int taskid,
@@ -1578,6 +1624,7 @@ static void perform_bcast(
     if(comm != ns->my_pe->currentCollComm ||
        collSeq != ns->my_pe->currentCollSeq) {
       ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+      b->c12 = 1;
       return;
     }
     t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
@@ -1586,6 +1633,7 @@ static void perform_bcast(
   int amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
 
   if(recvCount == 0 && !amIroot) {
+    b->c13 = 1;
     return;
   }
 
@@ -1627,6 +1675,35 @@ static void perform_bcast(
   send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_BCAST, lp);
 }
 
+static void perform_bcast_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent) {
+  Task *t;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
+    ns->my_pe->currentCollSeq = -1;
+    ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
+  } else {
+    if(b->c12) {
+      ns->my_pe->pendingCollMsgs[m->msgId.comm].erase(m->msgId.seq);
+      return;
+    }
+  }
+
+  if(b->c13) return;
+  
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+}
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -1645,6 +1722,15 @@ static void handle_coll_complete_event(
   }
 }
 
+static void handle_coll_complete_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp) {
+  ns->my_pe->currentCollTask = m->executed.taskid;
+  ns->my_pe->currentCollSeq = m->msgId.seq;
+  ns->my_pe->currentCollComm = m->msgId.comm;
+}
 
 //Creates and initiates bcast_msg
 static int bcast_msg(

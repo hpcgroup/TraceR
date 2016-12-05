@@ -163,10 +163,12 @@ callbackEvtBegin( OTF2_LocationRef    location,
                   OTF2_AttributeList* attributes,
                   OTF2_RegionRef      region )
 {
-  if(evtPos != 1) {
-    addUserEvt(userData, time);
-  }
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+  if(!ld->firstEnter) {
+    addUserEvt(userData, time);
+  } else {
+    ld->firstEnter = false;
+  }
   AllData *globalData = (AllData *)userData;
   if(globalData->regions[region].isTracerPrintEvt) {
     ld->tasks.push_back(Task());
@@ -515,6 +517,7 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
   
   allData->ld = ld;
   ld->lastLogTime = 0;
+  ld->firstEnter = true;
   OTF2_Reader_RegisterEvtCallbacks( reader,
       evt_reader,
       event_callbacks,
