@@ -25,6 +25,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <signal.h>
+#include <algorithm>
 
 extern "C" {
 #include "codes/model-net.h"
@@ -731,6 +732,12 @@ static void proc_event(
     case EXEC_COMP:
       handle_exec_event(ns, b, m, lp);
       break;
+    case COLL_BCAST:
+      perform_bcast(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_COMPLETE:
+      handle_coll_complete_event(ns, b, m, lp);
+      break;
     default:
       printf("\n Invalid message type %d event %lld ", 
           m->proc_event_type, m);
@@ -1216,7 +1223,7 @@ static tw_stime exec_task(
     if(t->event_id == TRACER_COLL_EVT) {
       b->c11 = 1;
       perform_collective(ns, task_id.taskid, lp, m, b);
-      return;
+      return 0;
     }
 
     //else continue
@@ -1546,8 +1553,10 @@ static void perform_bcast(
   Task *t;
   int recvCount;
   if(!isEvent) {
+    PE_set_busy(ns->my_pe, true);
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    ns->my_pe->currentCollTask = taskid;
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
     std::map<int64_t, std::map<int64_t, std::vector<int> > >::iterator it =
@@ -1568,7 +1577,7 @@ static void perform_bcast(
     int64_t collSeq = m->msgId.seq;
     if(comm != ns->my_pe->currentCollComm ||
        collSeq != ns->my_pe->currentCollSeq) {
-      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
+      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
       return;
     }
     t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
@@ -1591,14 +1600,14 @@ static void perform_bcast(
     maxSize = g.members.size();
   }
 
-  thisTreePe = (index - t->myEntry.msgId.pe + maxSize) % maxSize;
+  thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
 
   for(int i = 0; i < BCAST_DEGREE; i++) {
     int next_child = BCAST_DEGREE * thisTreePe + i + 1;
     if(next_child >= maxSize) {
       break;
     }
-    myChildren[i] = (t->myEntry.msgId.pe + next_child) % maxSize;
+    myChildren[i] = (t->myEntry.node + next_child) % maxSize;
     numValidChildren++;
   }
 
@@ -1610,7 +1619,7 @@ static void perform_bcast(
       dest = g.members[dest];
     }
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
-      t->myEntry.msgId,  0, pe_to_lpid(dest, ns->my_job),
+      &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
       soft_delay_mpi + delay, COLL_BCAST, lp);
     delay += copyTime;
     m->model_net_calls++;
@@ -1696,7 +1705,9 @@ static int exec_comp(
     m->msgId.id = task_id;
 #if TRACER_OTF_TRACES
     m->msgId.comm = comm_id;
-    m->msgId.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
+    if(recv) {
+      m->msgId.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
+    }
 #endif
     m->iteration = iter;
     if(recv) {
