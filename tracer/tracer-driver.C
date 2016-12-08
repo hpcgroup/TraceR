@@ -97,6 +97,7 @@ enum proc_event
     BCAST,      /* broadcast --> to be deprecated */
     EXEC_COMP,   /* bigsim, when completed an execution */
     COLL_BCAST, /* Collective impl for bcast */
+    COLL_REDUCTION, /* Collective impl for reduction */
     COLL_COMPLETE
 };
 
@@ -125,6 +126,7 @@ struct proc_msg
     MsgID msgId;
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
+    int coll_info;
 };
 
 static void proc_init(
@@ -281,6 +283,14 @@ static void perform_bcast(
     tw_bf * b,
     int isEvent);
 
+static void perform_reduction(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -301,6 +311,14 @@ static void perform_collective_rev(
     tw_bf * b);
 
 static void perform_bcast_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_reduction_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -756,6 +774,9 @@ static void proc_event(
     case COLL_BCAST:
       perform_bcast(ns, -1, lp, m, b, 1);
       break;
+    case COLL_REDUCTION:
+      perform_reduction(ns, -1, lp, m, b, 1);
+      break;
     case COLL_COMPLETE:
       handle_coll_complete_event(ns, b, m, lp);
       break;
@@ -792,6 +813,9 @@ static void proc_rev_event(
       break;
     case COLL_BCAST:
       perform_bcast_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_REDUCTION:
+      perform_reduction_rev(ns, -1, lp, m, b, 1);
       break;
     case COLL_COMPLETE:
       handle_coll_complete_rev_event(ns, b, m, lp);
@@ -1570,6 +1594,8 @@ static void perform_collective(
   assert(t->event_id == TRACER_COLL_EVT);
   if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
     perform_bcast(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
+    perform_reduction(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -1584,6 +1610,8 @@ static void perform_collective_rev(
   Task *t = &ns->my_pe->myTasks[taskid];
   if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
     perform_bcast_rev(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
+    perform_reduction_rev(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -1731,6 +1759,147 @@ static void perform_bcast_rev(
   }
 }
 
+static void perform_reduction(
+            proc_state * ns,
+            int taskid,
+            tw_lp * lp,
+            proc_msg *m,
+            tw_bf * b,
+            int isEvent) {
+  Task *t;
+  int recvCount;
+  if(!isEvent) {
+    PE_set_busy(ns->my_pe, true);
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    ns->my_pe->currentCollTask = taskid;
+    int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
+    ns->my_pe->currentCollSeq = collSeq;
+    std::map<int64_t, std::map<int64_t, std::vector<int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.find(t->myEntry.msgId.comm);
+    if(it == ns->my_pe->pendingCollMsgs.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int64_t, std::vector<int> >::iterator cIt =
+        it->second.find(collSeq);
+      if(cIt == it->second.end()) {
+        recvCount = 0;
+      } else {
+        assert(cIt->second.size() > 0);
+        recvCount = cIt->second[0];
+      }
+    }
+  } else {
+    int comm = m->msgId.comm;
+    int64_t collSeq = m->msgId.seq;
+    if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
+    } else {
+      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+    }
+    if(comm != ns->my_pe->currentCollComm ||
+       collSeq != ns->my_pe->currentCollSeq) {
+      b->c12 = 1;
+      return;
+    }
+    t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+    recvCount = ns->my_pe->pendingCollMsgs[comm][collSeq][0];
+  }
+
+  int numValidChildren = 0;
+  int thisTreePe, index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+
+  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  if(jobs[ns->my_job].numRanks != g.members.size()) {
+    index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
+      - g.members.begin();
+    maxSize = g.members.size();
+  }
+
+  thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
+
+  for(int i = 0; i < BCAST_DEGREE; i++) {
+    int next_child = BCAST_DEGREE * thisTreePe + i + 1;
+    if(next_child >= maxSize) {
+      break;
+    }
+    numValidChildren++;
+  }
+  
+  if(recvCount != numValidChildren) {
+    b->c13 = 1;
+    return;
+  }
+  
+  bool amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
+  int myParent = (thisTreePe - 1)/BCAST_DEGREE;
+  myParent = (t->myEntry.node + myParent) % maxSize;
+ 
+  if(numValidChildren != 0) {
+    b->c14 = 1;
+    m->coll_info = ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][0];
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
+  }
+
+  tw_stime delay = 0, copyTime = codes_local_latency(lp);
+  m->model_net_calls = 0;
+  if(!amIroot) {
+    int dest = myParent;
+    if(jobs[ns->my_job].numRanks != g.members.size()) {
+      dest = g.members[dest];
+    }
+    send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
+        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
+        soft_delay_mpi + delay, COLL_REDUCTION, lp);
+    m->model_net_calls++;
+  }
+  delay += copyTime;
+  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_REDUCE, lp);
+}
+
+static void perform_reduction_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent) {
+  Task *t;
+  int comm = ns->my_pe->currentCollComm;
+  int64_t collSeq = ns->my_pe->currentCollSeq;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
+    ns->my_pe->currentCollSeq = -1;
+    ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
+  } else {
+    if(b->c12 || b->c13) {
+      ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0]--;
+      if(ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0] == 0) {
+        ns->my_pe->pendingCollMsgs[m->msgId.comm].erase(m->msgId.seq);
+      }
+      return;
+    }
+  }
+
+  if(b->c13) return;
+ 
+  if(b->c14) {
+    int toInsert = m->coll_info;
+    if(isEvent) toInsert--;
+    if(toInsert != 0) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(toInsert);
+    }
+  }
+  
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+}
+
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -1740,8 +1909,11 @@ static void handle_coll_complete_event(
   m->executed.taskid = ns->my_pe->currentCollTask;
   m->msgId.seq = ns->my_pe->currentCollSeq;
   m->msgId.comm = ns->my_pe->currentCollComm;
-  if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST &&
-     m->msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
+  if((t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST &&
+      m->msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) ||
+     (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE &&
+      m->msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) 
+    ) {
     exec_comp(ns, ns->my_pe->currIter, ns->my_pe->currentCollTask, 0,
       codes_local_latency(lp), 0, lp);
     ns->my_pe->currentCollTask = ns->my_pe->currentCollComm =
