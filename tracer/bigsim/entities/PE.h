@@ -81,8 +81,9 @@ class PE {
 
     //handling collectives
     std::vector<int64_t> collectiveSeq;
-    std::map<int64_t, std::map<int64_t, std::vector<int> > > pendingCollMsgs;
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > > pendingCollMsgs;
     int64_t currentCollComm, currentCollSeq, currentCollTask;
+    int currentCollRank, currentCollPartner, currentCollSize;
 };
 
 #endif /* PE_H_ */

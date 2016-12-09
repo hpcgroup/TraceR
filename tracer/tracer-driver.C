@@ -98,6 +98,7 @@ enum proc_event
     EXEC_COMP,   /* bigsim, when completed an execution */
     COLL_BCAST, /* Collective impl for bcast */
     COLL_REDUCTION, /* Collective impl for reduction */
+    COLL_A2A, /* Collective impl for a2a */
     COLL_COMPLETE
 };
 
@@ -291,6 +292,14 @@ static void perform_reduction(
     tw_bf * b,
     int isEvent);
 
+static void perform_a2a(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -319,6 +328,14 @@ static void perform_bcast_rev(
     int isEvent);
 
 static void perform_reduction_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_a2a_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -777,6 +794,9 @@ static void proc_event(
     case COLL_REDUCTION:
       perform_reduction(ns, -1, lp, m, b, 1);
       break;
+    case COLL_A2A:
+      perform_a2a(ns, -1, lp, m, b, 1);
+      break;
     case COLL_COMPLETE:
       handle_coll_complete_event(ns, b, m, lp);
       break;
@@ -816,6 +836,9 @@ static void proc_rev_event(
       break;
     case COLL_REDUCTION:
       perform_reduction_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_A2A:
+      perform_a2a_rev(ns, -1, lp, m, b, 1);
       break;
     case COLL_COMPLETE:
       handle_coll_complete_rev_event(ns, b, m, lp);
@@ -1596,6 +1619,8 @@ static void perform_collective(
     perform_bcast(ns, taskid, lp, m, b, 0);
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
     perform_reduction(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) {
+    perform_a2a(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -1612,6 +1637,8 @@ static void perform_collective_rev(
     perform_bcast_rev(ns, taskid, lp, m, b, 0);
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
     perform_reduction_rev(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) {
+    perform_a2a_rev(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -1633,12 +1660,12 @@ static void perform_bcast(
     ns->my_pe->currentCollTask = taskid;
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
-    std::map<int64_t, std::map<int64_t, std::vector<int> > >::iterator it =
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
       ns->my_pe->pendingCollMsgs.find(t->myEntry.msgId.comm);
     if(it == ns->my_pe->pendingCollMsgs.end()) {
       recvCount = 0;
     } else {
-      std::map<int64_t, std::vector<int> >::iterator cIt =
+      std::map<int64_t, std::map<int, int> >::iterator cIt =
         it->second.find(collSeq);
       if(cIt == it->second.end()) {
         recvCount = 0;
@@ -1655,7 +1682,7 @@ static void perform_bcast(
       if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
         ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
       } else {
-        ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+        ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
       }
       b->c12 = 1;
       return;
@@ -1748,7 +1775,7 @@ static void perform_bcast_rev(
     if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
       ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
     } else {
-      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
     }
   }
   
@@ -1775,12 +1802,12 @@ static void perform_reduction(
     ns->my_pe->currentCollTask = taskid;
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
-    std::map<int64_t, std::map<int64_t, std::vector<int> > >::iterator it =
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
       ns->my_pe->pendingCollMsgs.find(t->myEntry.msgId.comm);
     if(it == ns->my_pe->pendingCollMsgs.end()) {
       recvCount = 0;
     } else {
-      std::map<int64_t, std::vector<int> >::iterator cIt =
+      std::map<int64_t, std::map<int, int> >::iterator cIt =
         it->second.find(collSeq);
       if(cIt == it->second.end()) {
         recvCount = 0;
@@ -1795,7 +1822,7 @@ static void perform_reduction(
     if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
       ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
     } else {
-      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(1);
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
     }
     if(comm != ns->my_pe->currentCollComm ||
        collSeq != ns->my_pe->currentCollSeq) {
@@ -1888,7 +1915,7 @@ static void perform_reduction_rev(
     int toInsert = m->coll_info;
     if(isEvent) toInsert--;
     if(toInsert != 0) {
-      ns->my_pe->pendingCollMsgs[comm][collSeq].push_back(toInsert);
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = toInsert;
     }
   }
   
@@ -1899,6 +1926,158 @@ static void perform_reduction_rev(
   }
 }
 
+static void perform_a2a(
+            proc_state * ns,
+            int taskid,
+            tw_lp * lp,
+            proc_msg *m,
+            tw_bf * b,
+            int isEvent) {
+  Task *t;
+  int recvCount;
+  if(!isEvent) {
+    PE_set_busy(ns->my_pe, true);
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    ns->my_pe->currentCollTask = taskid;
+    int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
+    ns->my_pe->currentCollSeq = collSeq;
+    int index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+    if(jobs[ns->my_job].numRanks != g.members.size()) {
+      index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
+        - g.members.begin();
+      maxSize = g.members.size();
+    }
+    ns->my_pe->currentCollRank = index;
+    ns->my_pe->currentCollPartner = 0;
+    ns->my_pe->currentCollSize = maxSize;
+    t->myEntry.msgId.pe = index;
+  } else {
+    if(m->msgId.pe != ns->my_pe->currentCollRank) {
+      int comm = m->msgId.comm;
+      int64_t collSeq = m->msgId.seq;
+      ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
+      if(comm != ns->my_pe->currentCollComm ||
+          collSeq != ns->my_pe->currentCollSeq) {
+        b->c12 = 1;
+        return;
+      }
+      if(m->msgId.pe != ((ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) % 
+          ns->my_pe->currentCollSize)) {
+        b->c12 = 1;
+        return;
+      }
+    }
+    t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+  }
+
+  m->model_net_calls = 0;
+  tw_stime delay = 0, copyTime = codes_local_latency(lp);
+  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+
+  if(isEvent && m->msgId.pe != ns->my_pe->currentCollRank) {
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe] == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(m->msgId.pe);
+    }
+  }
+
+  if(ns->my_pe->currentCollPartner != ns->my_pe->currentCollSize - 1) {
+    b->c13 = 1;
+    ns->my_pe->currentCollPartner++;
+    int dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner) %  ns->my_pe->currentCollSize;
+    int partner = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
+    if(jobs[ns->my_job].numRanks != g.members.size()) {
+      dest = g.members[dest];
+    }
+    send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
+        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
+        soft_delay_mpi + delay, COLL_A2A, lp);
+    delay += copyTime;
+    m->model_net_calls++;
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
+    if(it == ns->my_pe->pendingCollMsgs.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int64_t, std::map<int, int> >::iterator cIt =
+        it->second.find(ns->my_pe->currentCollSeq);
+      if(cIt == it->second.end()) {
+        recvCount = 0;
+      } else {
+        std::map<int, int>::iterator c2It = cIt->second.find(partner);
+        if(c2It == cIt->second.end()) {
+          recvCount = 0;
+        } else {
+          recvCount = c2It->second;
+        }
+      }
+    }
+    assert(recvCount >= 0);
+    if(recvCount != 0) {
+      b->c14 = 1;
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner]--;
+      m->coll_info = partner;
+      if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner] == 0) {
+        ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
+      }
+      //send to self
+      tw_event *e = codes_event_new(lp->gid, delay, lp);
+      proc_msg *m_new = (proc_msg*)tw_event_data(e);
+      m_new->msgId.pe = ns->my_pe->currentCollRank;
+      m_new->proc_event_type = COLL_A2A;
+      tw_event_send(e);
+    }
+  } else {
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
+    }
+    send_coll_comp(ns, copyTime, OTF2_COLLECTIVE_OP_ALLTOALL, lp);
+  }
+}
+
+static void perform_a2a_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent) {
+  Task *t;
+  int comm = ns->my_pe->currentCollComm;
+  int64_t collSeq = ns->my_pe->currentCollSeq;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
+    ns->my_pe->currentCollSeq = ns->my_pe->currentCollRank = 
+    ns->my_pe->currentCollSize = ns->my_pe->currentCollPartner = -1;
+    ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
+  } else {
+    if(b->c12) {
+      ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][m->msgId.pe]--;
+      if(ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][m->msgId.pe] == 0) {
+        ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq].erase(m->msgId.pe);
+      }
+      return;
+    }
+  }
+  
+  if(b->c13) {
+    ns->my_pe->currentCollPartner--;
+  }
+
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+  
+  if(b->c14) {
+    ns->my_pe->pendingCollMsgs[comm][collSeq][m->coll_info]++;
+  }
+
+}
 
 static void handle_coll_complete_event(
     proc_state * ns,
@@ -1909,15 +2088,19 @@ static void handle_coll_complete_event(
   m->executed.taskid = ns->my_pe->currentCollTask;
   m->msgId.seq = ns->my_pe->currentCollSeq;
   m->msgId.comm = ns->my_pe->currentCollComm;
+  m->coll_info = ns->my_pe->currentCollRank;
   if((t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST &&
       m->msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) ||
      (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE &&
-      m->msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) 
+      m->msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) || 
+     (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL &&
+      m->msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) 
     ) {
     exec_comp(ns, ns->my_pe->currIter, ns->my_pe->currentCollTask, 0,
       codes_local_latency(lp), 0, lp);
     ns->my_pe->currentCollTask = ns->my_pe->currentCollComm =
-      ns->my_pe->currentCollSeq = -1;
+    ns->my_pe->currentCollSeq = ns->my_pe->currentCollRank = 
+    ns->my_pe->currentCollPartner = ns->my_pe->currentCollSize = -1;
   }
 }
 
@@ -1929,6 +2112,12 @@ static void handle_coll_complete_rev_event(
   ns->my_pe->currentCollTask = m->executed.taskid;
   ns->my_pe->currentCollSeq = m->msgId.seq;
   ns->my_pe->currentCollComm = m->msgId.comm;
+  if(m->msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) {
+    ns->my_pe->currentCollRank = m->coll_info;
+    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+    ns->my_pe->currentCollPartner = g.members.size() - 1;
+    ns->my_pe->currentCollSize = g.members.size();
+  }
   codes_local_latency_reverse(lp);
 }
 
