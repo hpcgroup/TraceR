@@ -2,7 +2,7 @@
 #include "otf2_reader.h"
 #include "CWrapper.h"
 #include <cassert>
-#define VERBOSE_L1 0
+#define VERBOSE_L1 1
 #define VERBOSE_L2 0
 #define VERBOSE_L3 0
 
@@ -31,11 +31,10 @@ callbackDefClockProperties(void * userData,
   ClockProperties &clockProperties = ((AllData*)userData)->clockProperties;
   clockProperties.ticks_per_second = timerResolution;
   clockProperties.ticksToSecond = TIME_MULT * 1.0/timerResolution;
-#if VERBOSE_L1
-  printf("Clock Props: %lld %lld %f\n", clockProperties.ticks_per_second,
-    TIME_MULT, clockProperties.ticksToSecond);
+  if(!g_tw_mynode) 
+    printf("Clock Props: %lld %lld %f\n", clockProperties.ticks_per_second,
+      TIME_MULT, clockProperties.ticksToSecond);
   fflush(stdout);
-#endif
   clockProperties.time_offset = globalOffset;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -70,6 +69,7 @@ callbackDefGroup(void* userData,
 #endif
   for (uint64_t i = 0; i < numberOfMembers; i++) {
     new_g.members.push_back(members[i]); 
+    new_g.rmembers[members[i]] = i;
 #if VERBOSE_L3
     printf("%llu ", members[i]);
     fflush(stdout);

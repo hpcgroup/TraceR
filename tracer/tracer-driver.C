@@ -367,7 +367,7 @@ int main(int argc, char **argv)
     int num_nets;
     int *net_ids;
     //printf("\n Config count %d ",(int) config.lpgroups_count);
-    g_tw_ts_end = s_to_ns(60*60*24*365); /* one year, in nsecs */
+    g_tw_ts_end = s_to_ns(60*60); /* one hour, in nsecs */
     lp_io_handle handle;
 
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
@@ -1708,14 +1708,16 @@ static void perform_bcast(
 
   int numValidChildren = 0;
   int myChildren[BCAST_DEGREE];
-  int thisTreePe, index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+  int thisTreePe, index, maxSize;
 
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-  if(jobs[ns->my_job].numRanks != g.members.size()) {
-    index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
-      - g.members.begin();
-    maxSize = g.members.size();
+  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+  if(it == g.rmembers.end()) {
+    assert(0);
+  } else {
+    index = it->second;
   }
+  maxSize = g.members.size();
 
   thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
 
@@ -1731,10 +1733,7 @@ static void perform_bcast(
   tw_stime delay = 0, copyTime = codes_local_latency(lp);
   m->model_net_calls = 0;
   for(int i = 0; i < numValidChildren; i++) {
-    int dest = myChildren[i];
-    if(jobs[ns->my_job].numRanks != g.members.size()) {
-      dest = g.members[dest];
-    }
+    int dest = g.members[myChildren[i]];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
       &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
       soft_delay_mpi + delay, COLL_BCAST, lp);
@@ -1834,14 +1833,16 @@ static void perform_reduction(
   }
 
   int numValidChildren = 0;
-  int thisTreePe, index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+  int thisTreePe, index, maxSize;
 
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-  if(jobs[ns->my_job].numRanks != g.members.size()) {
-    index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
-      - g.members.begin();
-    maxSize = g.members.size();
+  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+  if(it == g.rmembers.end()) {
+    assert(0);
+  } else {
+    index = it->second;
   }
+  maxSize = g.members.size();
 
   thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
 
@@ -1871,10 +1872,7 @@ static void perform_reduction(
   tw_stime delay = 0, copyTime = codes_local_latency(lp);
   m->model_net_calls = 0;
   if(!amIroot) {
-    int dest = myParent;
-    if(jobs[ns->my_job].numRanks != g.members.size()) {
-      dest = g.members[dest];
-    }
+    int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
         soft_delay_mpi + delay, COLL_REDUCTION, lp);
@@ -1942,13 +1940,16 @@ static void perform_a2a(
     ns->my_pe->currentCollTask = taskid;
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
-    int index = ns->my_pe_num, maxSize = jobs[ns->my_job].numRanks;
+    int index, maxSize;
     Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-    if(jobs[ns->my_job].numRanks != g.members.size()) {
-      index = std::find(g.members.begin(), g.members.end(), ns->my_pe_num)
-        - g.members.begin();
-      maxSize = g.members.size();
+    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+    if(it == g.rmembers.end()) {
+      assert(0);
+    } else {
+      index = it->second;
     }
+    maxSize = g.members.size();
+
     ns->my_pe->currentCollRank = index;
     ns->my_pe->currentCollPartner = 0;
     ns->my_pe->currentCollSize = maxSize;
@@ -1988,9 +1989,7 @@ static void perform_a2a(
     ns->my_pe->currentCollPartner++;
     int dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner) %  ns->my_pe->currentCollSize;
     int partner = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
-    if(jobs[ns->my_job].numRanks != g.members.size()) {
-      dest = g.members[dest];
-    }
+    dest = g.members[dest];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
         soft_delay_mpi + delay, COLL_A2A, lp);

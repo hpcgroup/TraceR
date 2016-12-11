@@ -47,6 +47,7 @@ struct Region {
 struct Group {
   OTF2_GroupType type;
   std::vector<uint64_t> members;
+  std::map<int, int> rmembers;
 };
 
 struct LocationData {
