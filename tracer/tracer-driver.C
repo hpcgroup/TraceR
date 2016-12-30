@@ -74,7 +74,8 @@ int total_ranks;
 tw_stime *jobTimes;
 tw_stime *finalizeTimes;
 int num_jobs = 0;
-tw_stime soft_delay_mpi = 0;
+tw_stime soft_delay_mpi = 50;
+tw_stime nic_delay = 300;
 
 int* size_replace_by;
 int* size_replace_limit;
@@ -96,6 +97,7 @@ enum proc_event
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast --> to be deprecated */
     EXEC_COMP,   /* bigsim, when completed an execution */
+    SEND_COMP, /* Send completed for Isends */
     COLL_BCAST, /* Collective impl for bcast */
     COLL_REDUCTION, /* Collective impl for reduction */
     COLL_A2A, /* Collective impl for a2a */
@@ -189,6 +191,11 @@ static void handle_exec_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 
 //reverse event handler declarations
 static void handle_kickoff_rev_event(
@@ -212,6 +219,11 @@ static void handle_bcast_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_exec_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -249,6 +261,18 @@ static int send_msg(
     tw_stime timeOffset,
     enum proc_event evt_type,
     tw_lp * lp);
+
+static void enqueue_msg(
+        proc_state * ns,
+        int size,
+        int iter,
+        MsgID *msgId,
+        uint64_t seq,
+        int dest_id,
+        tw_stime sendOffset,
+        enum proc_event evt_type,
+        proc_msg *m_local,
+        tw_lp * lp);
 
 static int bcast_msg(
     proc_state * ns,
@@ -310,7 +334,9 @@ static int send_coll_comp(
     proc_state * ns,
     tw_stime sendOffset,
     int collType,
-    tw_lp * lp);
+    tw_lp * lp,
+    int isEvent,
+    proc_msg * m);
 
 static void perform_collective_rev(
     proc_state * ns,
@@ -348,6 +374,14 @@ static void handle_coll_complete_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+
+static int send_coll_comp_rev(
+    proc_state * ns,
+    tw_stime sendOffset,
+    int collType,
+    tw_lp * lp,
+    int isEvent,
+    proc_msg * m);
 
 static inline int pe_to_lpid(int pe, int job);
 static inline int pe_to_job(int pe);
@@ -466,6 +500,11 @@ int main(int argc, char **argv)
         &soft_delay_mpi);
     if(!rank) 
       printf("Found soft_delay as %f\n", soft_delay_mpi);
+    
+    configuration_get_value_double(&config, "PARAMS", "nic_delay", NULL,
+        &nic_delay);
+    if(!rank) 
+      printf("Found nic_delay as %f\n", nic_delay);
     
     configuration_get_value_double(&config, "PARAMS", "copy_per_byte", NULL,
         &copy_per_byte);
@@ -788,6 +827,9 @@ static void proc_event(
     case EXEC_COMP:
       handle_exec_event(ns, b, m, lp);
       break;
+    case SEND_COMP:
+      handle_send_comp_event(ns, b, m, lp);
+      break;
     case COLL_BCAST:
       perform_bcast(ns, -1, lp, m, b, 1);
       break;
@@ -830,6 +872,9 @@ static void proc_rev_event(
       break;
     case EXEC_COMP:
       handle_exec_rev_event(ns, b, m, lp);
+      break;
+    case SEND_COMP:
+      handle_send_comp_rev_event(ns, b, m, lp);
       break;
     case COLL_BCAST:
       perform_bcast_rev(ns, -1, lp, m, b, 1);
@@ -1014,9 +1059,12 @@ static void handle_recv_event(
             assert(0);
         }
         PE_invertMsgPe(ns->my_pe, iter, task_id);
-        if(m->msgId.size <= eager_limit) {
+        if(m->msgId.size <= eager_limit &&  ns->my_pe->currIter == 0) {
           b->c1 = 1;
-          PE_addTaskExecTime(ns->my_pe, task_id, m->msgId.size * copy_per_byte);
+          if(m->msgId.pe != ns->my_pe_num) {
+            PE_addTaskExecTime(ns->my_pe, task_id, nic_delay);
+          }
+          PE_addTaskExecTime(ns->my_pe, task_id, m->msgId.size * copy_per_byte + soft_delay_mpi);
         }
         //Add task to the task buffer
         TaskPair pair;
@@ -1136,6 +1184,37 @@ static void handle_exec_event(
     }
 }
 
+static void handle_send_comp_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+    std::map<int, int>::iterator it = ns->my_pe->pendingReqs.find(m->msgId.id);
+    if(it == ns->my_pe->pendingReqs.end()) {
+      b->c1 = 1;
+    } else if(it->second == -1) {
+      b->c2 = 1;
+      ns->my_pe->pendingReqs.erase(it);
+    } else {
+      b->c3 = 1;
+      m->executed.taskid = it->second;
+      exec_comp(ns, ns->my_pe->currIter, it->second, 0, 0, 0, lp);
+      ns->my_pe->pendingReqs.erase(it);
+    }
+}
+
+static void handle_send_comp_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+    if(b->c1) return;
+    if(b->c2) ns->my_pe->pendingReqs[m->msgId.id] = -1;
+    if(b->c3) ns->my_pe->pendingReqs[m->msgId.id] = m->executed.taskid;
+}
+
 static void handle_recv_rev_event(
 		proc_state * ns,
 		tw_bf * b,
@@ -1183,6 +1262,9 @@ static void handle_recv_rev_event(
     wasBusy, now);
 #endif
     if(b->c1) {
+      if(m->msgId.pe != ns->my_pe_num) {
+        PE_addTaskExecTime(ns->my_pe, task_id, -1 * nic_delay);
+      }
       PE_addTaskExecTime(ns->my_pe, task_id, -1 * m->msgId.size * copy_per_byte);
     }
 
@@ -1462,35 +1544,58 @@ static tw_stime exec_task(
 
     PE_execPrintEvt(lp, ns->my_pe, task_id.taskid, tw_now(lp));
 #else 
-    tw_stime soft_latency = codes_local_latency(lp);
+    tw_stime sendOffset, soft_latency = codes_local_latency(lp);
     tw_stime delay = soft_latency; //intra node latency
     double sendFinishTime = 0;
 
     if(t->event_id == TRACER_SEND_EVT) {
       b->c23 = 1;
       MsgEntry *taskEntry = &t->myEntry;
+      bool isCopying = true;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
       if(MsgEntry_getSize(taskEntry) > eager_limit) {
         copyTime = soft_latency;
+        isCopying = false;
       }
       int node = MsgEntry_getNode(taskEntry);
-      tw_stime sendOffset = soft_delay_mpi;
+      sendOffset = soft_delay_mpi;
 
       if(node == ns->my_pe_num) {
         exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 
-          taskEntry->msgId.comm, sendOffset+delay, 1, lp);
+          taskEntry->msgId.comm, sendOffset+copyTime+delay, 1, lp);
       } else {
         m->model_net_calls++;
 #if DEBUG_PRINT
         printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
           node, taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
 #endif
-          
-        send_msg(ns, MsgEntry_getSize(taskEntry),
-            task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
-            pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+
+        if(isCopying) {
+          send_msg(ns, MsgEntry_getSize(taskEntry),
+              task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
+              pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
+              RECV_MSG, lp);
+        } else {
+          b->c24 = 1;
+          proc_msg m_local;
+          if(t->isNonBlocking) {
+            m_local.proc_event_type = SEND_COMP;
+            m_local.msgId.id = t->req_id;
+            ns->my_pe->pendingReqs[t->req_id] = -1;
+          } else {
+            m_local.proc_event_type = EXEC_COMP;
+            m_local.iteration = task_id.iter;
+            m_local.msgId.id = task_id.taskid;
+          }
+
+          enqueue_msg(ns, MsgEntry_getSize(taskEntry),
+              task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
+              pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
+              RECV_MSG, &m_local, lp);
+          return;
+        }
       }
-      sendFinishTime = delay;
+      sendFinishTime = sendOffset+copyTime;
     }
    
     //print event
@@ -1508,6 +1613,18 @@ static tw_stime exec_task(
 
     if(t->loopStartEvent) {
       ns->my_pe->loop_start_task = task_id.taskid;
+    }
+
+    if(t->event_id == TRACER_SEND_COMP_EVT) {
+      std::map<int, int>::iterator it = ns->my_pe->pendingReqs.find(t->req_id);
+      if(it !=  ns->my_pe->pendingReqs.end()) {
+        if(it->second == -1) {
+          b->c27 = 1;
+          ns->my_pe->pendingReqs[t->req_id] = task_id.taskid;
+        }
+        b->c28 = 1;
+        return;
+      } 
     }
 #endif
 
@@ -1564,7 +1681,18 @@ static void exec_task_rev(
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
     MsgEntry *taskEntry = &t->myEntry;
     ns->my_pe->sendSeq[MsgEntry_getNode(taskEntry)]--;
+    if(b->c24) {
+      if(t->isNonBlocking) {
+        ns->my_pe->pendingReqs.erase(t->req_id);
+      }
+      return;
+    }
   }
+  if(b->c27) { 
+    Task *t = &ns->my_pe->myTasks[task_id.taskid];
+    ns->my_pe->pendingReqs[t->req_id] = -1;
+  }
+  if(b->c28) return;
 #endif
   codes_local_latency_reverse(lp);
 }
@@ -1605,6 +1733,36 @@ static int send_msg(
         free(m_remote);
     
     return 0;
+}
+
+static void enqueue_msg(
+        proc_state * ns,
+        int size,
+        int iter,
+        MsgID *msgId,
+        uint64_t seq,
+        int dest_id,
+        tw_stime sendOffset,
+        enum proc_event evt_type,
+        proc_msg *m_local,
+        tw_lp * lp) {
+        proc_msg m_remote;
+
+        m_remote.proc_event_type = evt_type;
+        m_remote.src = lp->gid;
+        m_remote.msgId.size = size;
+        m_remote.msgId.pe = msgId->pe;
+        m_remote.msgId.id = msgId->id;
+#if TRACER_OTF_TRACES
+        m_remote.msgId.comm = msgId->comm;
+        m_remote.msgId.seq = seq;
+#endif
+        m_remote.iteration = iter;
+
+        model_net_event(net_id, "p2p", dest_id, size, sendOffset,
+          sizeof(proc_msg), (const void*)&m_remote, sizeof(proc_msg), m_local, 
+          lp);
+        ns->msg_sent_count++;
 }
 
 static void perform_collective(
@@ -1678,7 +1836,7 @@ static void perform_bcast(
     int comm = m->msgId.comm;
     int64_t collSeq = m->msgId.seq;
     if(comm != ns->my_pe->currentCollComm ||
-       collSeq != ns->my_pe->currentCollSeq) {
+       collSeq != ns->my_pe->currentCollSeq || ns->my_pe->currentCollTask == -1) {
       if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
         ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
       } else {
@@ -1736,11 +1894,11 @@ static void perform_bcast(
     int dest = g.members[myChildren[i]];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
       &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-      soft_delay_mpi + delay, COLL_BCAST, lp);
+      delay, COLL_BCAST, lp);
     delay += copyTime;
     m->model_net_calls++;
   }
-  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_BCAST, lp);
+  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_BCAST, lp, isEvent, m);
 }
 
 static void perform_bcast_rev(
@@ -1783,6 +1941,7 @@ static void perform_bcast_rev(
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
   }
+  send_coll_comp_rev(ns, 0, OTF2_COLLECTIVE_OP_BCAST, lp, isEvent, m);
 }
 
 static void perform_reduction(
@@ -1824,7 +1983,7 @@ static void perform_reduction(
       ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
     }
     if(comm != ns->my_pe->currentCollComm ||
-       collSeq != ns->my_pe->currentCollSeq) {
+       collSeq != ns->my_pe->currentCollSeq || ns->my_pe->currentCollTask == -1) {
       b->c12 = 1;
       return;
     }
@@ -1875,11 +2034,11 @@ static void perform_reduction(
     int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        soft_delay_mpi + delay, COLL_REDUCTION, lp);
+        delay, COLL_REDUCTION, lp);
     m->model_net_calls++;
   }
   delay += copyTime;
-  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_REDUCE, lp);
+  send_coll_comp(ns, delay, OTF2_COLLECTIVE_OP_REDUCE, lp, isEvent, m);
 }
 
 static void perform_reduction_rev(
@@ -1922,6 +2081,7 @@ static void perform_reduction_rev(
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
   }
+  send_coll_comp_rev(ns, 0, OTF2_COLLECTIVE_OP_REDUCE, lp, isEvent, m);
 }
 
 static void perform_a2a(
@@ -1960,7 +2120,7 @@ static void perform_a2a(
       int64_t collSeq = m->msgId.seq;
       ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
       if(comm != ns->my_pe->currentCollComm ||
-          collSeq != ns->my_pe->currentCollSeq) {
+          collSeq != ns->my_pe->currentCollSeq || ns->my_pe->currentCollTask == -1) {
         b->c12 = 1;
         return;
       }
@@ -1992,7 +2152,7 @@ static void perform_a2a(
     dest = g.members[dest];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        soft_delay_mpi + delay, COLL_A2A, lp);
+        delay, COLL_A2A, lp);
     delay += copyTime;
     m->model_net_calls++;
     std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
@@ -2029,10 +2189,11 @@ static void perform_a2a(
       tw_event_send(e);
     }
   } else {
+    b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
       ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
     }
-    send_coll_comp(ns, copyTime, OTF2_COLLECTIVE_OP_ALLTOALL, lp);
+    send_coll_comp(ns, copyTime, OTF2_COLLECTIVE_OP_ALLTOALL, lp, isEvent, m);
   }
 }
 
@@ -2076,6 +2237,9 @@ static void perform_a2a_rev(
     ns->my_pe->pendingCollMsgs[comm][collSeq][m->coll_info]++;
   }
 
+  if(b->c15) {
+    send_coll_comp_rev(ns, 0, OTF2_COLLECTIVE_OP_ALLTOALL, lp, isEvent, m);
+  }
 }
 
 static void handle_coll_complete_event(
@@ -2083,8 +2247,7 @@ static void handle_coll_complete_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
-  Task *t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
-  m->executed.taskid = ns->my_pe->currentCollTask;
+  Task *t = &ns->my_pe->myTasks[m->executed.taskid];
   m->msgId.seq = ns->my_pe->currentCollSeq;
   m->msgId.comm = ns->my_pe->currentCollComm;
   m->coll_info = ns->my_pe->currentCollRank;
@@ -2095,11 +2258,11 @@ static void handle_coll_complete_event(
      (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL &&
       m->msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) 
     ) {
-    exec_comp(ns, ns->my_pe->currIter, ns->my_pe->currentCollTask, 0,
+    exec_comp(ns, ns->my_pe->currIter, m->executed.taskid, 0,
       codes_local_latency(lp), 0, lp);
-    ns->my_pe->currentCollTask = ns->my_pe->currentCollComm =
-    ns->my_pe->currentCollSeq = ns->my_pe->currentCollRank = 
-    ns->my_pe->currentCollPartner = ns->my_pe->currentCollSize = -1;
+    ns->my_pe->currentCollComm = ns->my_pe->currentCollSeq = 
+    ns->my_pe->currentCollRank = ns->my_pe->currentCollPartner = 
+    ns->my_pe->currentCollSize = -1;
   }
 }
 
@@ -2108,7 +2271,6 @@ static void handle_coll_complete_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
-  ns->my_pe->currentCollTask = m->executed.taskid;
   ns->my_pe->currentCollSeq = m->msgId.seq;
   ns->my_pe->currentCollComm = m->msgId.comm;
   if(m->msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) {
@@ -2198,20 +2360,42 @@ static int send_coll_comp(
     proc_state * ns,
     tw_stime sendOffset,
     int collType,
-    tw_lp * lp)
+    tw_lp * lp,
+    int isEvent,
+    proc_msg *m)
 {
     tw_event *e;
-    proc_msg *m;
+    proc_msg *msg;
+    
+    int taskid = ns->my_pe->currentCollTask;
+    if(isEvent) {
+      m->executed.taskid = ns->my_pe->currentCollTask;
+    }
+    ns->my_pe->currentCollTask = -1;
 
     if(sendOffset < g_tw_lookahead) {
       sendOffset += g_tw_lookahead;
     }
-    e = codes_event_new(lp->gid, sendOffset, lp);
-    m = (proc_msg*)tw_event_data(e);
-    m->msgId.coll_type = collType;
-    m->proc_event_type = COLL_COMPLETE;
+    e = codes_event_new(lp->gid, sendOffset + soft_delay_mpi + nic_delay, lp);
+    msg = (proc_msg*)tw_event_data(e);
+    msg->msgId.coll_type = collType;
+    msg->proc_event_type = COLL_COMPLETE;
+    msg->executed.taskid = taskid;
     tw_event_send(e);
     return 0;
+}
+
+static int send_coll_comp_rev(
+    proc_state * ns,
+    tw_stime sendOffset,
+    int collType,
+    tw_lp * lp,
+    int isEvent,
+    proc_msg *m)
+{
+  if(isEvent) {
+    ns->my_pe->currentCollTask = m->executed.taskid;
+  }
 }
 
 //Utility function to convert pe number to tw_lpid number

@@ -187,6 +187,8 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
 
   if(strcmp(bglog->name, "AMPI_START") == 0 ||
     strcmp(bglog->name, "AMPI_generic") == 0 ||
+    strcmp(bglog->name, "AMPI_Recv") == 0 ||
+    strcmp(bglog->name, "AMPI_Irecv") == 0 ||
     strcmp(bglog->name, "AMPI_SEND") == 0 ||
     strcmp(bglog->name, "AMPI_SEND_END") == 0 ||
     strcmp(bglog->name, "ATAReq_wait") == 0 ||

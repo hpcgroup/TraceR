@@ -78,6 +78,7 @@ class PE {
 
     KeyType pendingMsgs;
     int64_t *sendSeq, *recvSeq;
+    std::map<int, int> pendingReqs;
 
     //handling collectives
     std::vector<int64_t> collectiveSeq;
