@@ -96,8 +96,9 @@ enum proc_event
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast --> to be deprecated */
-    EXEC_COMP,   /* bigsim, when completed an execution */
+    EXEC_COMPLETE,   /* bigsim, when completed an execution */
     SEND_COMP, /* Send completed for Isends */
+    RECV_POST, /* Message from receiver that the recv is posted */
     COLL_BCAST, /* Collective impl for bcast */
     COLL_REDUCTION, /* Collective impl for reduction */
     COLL_A2A, /* Collective impl for a2a */
@@ -196,6 +197,11 @@ static void handle_send_comp_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_recv_post_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 
 //reverse event handler declarations
 static void handle_kickoff_rev_event(
@@ -224,6 +230,11 @@ static void handle_exec_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_recv_post_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -273,6 +284,14 @@ static void enqueue_msg(
         enum proc_event evt_type,
         proc_msg *m_local,
         tw_lp * lp);
+
+static void delegate_send_msg(proc_state *ns,
+  tw_lp * lp,
+  proc_msg * m,
+  tw_bf * b,
+  Task * t,
+  int taskid,
+  tw_stime delay);
 
 static int bcast_msg(
     proc_state * ns,
@@ -824,11 +843,14 @@ static void proc_event(
     case BCAST:
       handle_bcast_event(ns, b, m, lp);
       break;
-    case EXEC_COMP:
+    case EXEC_COMPLETE:
       handle_exec_event(ns, b, m, lp);
       break;
     case SEND_COMP:
       handle_send_comp_event(ns, b, m, lp);
+      break;
+    case RECV_POST:
+      handle_recv_post_event(ns, b, m, lp);
       break;
     case COLL_BCAST:
       perform_bcast(ns, -1, lp, m, b, 1);
@@ -870,11 +892,14 @@ static void proc_rev_event(
     case BCAST:
       handle_bcast_rev_event(ns, b, m, lp);
       break;
-    case EXEC_COMP:
+    case EXEC_COMPLETE:
       handle_exec_rev_event(ns, b, m, lp);
       break;
     case SEND_COMP:
       handle_send_comp_rev_event(ns, b, m, lp);
+      break;
+    case RECV_POST:
+      handle_recv_post_rev_event(ns, b, m, lp);
       break;
     case COLL_BCAST:
       perform_bcast_rev(ns, -1, lp, m, b, 1);
@@ -1215,6 +1240,56 @@ static void handle_send_comp_rev_event(
     if(b->c3) ns->my_pe->pendingReqs[m->msgId.id] = m->executed.taskid;
 }
 
+static void handle_recv_post_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
+  KeyType::iterator it = ns->my_pe->pendingRMsgs.find(key);
+  if(it == ns->my_pe->pendingRMsgs.end() || it->second.front() == -1) {
+    b->c1 = 1;
+    ns->my_pe->pendingRMsgs[key].push_back(-1);
+  } else {
+    b->c2 = 1;
+    Task *t = &ns->my_pe->myTasks[it->second.front()];
+    m->model_net_calls = 1;
+    delegate_send_msg(ns, lp, m, b, t, it->second.front(), 0);
+    m->executed.taskid = it->second.front();
+    it->second.pop_front();
+    if(it->second.size() == 0) {
+      ns->my_pe->pendingRMsgs.erase(it);
+    }
+  }
+#if DEBUG_PRINT
+  printf("%d: Recv post recevied %d %d %d %d, found %d %d\n", ns->my_pe_num, 
+      m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq, b->c2, m->executed.taskid);
+#endif
+}
+
+static void handle_recv_post_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
+  KeyType::iterator it = ns->my_pe->pendingRMsgs.find(key);
+  if(b->c1) {
+    it->second.pop_back();
+    if(it->second.size() == 0) {
+      ns->my_pe->pendingRMsgs.erase(it);
+    }
+  }
+  if(b->c2) {
+     ns->my_pe->pendingRMsgs[key].push_front(m->executed.taskid);
+     for(int i = 0; i < m->model_net_calls; i++) {
+       model_net_event_rc(net_id, lp, 0);
+     }
+  }
+}
+
 static void handle_recv_rev_event(
 		proc_state * ns,
 		tw_bf * b,
@@ -1340,6 +1415,30 @@ static void handle_exec_rev_event(
     }
 }
 
+
+static void delegate_send_msg(proc_state *ns,
+  tw_lp * lp,
+  proc_msg * m,
+  tw_bf * b,
+  Task * t,
+  int taskid,
+  tw_stime delay) {
+  proc_msg m_local;
+  if(t->isNonBlocking) {
+    m_local.proc_event_type = SEND_COMP;
+    m_local.msgId.id = t->req_id;
+  } else {
+    m_local.proc_event_type = EXEC_COMPLETE;
+    m_local.iteration = ns->my_pe->currIter;
+    m_local.msgId.id = taskid;
+  }
+  MsgEntry *taskEntry = &t->myEntry;
+  enqueue_msg(ns, MsgEntry_getSize(taskEntry),
+      ns->my_pe->currIter, &taskEntry->msgId, taskEntry->msgId.seq,
+      pe_to_lpid(taskEntry->node, ns->my_job), nic_delay+delay, 
+      RECV_MSG, &m_local, lp);
+}
+
 //executes the task with the specified id
 static tw_stime exec_task(
             proc_state * ns,
@@ -1383,9 +1482,29 @@ static tw_stime exec_task(
     }
 
     //else continue
-    if(t->event_id == TRACER_RECV_EVT && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
-      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
+    bool needPost = false, returnAtEnd = false;
+    uint64_t seq;
+    if(t->event_id == TRACER_RECV_POST_EVT) {
+      seq = ns->my_pe->recvSeq[t->myEntry.node];
+      ns->my_pe->pendingRReqs[t->req_id] = seq;
       ns->my_pe->recvSeq[t->myEntry.node]++;
+    }
+    if((t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT) 
+       && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
+      b->c7 = 1;
+      seq = ns->my_pe->recvSeq[t->myEntry.node];
+      if(t->event_id == TRACER_RECV_COMP_EVT) {
+        std::map<int, int64_t>::iterator it = ns->my_pe->pendingRReqs.find(t->req_id);
+        assert(it != ns->my_pe->pendingRReqs.end());
+        seq = it->second;
+        t->myEntry.msgId.seq = seq;
+        ns->my_pe->pendingRReqs.erase(it);
+      }
+      MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
+      if(t->event_id == TRACER_RECV_EVT) {
+        needPost = true;
+        ns->my_pe->recvSeq[t->myEntry.node]++;
+      }
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
       if(it == ns->my_pe->pendingMsgs.end()) {
         ns->my_pe->pendingMsgs[key].push_back(task_id.taskid);
@@ -1395,15 +1514,33 @@ static tw_stime exec_task(
             t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
 #endif
         b->c21 = 1;
-        return 0;
+        if(!needPost) {
+          return 0;
+        } else {
+          returnAtEnd = true;
+        }
       } else {
         b->c22 = 1;
+        assert(needPost == false);
         ns->my_pe->pendingMsgs[key].pop_front();
         if(it->second.size() == 0) {
           ns->my_pe->pendingMsgs.erase(it);
         }
       }
     }
+    if(t->myEntry.node != ns->my_pe_num && 
+       t->myEntry.msgId.size > eager_limit &&
+       (t->event_id == TRACER_RECV_POST_EVT || needPost)) {
+      m->model_net_calls++;
+      send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, seq,  
+        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay, RECV_POST, lp);
+#if DEBUG_PRINT
+      printf("%d: Recv post %d %d %d %d\n", ns->my_pe_num, 
+          t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, 
+          seq);
+#endif
+    }
+    if(returnAtEnd) return 0;
 #endif
 
     //Executing the task, set the pe as busy
@@ -1564,34 +1701,47 @@ static tw_stime exec_task(
         exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 
           taskEntry->msgId.comm, sendOffset+copyTime+delay, 1, lp);
       } else {
-        m->model_net_calls++;
 #if DEBUG_PRINT
         printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
           node, taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
 #endif
 
         if(isCopying) {
+          m->model_net_calls++;
           send_msg(ns, MsgEntry_getSize(taskEntry),
               task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
               pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
               RECV_MSG, lp);
         } else {
           b->c24 = 1;
-          proc_msg m_local;
+          taskEntry->msgId.seq = ns->my_pe->sendSeq[node]++;
           if(t->isNonBlocking) {
-            m_local.proc_event_type = SEND_COMP;
-            m_local.msgId.id = t->req_id;
-            ns->my_pe->pendingReqs[t->req_id] = -1;
-          } else {
-            m_local.proc_event_type = EXEC_COMP;
-            m_local.iteration = task_id.iter;
-            m_local.msgId.id = task_id.taskid;
+            if(ns->my_pe->pendingReqs.find(t->req_id) == 
+               ns->my_pe->pendingReqs.end()) {
+              b->c25 = 1;
+              ns->my_pe->pendingReqs[t->req_id] = -1;
+            }
           }
-
-          enqueue_msg(ns, MsgEntry_getSize(taskEntry),
-              task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
-              pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
-              RECV_MSG, &m_local, lp);
+          MsgKey key(taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
+            taskEntry->msgId.seq);
+          KeyType::iterator it = ns->my_pe->pendingRMsgs.find(key);
+          if(it == ns->my_pe->pendingRMsgs.end() || (it->second.front() != -1)) {
+            b->c26 = 1;
+            ns->my_pe->pendingRMsgs[key].push_back(task_id.taskid);
+          } else {
+            b->c27 = 1;
+            m->model_net_calls++;
+            delegate_send_msg(ns, lp, m, b, t, task_id.taskid, sendOffset+delay);
+            it->second.pop_front();
+            if(it->second.size() == 0) {
+              ns->my_pe->pendingRMsgs.erase(it);
+            }
+          }
+#if DEBUG_PRINT
+          printf("%d: Send %d %d %d %d, wait %d, do %d, task %d\n", ns->my_pe_num, 
+           taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
+           taskEntry->msgId.seq, b->c26, b->c27, task_id.taskid);
+#endif
           return;
         }
       }
@@ -1619,10 +1769,10 @@ static tw_stime exec_task(
       std::map<int, int>::iterator it = ns->my_pe->pendingReqs.find(t->req_id);
       if(it !=  ns->my_pe->pendingReqs.end()) {
         if(it->second == -1) {
-          b->c27 = 1;
+          b->c28 = 1;
           ns->my_pe->pendingReqs[t->req_id] = task_id.taskid;
         }
-        b->c28 = 1;
+        b->c29 = 1;
         return;
       } 
     }
@@ -1651,12 +1801,27 @@ static void exec_task_rev(
     perform_collective_rev(ns, task_id.taskid, lp, m, b);
     return;
   }
+  
+  Task *t = &ns->my_pe->myTasks[task_id.taskid];
+  if(t->event_id == TRACER_RECV_POST_EVT) {
+    ns->my_pe->pendingRReqs.erase(t->req_id);
+    ns->my_pe->recvSeq[t->myEntry.node]--;
+  }
+
+  uint64_t seq;
+  if(b->c7) {
+    if(t->event_id == TRACER_RECV_COMP_EVT) {
+      ns->my_pe->pendingRReqs[t->req_id] = t->myEntry.msgId.seq;
+      seq = t->myEntry.msgId.seq;
+    }
+    if(t->event_id == TRACER_RECV_EVT) {
+      ns->my_pe->recvSeq[t->myEntry.node]--;
+      seq = ns->my_pe->recvSeq[t->myEntry.node];
+    }
+  }
 
   if(b->c21 || b->c22) {
-    Task *t = &ns->my_pe->myTasks[task_id.taskid];
-    ns->my_pe->recvSeq[t->myEntry.node]--;
-    MsgKey key(t->myEntry.node, t->myEntry.msgId.id, 
-        t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]);
+    MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
     if(b->c21) {
       assert(it != ns->my_pe->pendingMsgs.end());
@@ -1682,17 +1847,28 @@ static void exec_task_rev(
     MsgEntry *taskEntry = &t->myEntry;
     ns->my_pe->sendSeq[MsgEntry_getNode(taskEntry)]--;
     if(b->c24) {
-      if(t->isNonBlocking) {
+      if(b->c25) {
         ns->my_pe->pendingReqs.erase(t->req_id);
+      }
+      MsgKey key(taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
+          taskEntry->msgId.seq);
+      if(b->c26) {
+        ns->my_pe->pendingRMsgs[key].pop_back();
+        if(ns->my_pe->pendingRMsgs[key].size() == 0) {
+          ns->my_pe->pendingRMsgs.erase(key);
+        }
+      }
+      if(b->c27) {
+        ns->my_pe->pendingRMsgs[key].push_front(-1);
       }
       return;
     }
   }
-  if(b->c27) { 
+  if(b->c28) { 
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
     ns->my_pe->pendingReqs[t->req_id] = -1;
   }
-  if(b->c28) return;
+  if(b->c29) return;
 #endif
   codes_local_latency_reverse(lp);
 }
@@ -2350,7 +2526,7 @@ static int exec_comp(
         m->proc_event_type = RECV_MSG;
     }
     else 
-        m->proc_event_type = EXEC_COMP;
+        m->proc_event_type = EXEC_COMPLETE;
     tw_event_send(e);
 
     return 0;

@@ -350,7 +350,9 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
       pe->msgStatus[i][logInd] = false;
     }
   
-    if(t->event_id == TRACER_SEND_EVT) { 
+    if(t->event_id == TRACER_SEND_EVT || t->event_id == TRACER_RECV_POST_EVT
+       || t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT) 
+    { 
       if(size_replace_limit[pe->jobNum] != -1 && 
           t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
         t->myEntry.msgId.size = size_replace_by[pe->jobNum];

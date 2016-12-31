@@ -334,7 +334,15 @@ callbackIrecv(OTF2_LocationRef locationID,
                  OTF2_AttributeList * attributeList,
                  uint64_t requestID)
 {
-  //do nothing for now
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_RECV_POST_EVT;
+  new_task.req_id = requestID;
+  new_task.isNonBlocking = true;;
+  ((AllData *)userData)->matchRecvIds[requestID] = ld->tasks.size() - 1;
+  ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
 
@@ -355,7 +363,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = 0;
-  new_task.event_id = TRACER_RECV_EVT;
+  new_task.event_id = TRACER_RECV_COMP_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
   new_task.myEntry.msgId.id = msgTag;
@@ -366,6 +374,18 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   new_task.myEntry.thread = 0;
   new_task.isNonBlocking = false;
   new_task.req_id = requestID;
+
+  std::map<int, int>::iterator it = ((AllData *)userData)->matchRecvIds.find(requestID);
+  assert(it != ((AllData *)userData)->matchRecvIds.end());
+  Task &postTask = ld->tasks[it->second];
+  postTask.myEntry.msgId.pe = locationID;
+  postTask.myEntry.msgId.id = msgTag;
+  postTask.myEntry.msgId.size = msgLength;
+  postTask.myEntry.msgId.comm = communicator;
+  postTask.myEntry.msgId.coll_type = -1;
+  postTask.myEntry.node = new_task.myEntry.node;
+  ((AllData *)userData)->matchRecvIds.erase(it);
+
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }

@@ -25,8 +25,9 @@ enum Tracer_evt_type {
   TRACER_RECV_EVT = -4,
   TRACER_COLL_EVT = -5,
   TRACER_SEND_COMP_EVT = -6,
-  TRACER_RECV_COMP_EVT = -7,
-  TRACER_LOOP_EVT = -8
+  TRACER_RECV_POST_EVT = -7,
+  TRACER_RECV_COMP_EVT = -8,
+  TRACER_LOOP_EVT = -9
 };
 
 struct ClockProperties {
@@ -64,6 +65,7 @@ struct AllData {
   std::map<uint64_t,Group> groups;
   std::map<uint64_t,Region> regions;
   LocationData *ld;
+  std::map<int, int> matchRecvIds;//temp space
 };
 
 OTF2_Reader * readGlobalDefinitions(int jobID, char* tracefileName, 

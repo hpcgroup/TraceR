@@ -77,8 +77,10 @@ class PE {
     int numWth, numEmPes;
 
     KeyType pendingMsgs;
+    KeyType pendingRMsgs;
     int64_t *sendSeq, *recvSeq;
     std::map<int, int> pendingReqs;
+    std::map<int, int64_t> pendingRReqs;
 
     //handling collectives
     std::vector<int64_t> collectiveSeq;
