@@ -1521,7 +1521,6 @@ static tw_stime exec_task(
         }
       } else {
         b->c22 = 1;
-        assert(needPost == false);
         ns->my_pe->pendingMsgs[key].pop_front();
         if(it->second.size() == 0) {
           ns->my_pe->pendingMsgs.erase(it);
@@ -1738,11 +1737,11 @@ static tw_stime exec_task(
             }
           }
 #if DEBUG_PRINT
-          printf("%d: Send %d %d %d %d, wait %d, do %d, task %d\n", ns->my_pe_num, 
+          printf("%d: Send %d %d %d %d, nonblock %d/%d, wait %d, do %d, task %d\n", ns->my_pe_num, 
            taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
-           taskEntry->msgId.seq, b->c26, b->c27, task_id.taskid);
+           taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
-          return;
+          if(!t->isNonBlocking) return;
         }
       }
       sendFinishTime = sendOffset+copyTime;
@@ -1861,7 +1860,7 @@ static void exec_task_rev(
       if(b->c27) {
         ns->my_pe->pendingRMsgs[key].push_front(-1);
       }
-      return;
+      if(!t->isNonBlocking) return;
     }
   }
   if(b->c28) { 
