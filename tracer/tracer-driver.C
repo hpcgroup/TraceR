@@ -75,7 +75,8 @@ tw_stime *jobTimes;
 tw_stime *finalizeTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 50;
-tw_stime nic_delay = 300;
+tw_stime nic_delay = 500;
+tw_stime rdma_delay = 4500;
 
 int* size_replace_by;
 int* size_replace_limit;
@@ -524,6 +525,11 @@ int main(int argc, char **argv)
         &nic_delay);
     if(!rank) 
       printf("Found nic_delay as %f\n", nic_delay);
+    
+    configuration_get_value_double(&config, "PARAMS", "rdma_delay", NULL,
+        &rdma_delay);
+    if(!rank) 
+      printf("Found rdma_delay as %f\n", rdma_delay);
     
     configuration_get_value_double(&config, "PARAMS", "copy_per_byte", NULL,
         &copy_per_byte);
@@ -1084,7 +1090,7 @@ static void handle_recv_event(
             assert(0);
         }
         PE_invertMsgPe(ns->my_pe, iter, task_id);
-        if(m->msgId.size <= eager_limit &&  ns->my_pe->currIter == 0) {
+        if(m->msgId.size <= eager_limit && ns->my_pe->currIter == 0) {
           b->c1 = 1;
           if(m->msgId.pe != ns->my_pe_num) {
             PE_addTaskExecTime(ns->my_pe, task_id, nic_delay);
@@ -1340,7 +1346,7 @@ static void handle_recv_rev_event(
       if(m->msgId.pe != ns->my_pe_num) {
         PE_addTaskExecTime(ns->my_pe, task_id, -1 * nic_delay);
       }
-      PE_addTaskExecTime(ns->my_pe, task_id, -1 * m->msgId.size * copy_per_byte);
+      PE_addTaskExecTime(ns->my_pe, task_id, -1 * (m->msgId.size * copy_per_byte + soft_delay_mpi));
     }
 
     if(!wasBusy){
@@ -1435,7 +1441,7 @@ static void delegate_send_msg(proc_state *ns,
   MsgEntry *taskEntry = &t->myEntry;
   enqueue_msg(ns, MsgEntry_getSize(taskEntry),
       ns->my_pe->currIter, &taskEntry->msgId, taskEntry->msgId.seq,
-      pe_to_lpid(taskEntry->node, ns->my_job), nic_delay+delay, 
+      pe_to_lpid(taskEntry->node, ns->my_job), nic_delay+rdma_delay+delay, 
       RECV_MSG, &m_local, lp);
 }
 
@@ -1471,6 +1477,7 @@ static tw_stime exec_task(
 #endif
 
     m->model_net_calls = 0;
+    tw_stime recvFinishTime = 0;
 #if TRACER_OTF_TRACES
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
 
@@ -1532,12 +1539,13 @@ static tw_stime exec_task(
        (t->event_id == TRACER_RECV_POST_EVT || needPost)) {
       m->model_net_calls++;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, seq,  
-        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay, RECV_POST, lp);
+        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay+rdma_delay, RECV_POST, lp);
 #if DEBUG_PRINT
       printf("%d: Recv post %d %d %d %d\n", ns->my_pe_num, 
           t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, 
           seq);
 #endif
+      recvFinishTime = soft_delay_mpi + nic_delay;
     }
     if(returnAtEnd) return 0;
 #endif
@@ -1689,7 +1697,7 @@ static tw_stime exec_task(
       MsgEntry *taskEntry = &t->myEntry;
       bool isCopying = true;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
-      if(MsgEntry_getSize(taskEntry) > eager_limit) {
+      if(MsgEntry_getSize(taskEntry) > eager_limit && node != ns->my_pe_num) {
         copyTime = soft_latency;
         isCopying = false;
       }
@@ -1699,6 +1707,7 @@ static tw_stime exec_task(
       if(node == ns->my_pe_num) {
         exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 
           taskEntry->msgId.comm, sendOffset+copyTime+delay, 1, lp);
+        sendFinishTime = sendOffset + copyTime;
       } else {
 #if DEBUG_PRINT
         printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
@@ -1711,6 +1720,7 @@ static tw_stime exec_task(
               task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
               pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
               RECV_MSG, lp);
+          sendFinishTime = sendOffset+copyTime;
         } else {
           b->c24 = 1;
           taskEntry->msgId.seq = ns->my_pe->sendSeq[node]++;
@@ -1742,9 +1752,9 @@ static tw_stime exec_task(
            taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
           if(!t->isNonBlocking) return;
+          sendFinishTime = sendOffset+copyTime+nic_delay;
         }
       }
-      sendFinishTime = sendOffset+copyTime;
     }
    
     //print event
@@ -1780,6 +1790,7 @@ static tw_stime exec_task(
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + 
                               ((sendFinishTime > time) ? sendFinishTime : time);
+    finish_time = (finish_time > recvFinishTime) ? finish_time : recvFinishTime;
     exec_comp(ns, task_id.iter, task_id.taskid, 0, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
       ns->end_ts = tw_now(lp);
@@ -1818,6 +1829,11 @@ static void exec_task_rev(
       seq = ns->my_pe->recvSeq[t->myEntry.node];
     }
   }
+  
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
 
   if(b->c21 || b->c22) {
     MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
@@ -1836,10 +1852,6 @@ static void exec_task_rev(
 #endif
 
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
 #if TRACER_OTF_TRACES
   if(b->c23) {
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
