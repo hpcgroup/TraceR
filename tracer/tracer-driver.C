@@ -1697,11 +1697,11 @@ static tw_stime exec_task(
       MsgEntry *taskEntry = &t->myEntry;
       bool isCopying = true;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
+      int node = MsgEntry_getNode(taskEntry);
       if(MsgEntry_getSize(taskEntry) > eager_limit && node != ns->my_pe_num) {
         copyTime = soft_latency;
         isCopying = false;
       }
-      int node = MsgEntry_getNode(taskEntry);
       sendOffset = soft_delay_mpi;
 
       if(node == ns->my_pe_num) {
