@@ -18,7 +18,7 @@
 #include <cstdlib>
 #include <string.h>
 #include <vector>
-#include <hilbert.h>
+#include "hilbert.h"
 #include <assert.h>
 
 #define LINEAR 1

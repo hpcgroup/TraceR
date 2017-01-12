@@ -110,10 +110,12 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   pe->myEmPE = (penum/numWth)%numEmPes;
   pe->myTasks= new Task[tlinerec.length()];
   pe->taskStatus= new bool*[jobs[jobnum].numIters];
+  pe->taskExecuted= new bool*[jobs[jobnum].numIters];
   pe->msgStatus= new bool*[jobs[jobnum].numIters];
   pe->allMarked= new bool[jobs[jobnum].numIters];
   for(int i = 0; i < jobs[jobnum].numIters; i++) {
     pe->taskStatus[i] = new bool[tlinerec.length()];
+    pe->taskExecuted[i] = new bool[tlinerec.length()];
     pe->msgStatus[i] = new bool[tlinerec.length()];
     pe->allMarked[i] = false;
   }
@@ -137,6 +139,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
       } else {
         for(int i = 0; i < jobs[jobnum].numIters; i++) {
           pe->taskStatus[i][logInd] = true;
+          pe->taskExecuted[i][logInd] = true;
         }
         continue;
       }
@@ -237,11 +240,13 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
     for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
       pe->msgStatus[i][logInd] = true;
       pe->taskStatus[i][logInd] = false;
+      pe->taskExecuted[i][logInd] = false;
     }
   } else {
     for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
       pe->msgStatus[i][logInd] = false;
       pe->taskStatus[i][logInd] = false;
+      pe->taskExecuted[i][logInd] = false;
     }
   }
 
@@ -315,10 +320,12 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->tasksCount = ld->tasks.size();
   pe->totalTasksCount = pe->tasksCount;
   pe->taskStatus= new bool*[jobs[pe->jobNum].numIters];
+  pe->taskExecuted= new bool*[jobs[pe->jobNum].numIters];
   pe->msgStatus= new bool*[jobs[pe->jobNum].numIters];
   pe->allMarked= new bool[jobs[pe->jobNum].numIters];
   for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
     pe->taskStatus[i] = new bool[pe->tasksCount];
+    pe->taskExecuted[i] = new bool[pe->tasksCount];
     pe->msgStatus[i] = new bool[pe->tasksCount];
     pe->allMarked[i] = false;
   }
@@ -347,6 +354,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
 
     for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
       pe->taskStatus[i][logInd] = false;
+      pe->taskExecuted[i][logInd] = false;
       pe->msgStatus[i][logInd] = false;
     }
   

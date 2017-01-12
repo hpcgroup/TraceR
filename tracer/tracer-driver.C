@@ -1469,6 +1469,11 @@ static tw_stime exec_task(
             proc_msg *m,
             tw_bf * b)
 {
+    m->model_net_calls = 0;
+    if(((PE*)(ns->my_pe))->taskExecuted[task_id.iter][task_id.taskid]) {
+      b->c10 = 1;
+      return;
+    }
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
     //If yes, execute the task
@@ -1492,7 +1497,6 @@ static tw_stime exec_task(
     }
 #endif
 
-    m->model_net_calls = 0;
     tw_stime recvFinishTime = 0;
 #if TRACER_OTF_TRACES
     Task *t = &ns->my_pe->myTasks[task_id.taskid];
@@ -1501,6 +1505,7 @@ static tw_stime exec_task(
     if(t->event_id == TRACER_COLL_EVT) {
       b->c11 = 1;
       perform_collective(ns, task_id.taskid, lp, m, b);
+      ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = true;
       return 0;
     }
 
@@ -1570,6 +1575,7 @@ static tw_stime exec_task(
     PE_set_busy(ns->my_pe, true);
     //Mark the execution time of the task
     tw_stime time = PE_getTaskExecTime(ns->my_pe, task_id.taskid);
+    ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = true;
 
 #if TRACER_BIGSIM_TRACES
     //For each entry of the task, create a recv event and send them out to
@@ -1822,9 +1828,12 @@ static void exec_task_rev(
     proc_msg *m,
     tw_bf * b) {
 
+  if(b->c10) return;
+
 #if TRACER_OTF_TRACES
   if(b->c11) {
     perform_collective_rev(ns, task_id.taskid, lp, m, b);
+    ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = false;
     return;
   }
   
@@ -1867,6 +1876,7 @@ static void exec_task_rev(
   }
 #endif
 
+  ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = false;
   codes_local_latency_reverse(lp);
 #if TRACER_OTF_TRACES
   if(b->c23) {

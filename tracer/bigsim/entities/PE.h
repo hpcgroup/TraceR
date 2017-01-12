@@ -49,7 +49,7 @@ class PE {
     ~PE();
     std::list<TaskPair> msgBuffer;
     Task* myTasks;	// all tasks of this PE
-    bool **taskStatus;
+    bool **taskStatus, **taskExecuted;
     bool **msgStatus;
     bool *allMarked;
     double currTime;
