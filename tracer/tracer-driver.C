@@ -1007,20 +1007,6 @@ static void handle_kickoff_event(
     exec_task(ns, pair, lp, m, b);
 }
 
-static void handle_local_event(
-		proc_state * ns,
-		tw_bf * b,
-		proc_msg * m,
-		tw_lp * lp)
-{ }
-
-static void handle_local_rev_event(
-	       proc_state * ns,
-	       tw_bf * b,
-	       proc_msg * m,
-	       tw_lp * lp)
-{ }
-
 /* reverse handler for kickoff */
 static void handle_kickoff_rev_event(
     proc_state * ns,
@@ -1038,6 +1024,20 @@ static void handle_kickoff_rev_event(
     exec_task_rev(ns, pair, lp, m, b);
     return;
 }
+
+static void handle_local_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{ }
+
+static void handle_local_rev_event(
+	       proc_state * ns,
+	       tw_bf * b,
+	       proc_msg * m,
+	       tw_lp * lp)
+{ }
 
 static void handle_recv_event(
     proc_state * ns,
@@ -1141,6 +1141,81 @@ static void handle_recv_event(
     assert(0);
 }
 
+static void handle_recv_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+#if TRACER_OTF_TRACES
+    if(b->c2 || b->c4) {
+      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
+      KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
+      if(b->c2) {
+        assert(it != ns->my_pe->pendingMsgs.end());
+        it->second.pop_back();
+        if(it->second.size() == 0) {
+          ns->my_pe->pendingMsgs.erase(it);
+        }
+      } else if(b->c4) {
+        ns->my_pe->pendingMsgs[key].push_front(-1);
+      }
+      return;
+    }
+#endif
+    if(m->executed.taskid == -2) {
+        return;
+    }
+    bool wasBusy = m->incremented_flag;
+    int iter = m->iteration;
+    PE_set_busy(ns->my_pe, wasBusy);
+
+#if TRACER_BIGSIM_TRACES
+    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
+#else
+    int task_id =  m->executed.taskid;
+    if(b->c3) {
+      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
+      ns->my_pe->pendingMsgs[key].push_front(task_id);
+    }
+#endif
+    PE_invertMsgPe(ns->my_pe, iter, task_id);
+
+#if DEBUG_PRINT
+    tw_stime now = tw_now(lp);
+    printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d."
+    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msgId.id, task_id,
+    wasBusy, now);
+#endif
+    if(b->c1) {
+      if(m->msgId.pe != ns->my_pe_num) {
+        PE_addTaskExecTime(ns->my_pe, task_id, -1 * nic_delay);
+      }
+      PE_addTaskExecTime(ns->my_pe, task_id, -1 * (m->msgId.size * copy_per_byte + soft_delay_mpi));
+    }
+
+    if(!wasBusy){
+        //if the task that I executed was not me
+        if(m->executed.taskid != task_id && m->executed.taskid != -1){
+            PE_addToFrontBuffer(ns->my_pe, &m->executed);    
+            TaskPair pair;
+            pair.iter = iter; pair.taskid = task_id;
+            PE_removeFromBuffer(ns->my_pe, &pair);
+        }
+        if(m->executed.taskid != -1) {
+          exec_task_rev(ns, m->executed, lp, m, b);
+        }
+    } else {
+#if TRACER_OTF_TRACES
+        assert(0);
+#endif
+        assert(m->executed.taskid == -1);
+        TaskPair pair;
+        pair.iter = iter; pair.taskid = task_id;
+        PE_removeFromBuffer(ns->my_pe, &pair);
+    }
+}
+
 static void handle_bcast_event(
     proc_state * ns,
     tw_bf * b,
@@ -1160,6 +1235,19 @@ static void handle_bcast_event(
   msg->iteration = m->iteration;
   msg->proc_event_type = RECV_MSG;
   tw_event_send(e);
+}
+
+static void handle_bcast_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  codes_local_latency_reverse(lp);
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    model_net_event_rc(net_id, lp, 0);
+  }
 }
 
 static void handle_exec_event(
@@ -1228,6 +1316,43 @@ static void handle_exec_event(
     }
     if(buffd_task.taskid != -1){
         exec_task(ns, buffd_task, lp, m, b); //we don't care about the return value?
+    }
+}
+
+static void handle_exec_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+    int task_id = m->msgId.id;
+
+    //Reverse the state: set the PE as busy, task is not completed yet
+    PE_set_busy(ns->my_pe, true);
+
+#if DEBUG_PRINT
+    printf("PE%d: In reverse handler of exec task with task_id: %d\n",
+    ns->my_pe_num, task_id);
+#endif
+    
+    //mark the task as not done
+    int iter = m->iteration;
+    PE_set_taskDone(ns->my_pe, iter, task_id, false);
+     
+    if(b->c1) {
+      PE_dec_iter(ns->my_pe);
+    }
+    
+    if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
+        PE_clearMsgBuffer(ns->my_pe);
+    } else {
+        PE_resizeBuffer(ns->my_pe, m->fwd_dep_count);
+        if(m->executed.taskid != -1) {
+            PE_addToFrontBuffer(ns->my_pe, &m->executed);
+        }
+    }
+    if(m->executed.taskid != -1) {
+      exec_task_rev(ns, m->executed, lp, m, b);
     }
 }
 
@@ -1311,132 +1436,6 @@ static void handle_recv_post_rev_event(
      }
   }
 }
-
-static void handle_recv_rev_event(
-		proc_state * ns,
-		tw_bf * b,
-		proc_msg * m,
-		tw_lp * lp)
-{
-#if TRACER_OTF_TRACES
-    if(b->c2 || b->c4) {
-      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
-      KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
-      if(b->c2) {
-        assert(it != ns->my_pe->pendingMsgs.end());
-        it->second.pop_back();
-        if(it->second.size() == 0) {
-          ns->my_pe->pendingMsgs.erase(it);
-        }
-      } else if(b->c4) {
-        ns->my_pe->pendingMsgs[key].push_front(-1);
-      }
-      return;
-    }
-#endif
-    if(m->executed.taskid == -2) {
-        return;
-    }
-    bool wasBusy = m->incremented_flag;
-    int iter = m->iteration;
-    PE_set_busy(ns->my_pe, wasBusy);
-
-#if TRACER_BIGSIM_TRACES
-    int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
-#else
-    int task_id =  m->executed.taskid;
-    if(b->c3) {
-      MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
-      ns->my_pe->pendingMsgs[key].push_front(task_id);
-    }
-#endif
-    PE_invertMsgPe(ns->my_pe, iter, task_id);
-
-#if DEBUG_PRINT
-    tw_stime now = tw_now(lp);
-    printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d."
-    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msgId.id, task_id,
-    wasBusy, now);
-#endif
-    if(b->c1) {
-      if(m->msgId.pe != ns->my_pe_num) {
-        PE_addTaskExecTime(ns->my_pe, task_id, -1 * nic_delay);
-      }
-      PE_addTaskExecTime(ns->my_pe, task_id, -1 * (m->msgId.size * copy_per_byte + soft_delay_mpi));
-    }
-
-    if(!wasBusy){
-        //if the task that I executed was not me
-        if(m->executed.taskid != task_id && m->executed.taskid != -1){
-            PE_addToFrontBuffer(ns->my_pe, &m->executed);    
-            TaskPair pair;
-            pair.iter = iter; pair.taskid = task_id;
-            PE_removeFromBuffer(ns->my_pe, &pair);
-        }
-        if(m->executed.taskid != -1) {
-          exec_task_rev(ns, m->executed, lp, m, b);
-        }
-    } else {
-#if TRACER_OTF_TRACES
-        assert(0);
-#endif
-        assert(m->executed.taskid == -1);
-        TaskPair pair;
-        pair.iter = iter; pair.taskid = task_id;
-        PE_removeFromBuffer(ns->my_pe, &pair);
-    }
-}
-
-static void handle_bcast_rev_event(
-		proc_state * ns,
-		tw_bf * b,
-		proc_msg * m,
-		tw_lp * lp)
-{
-  codes_local_latency_reverse(lp);
-  codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    model_net_event_rc(net_id, lp, 0);
-  }
-}
-
-static void handle_exec_rev_event(
-		proc_state * ns,
-		tw_bf * b,
-		proc_msg * m,
-		tw_lp * lp)
-{
-    int task_id = m->msgId.id;
-
-    //Reverse the state: set the PE as busy, task is not completed yet
-    PE_set_busy(ns->my_pe, true);
-
-#if DEBUG_PRINT
-    printf("PE%d: In reverse handler of exec task with task_id: %d\n",
-    ns->my_pe_num, task_id);
-#endif
-    
-    //mark the task as not done
-    int iter = m->iteration;
-    PE_set_taskDone(ns->my_pe, iter, task_id, false);
-     
-    if(b->c1) {
-      PE_dec_iter(ns->my_pe);
-    }
-    
-    if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
-        PE_clearMsgBuffer(ns->my_pe);
-    } else {
-        PE_resizeBuffer(ns->my_pe, m->fwd_dep_count);
-        if(m->executed.taskid != -1) {
-            PE_addToFrontBuffer(ns->my_pe, &m->executed);
-        }
-    }
-    if(m->executed.taskid != -1) {
-      exec_task_rev(ns, m->executed, lp, m, b);
-    }
-}
-
 
 static void delegate_send_msg(proc_state *ns,
   tw_lp * lp,
