@@ -29,7 +29,7 @@ all: traceR
 traceR: tracer-driver.o components
 	$(CXX) ${LDFLAGS} $< -o $@ ${TRACER_LDADD}
 
-tracer-driver.o: tracer-driver.C
+tracer-driver.o: tracer-driver.C tracer-driver.h
 	$(CXX) $(CFLAGS) ${BASE_INCS} $(TRACER_CFLAGS) -c $< -o $@
 
 components:
