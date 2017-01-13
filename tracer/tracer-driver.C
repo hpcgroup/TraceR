@@ -2325,7 +2325,7 @@ static int send_coll_comp_rev(
     int isEvent,
     proc_msg *m)
 {
-  ns->my_pe->currentCollTask = m->executed.taskid;
+  if(isEvent) ns->my_pe->currentCollTask = m->executed.taskid;
 }
 
 //Utility function to convert pe number to tw_lpid number
