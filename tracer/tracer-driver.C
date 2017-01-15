@@ -2021,7 +2021,9 @@ static void perform_a2a(
     ns->my_pe->currentCollSize = maxSize;
     t->myEntry.msgId.pe = index;
   } else {
-    if(m->msgId.pe != ns->my_pe->currentCollRank) {
+    if((m->msgId.pe != ns->my_pe->currentCollRank) || 
+       (m->msgId.comm != ns->my_pe->currentCollComm) ||
+       (m->msgId.seq != ns->my_pe->currentCollSeq)) {
       int comm = m->msgId.comm;
       int64_t collSeq = m->msgId.seq;
       ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
@@ -2145,6 +2147,8 @@ static void handle_a2a_send_comp_event(
     tw_event *e = codes_event_new(lp->gid, codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
     m_new->msgId.pe = ns->my_pe->currentCollRank;
+    m_new->msgId.comm = ns->my_pe->currentCollComm;
+    m_new->msgId.seq = ns->my_pe->currentCollSeq;
     m_new->proc_event_type = COLL_A2A;
     tw_event_send(e);
   }
