@@ -10,7 +10,8 @@
 #include "bigsim/otf2_reader.h"
 #endif
 
-#define BCAST_DEGREE  4
+#define BCAST_DEGREE  2
+#define REDUCE_DEGREE  2
 
 typedef struct CoreInf {
     int mapsTo, jobID;
@@ -57,6 +58,7 @@ enum proc_event
     COLL_BCAST, /* Collective impl for bcast */
     COLL_REDUCTION, /* Collective impl for reduction */
     COLL_A2A, /* Collective impl for a2a */
+    COLL_A2A_SEND_DONE, 
     COLL_COMPLETE
 };
 
@@ -108,6 +110,11 @@ static void handle_send_comp_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_a2a_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 static void handle_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -141,6 +148,11 @@ static void handle_exec_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_a2a_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,

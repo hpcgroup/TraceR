@@ -566,6 +566,9 @@ static void proc_event(
     case COLL_A2A:
       perform_a2a(ns, -1, lp, m, b, 1);
       break;
+    case COLL_A2A_SEND_DONE:
+      handle_a2a_send_comp_event(ns, b, m, lp);
+      break;
     case COLL_COMPLETE:
       handle_coll_complete_event(ns, b, m, lp);
       break;
@@ -614,6 +617,9 @@ static void proc_rev_event(
       break;
     case COLL_A2A:
       perform_a2a_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_A2A_SEND_DONE:
+      handle_a2a_send_comp_rev_event(ns, b, m, lp);
       break;
     case COLL_COMPLETE:
       handle_coll_complete_rev_event(ns, b, m, lp);
@@ -1794,7 +1800,7 @@ static void perform_bcast(
     int dest = g.members[myChildren[i]];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
       &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-      delay+ nic_delay*(t->myEntry.msgId.size?1:0), COLL_BCAST, lp);
+      delay, COLL_BCAST, lp);
     delay += copyTime;
     m->model_net_calls++;
   }
@@ -1905,8 +1911,8 @@ static void perform_reduction(
 
   thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
 
-  for(int i = 0; i < BCAST_DEGREE; i++) {
-    int next_child = BCAST_DEGREE * thisTreePe + i + 1;
+  for(int i = 0; i < REDUCE_DEGREE; i++) {
+    int next_child = REDUCE_DEGREE * thisTreePe + i + 1;
     if(next_child >= maxSize) {
       break;
     }
@@ -1919,7 +1925,7 @@ static void perform_reduction(
   }
   
   bool amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
-  int myParent = (thisTreePe - 1)/BCAST_DEGREE;
+  int myParent = (thisTreePe - 1)/REDUCE_DEGREE;
   myParent = (t->myEntry.node + myParent) % maxSize;
  
   if(numValidChildren != 0) {
@@ -1993,7 +1999,6 @@ static void perform_a2a(
             tw_bf * b,
             int isEvent) {
   Task *t;
-  int recvCount;
   if(!isEvent) {
     PE_set_busy(ns->my_pe, true);
     t = &ns->my_pe->myTasks[taskid];
@@ -2035,7 +2040,7 @@ static void perform_a2a(
   }
 
   m->model_net_calls = 0;
-  tw_stime delay = codes_local_latency(lp);
+  tw_stime delay = nic_delay + codes_local_latency(lp);
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
 
   if(isEvent && m->msgId.pe != ns->my_pe->currentCollRank) {
@@ -2047,49 +2052,16 @@ static void perform_a2a(
 
   if(ns->my_pe->currentCollPartner != ns->my_pe->currentCollSize - 1) {
     b->c13 = 1;
-    ns->my_pe->currentCollPartner++;
-    int dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner) %  ns->my_pe->currentCollSize;
-    int partner = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
+    int dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + 1) %  ns->my_pe->currentCollSize;
     dest = g.members[dest];
     tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
-    send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
+    proc_msg m_local;
+    m_local.proc_event_type = COLL_A2A_SEND_DONE;
+    enqueue_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        delay+nic_delay, COLL_A2A, lp);
+        delay + nic_delay, COLL_A2A, &m_local, lp);
     delay += copyTime;
     m->model_net_calls++;
-    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
-      ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
-    if(it == ns->my_pe->pendingCollMsgs.end()) {
-      recvCount = 0;
-    } else {
-      std::map<int64_t, std::map<int, int> >::iterator cIt =
-        it->second.find(ns->my_pe->currentCollSeq);
-      if(cIt == it->second.end()) {
-        recvCount = 0;
-      } else {
-        std::map<int, int>::iterator c2It = cIt->second.find(partner);
-        if(c2It == cIt->second.end()) {
-          recvCount = 0;
-        } else {
-          recvCount = c2It->second;
-        }
-      }
-    }
-    assert(recvCount >= 0);
-    if(recvCount != 0) {
-      b->c14 = 1;
-      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner]--;
-      m->coll_info = partner;
-      if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner] == 0) {
-        ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
-      }
-      //send to self
-      tw_event *e = codes_event_new(lp->gid, delay, lp);
-      proc_msg *m_new = (proc_msg*)tw_event_data(e);
-      m_new->msgId.pe = ns->my_pe->currentCollRank;
-      m_new->proc_event_type = COLL_A2A;
-      tw_event_send(e);
-    }
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2107,8 +2079,6 @@ static void perform_a2a_rev(
     tw_bf * b,
     int isEvent) {
   Task *t;
-  int comm = ns->my_pe->currentCollComm;
-  int64_t collSeq = ns->my_pe->currentCollSeq;
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
@@ -2125,22 +2095,73 @@ static void perform_a2a_rev(
     }
   }
   
-  if(b->c13) {
-    ns->my_pe->currentCollPartner--;
-  }
-
   codes_local_latency_reverse(lp);
   for(int i = 0; i < m->model_net_calls; i++) {
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
   }
   
-  if(b->c14) {
-    ns->my_pe->pendingCollMsgs[comm][collSeq][m->coll_info]++;
-  }
-
   if(b->c15) {
     send_coll_comp_rev(ns, 0, OTF2_COLLECTIVE_OP_ALLTOALL, lp, isEvent, m);
+  }
+}
+
+static void handle_a2a_send_comp_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  int recvCount;
+  ns->my_pe->currentCollPartner++;
+  int partner = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
+  std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
+    ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
+  if(it == ns->my_pe->pendingCollMsgs.end()) {
+    recvCount = 0;
+  } else {
+    std::map<int64_t, std::map<int, int> >::iterator cIt =
+      it->second.find(ns->my_pe->currentCollSeq);
+    if(cIt == it->second.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int, int>::iterator c2It = cIt->second.find(partner);
+      if(c2It == cIt->second.end()) {
+        recvCount = 0;
+      } else {
+        recvCount = c2It->second;
+      }
+    }
+  }
+  assert(recvCount >= 0);
+  if(recvCount != 0) {
+    b->c14 = 1;
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner]--;
+    m->coll_info = partner;
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][partner] == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
+    }
+    //send to self
+    tw_event *e = codes_event_new(lp->gid, codes_local_latency(lp), lp);
+    proc_msg *m_new = (proc_msg*)tw_event_data(e);
+    m_new->msgId.pe = ns->my_pe->currentCollRank;
+    m_new->proc_event_type = COLL_A2A;
+    tw_event_send(e);
+  }
+}
+
+static void handle_a2a_send_comp_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  int comm = ns->my_pe->currentCollComm;
+  int64_t collSeq = ns->my_pe->currentCollSeq;
+  ns->my_pe->currentCollPartner--;
+  if(b->c14) {
+    codes_local_latency_reverse(lp);
+    ns->my_pe->pendingCollMsgs[comm][collSeq][m->coll_info]++;
   }
 }
 
@@ -2308,7 +2329,7 @@ static int send_coll_comp(
     if(sendOffset < g_tw_lookahead) {
       sendOffset += g_tw_lookahead;
     }
-    e = codes_event_new(lp->gid, sendOffset + soft_delay_mpi + nic_delay, lp);
+    e = codes_event_new(lp->gid, sendOffset + soft_delay_mpi, lp);
     msg = (proc_msg*)tw_event_data(e);
     msg->msgId.coll_type = collType;
     msg->proc_event_type = COLL_COMPLETE;
