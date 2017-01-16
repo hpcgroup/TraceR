@@ -2032,8 +2032,14 @@ static void perform_a2a(
         b->c12 = 1;
         return;
       }
-      if(m->msgId.pe != ((ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) % 
-          ns->my_pe->currentCollSize)) {
+      int currSrc;
+      if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
+        currSrc = ns->my_pe->currentCollRank ^ ns->my_pe->currentCollPartner;
+      } else {
+        currSrc = ((ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner 
+                    + ns->my_pe->currentCollSize) % ns->my_pe->currentCollSize);
+      }
+      if(m->msgId.pe != currSrc) {
         b->c12 = 1;
         return;
       }
@@ -2054,7 +2060,13 @@ static void perform_a2a(
 
   if(ns->my_pe->currentCollPartner != ns->my_pe->currentCollSize - 1) {
     b->c13 = 1;
-    int dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + 1) %  ns->my_pe->currentCollSize;
+    int dest;
+    if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
+      dest = ns->my_pe->currentCollRank ^ (ns->my_pe->currentCollPartner + 1);
+    } else {
+      dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + 1) 
+        %  ns->my_pe->currentCollSize;
+    }
     dest = g.members[dest];
     tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
     proc_msg m_local;
@@ -2116,7 +2128,13 @@ static void handle_a2a_send_comp_event(
 {
   int recvCount;
   ns->my_pe->currentCollPartner++;
-  int partner = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
+  int partner;
+  if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
+    partner = ns->my_pe->currentCollRank ^ ns->my_pe->currentCollPartner;
+  } else {
+    partner = ((ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner 
+          + ns->my_pe->currentCollSize) % ns->my_pe->currentCollSize);
+  }
   std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
     ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
   if(it == ns->my_pe->pendingCollMsgs.end()) {
