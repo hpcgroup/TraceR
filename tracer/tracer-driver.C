@@ -1941,7 +1941,7 @@ static void perform_reduction(
     int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        delay+ nic_delay*(t->myEntry.msgId.size?1:0), COLL_REDUCTION, lp);
+        delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0), COLL_REDUCTION, lp);
     m->model_net_calls++;
   }
   delay += copyTime;
