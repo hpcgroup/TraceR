@@ -59,7 +59,12 @@ enum proc_event
     COLL_REDUCTION, /* Collective impl for reduction */
     COLL_A2A, /* Collective impl for a2a */
     COLL_A2A_SEND_DONE, 
+    RECV_COLL_POST,
     COLL_COMPLETE
+};
+
+struct Coll_lookup {
+  proc_event remote_event, local_event;
 };
 
 static void proc_init(
@@ -267,6 +272,12 @@ static void perform_allreduce(
     tw_bf * b,
     int isEvent);
 
+static void handle_coll_recv_post_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -319,6 +330,12 @@ static void perform_allreduce_rev(
     proc_msg *m,
     tw_bf * b,
     int isEvent);
+
+static void handle_coll_recv_post_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 
 static void handle_coll_complete_rev_event(
     proc_state * ns,

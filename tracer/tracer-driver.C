@@ -56,6 +56,10 @@ static int sync_mode = 0;
 
 char tracer_input[256];
 
+//the indexing should match between the define and the array
+#define TRACER_A2A 0
+Coll_lookup lookUpTable[] = { { COLL_A2A, COLL_A2A_SEND_DONE } };
+
 CoreInf *global_rank;
 JobInf *jobs;
 int default_mapping;
@@ -569,6 +573,9 @@ static void proc_event(
     case COLL_A2A_SEND_DONE:
       handle_a2a_send_comp_event(ns, b, m, lp);
       break;
+    case RECV_COLL_POST:
+      handle_coll_recv_post_event(ns, b, m, lp);
+      break;
     case COLL_COMPLETE:
       handle_coll_complete_event(ns, b, m, lp);
       break;
@@ -620,6 +627,9 @@ static void proc_rev_event(
       break;
     case COLL_A2A_SEND_DONE:
       handle_a2a_send_comp_rev_event(ns, b, m, lp);
+      break;
+    case RECV_COLL_POST:
+      handle_coll_recv_post_rev_event(ns, b, m, lp);
       break;
     case COLL_COMPLETE:
       handle_coll_complete_rev_event(ns, b, m, lp);
@@ -1607,18 +1617,18 @@ static int send_msg(
         tw_stime sendOffset,
         enum proc_event evt_type,
         tw_lp * lp) {
-        proc_msg* m_remote = (proc_msg *)malloc(sizeof(proc_msg));
+        proc_msg m_remote;
 
-        m_remote->proc_event_type = evt_type;
-        m_remote->src = lp->gid;
-        m_remote->msgId.size = size;
-        m_remote->msgId.pe = msgId->pe;
-        m_remote->msgId.id = msgId->id;
+        m_remote.proc_event_type = evt_type;
+        m_remote.src = lp->gid;
+        m_remote.msgId.size = size;
+        m_remote.msgId.pe = msgId->pe;
+        m_remote.msgId.id = msgId->id;
 #if TRACER_OTF_TRACES
-        m_remote->msgId.comm = msgId->comm;
-        m_remote->msgId.seq = seq;
+        m_remote.msgId.comm = msgId->comm;
+        m_remote.msgId.seq = seq;
 #endif
-        m_remote->iteration = iter;
+        m_remote.iteration = iter;
 
         /*   model_net_event params:
              int net_id, char* category, tw_lpid final_dest_lp,
@@ -1627,9 +1637,8 @@ static int send_msg(
              const void* self_event, tw_lp *sender */
 
         model_net_event(net_id, "test", dest_id, size, sendOffset,
-          sizeof(proc_msg), (const void*)m_remote, 0, NULL, lp);
+          sizeof(proc_msg), &m_remote, 0, NULL, lp);
         ns->msg_sent_count++;
-        free(m_remote);
     
     return 0;
 }
@@ -1662,6 +1671,136 @@ static void enqueue_msg(
           sizeof(proc_msg), (const void*)&m_remote, sizeof(proc_msg), m_local, 
           lp);
         ns->msg_sent_count++;
+}
+
+static void enqueue_coll_msg(
+        int index,
+        proc_state * ns,
+        int size,
+        int iter,
+        MsgID *msgId,
+        uint64_t seq,
+        int dest,
+        tw_stime sendOffset,
+        tw_stime copyTime,
+        tw_lp * lp,
+        proc_msg *m,
+        tw_bf * b) {
+    
+    CollMsgKey key(dest, msgId->comm, seq);
+    CollKeyType::iterator it = ns->my_pe->pendingRCollMsgs.find(key);  
+    bool isEager = (size <= eager_limit);
+    if(!isEager && (it == ns->my_pe->pendingRCollMsgs.end() || 
+        it->second.front() != -1)) {
+      b->c16 = 1;
+      ns->my_pe->pendingRCollMsgs[key].push_back(index);
+    } else {
+      proc_msg m_remote, m_local;
+      m_remote.proc_event_type = lookUpTable[index].remote_event;
+      m_remote.src = lp->gid;
+      m_remote.msgId.size = size;
+      m_remote.msgId.pe = msgId->pe;
+      m_remote.msgId.id = msgId->id;
+#if TRACER_OTF_TRACES
+      m_remote.msgId.comm = msgId->comm;
+      m_remote.msgId.seq = seq;
+#endif
+      m_remote.iteration = iter;
+
+      m_local.proc_event_type = lookUpTable[index].local_event;
+
+      model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
+          sendOffset + copyTime*(isEager?1:0) + rdma_delay*(isEager?0:1), 
+          sizeof(proc_msg), (const void*)&m_remote, 
+          sizeof(proc_msg), &m_local, lp);
+      m->model_net_calls++;
+      ns->msg_sent_count++;
+      if(!isEager) {
+        b->c17 = 1;
+        it->second.pop_front();
+        if(it->second.size()) {
+          ns->my_pe->pendingRCollMsgs.erase(it);
+        }
+      }
+    }
+}
+
+static void enqueue_coll_msg_rev(
+        int index,
+        proc_state * ns,
+        MsgID *msgId,
+        uint64_t seq,
+        int dest,
+        tw_lp * lp,
+        proc_msg *m,
+        tw_bf * b) {
+  CollMsgKey key(dest, msgId->comm, seq);
+  if(b->c16) {
+    ns->my_pe->pendingRCollMsgs[key].pop_back();
+  }
+  if(b->c17) {
+    ns->my_pe->pendingRCollMsgs[key].push_back(-1);
+  }
+}
+
+static void handle_coll_recv_post_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  CollMsgKey key(m->msgId.pe, m->msgId.comm, m->msgId.seq);
+  CollKeyType::iterator it = ns->my_pe->pendingRCollMsgs.find(key);
+  if(it == ns->my_pe->pendingRCollMsgs.end() || it->second.front() == -1) {
+    b->c1 = 1;
+    ns->my_pe->pendingRCollMsgs[key].push_back(-1);
+  } else {
+    b->c2 = 1;
+    Task *t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+    m->model_net_calls = 1;
+    assert(ns->my_pe->currentCollSeq == m->msgId.seq);
+    assert(ns->my_pe->currentCollComm == m->msgId.comm);
+    int index = it->second.front();
+    m->coll_info = index;
+    proc_msg m_remote, m_local;
+    m_remote.proc_event_type = lookUpTable[index].remote_event;
+    m_remote.src = lp->gid;
+    m_remote.msgId.size = t->myEntry.msgId.size;
+    m_remote.msgId.pe = t->myEntry.msgId.pe;
+    m_remote.msgId.id = t->myEntry.msgId.id;
+    m_remote.msgId.comm = ns->my_pe->currentCollComm;
+    m_remote.msgId.seq = ns->my_pe->currentCollSeq;
+    m_remote.iteration = ns->my_pe->currIter;
+
+    m_local.proc_event_type = lookUpTable[index].local_event;
+
+    model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_job), 
+        t->myEntry.msgId.size, nic_delay + rdma_delay,
+        sizeof(proc_msg), (const void*)&m_remote, 
+        sizeof(proc_msg), &m_local, lp);
+    it->second.pop_front();
+    if(it->second.size() == 0) {
+      ns->my_pe->pendingRCollMsgs.erase(it);
+    }
+  }
+}
+
+static void handle_coll_recv_post_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  CollMsgKey key(m->msgId.pe, m->msgId.comm, m->msgId.seq);
+  if(b->c1) {
+    ns->my_pe->pendingRCollMsgs[key].pop_back();
+  }
+  if(b->c2) {
+    ns->my_pe->pendingRCollMsgs[key].push_back(m->coll_info);
+    for(int i = 0; i < m->model_net_calls; i++) {
+      model_net_event_rc(net_id, lp, 0);
+    }
+  }
 }
 
 static void perform_collective(
@@ -2058,22 +2197,31 @@ static void perform_a2a(
 
   if(ns->my_pe->currentCollPartner != ns->my_pe->currentCollSize - 1) {
     b->c13 = 1;
-    int dest;
+    int dest, src;
     if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
       dest = ns->my_pe->currentCollRank ^ (ns->my_pe->currentCollPartner + 1);
+      src = dest;
     } else {
       dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + 1) 
         %  ns->my_pe->currentCollSize;
+      src = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner - 1
+        + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
     }
     dest = g.members[dest];
+    m->coll_info = dest;
     tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
-    proc_msg m_local;
-    m_local.proc_event_type = COLL_A2A_SEND_DONE;
-    enqueue_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
-        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        delay + nic_delay + copyTime + soft_delay_mpi, COLL_A2A, &m_local, lp);
+    enqueue_coll_msg(TRACER_A2A, ns, t->myEntry.msgId.size, 
+        ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
+        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+    if(t->myEntry.msgId.size > eager_limit) {
+      m->model_net_calls++;
+      t->myEntry.msgId.pe = ns->my_pe_num;
+      send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
+        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
+        nic_delay+rdma_delay, RECV_COLL_POST, lp);
+      t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
+    }
     delay += copyTime;
-    m->model_net_calls++;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2111,6 +2259,14 @@ static void perform_a2a_rev(
   for(int i = 0; i < m->model_net_calls; i++) {
     //TODO use the right size to rc
     model_net_event_rc(net_id, lp, 0);
+  }
+
+  if(b->c13) {
+    if(isEvent) {
+       t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];  
+    }
+    enqueue_coll_msg_rev(TRACER_A2A, ns, &t->myEntry.msgId, 
+      ns->my_pe->currentCollSeq, m->coll_info, lp, m, b);
   }
   
   if(b->c15) {

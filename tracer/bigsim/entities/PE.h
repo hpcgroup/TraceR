@@ -43,6 +43,22 @@ class MsgKey {
 };
 typedef std::map< MsgKey, std::list<int> > KeyType;
 
+class CollMsgKey {
+  public:
+  uint32_t rank, comm;
+  uint64_t seq;
+  CollMsgKey(uint32_t _rank, uint32_t _comm, uint64_t _seq) {
+    rank = _rank; comm = _comm; seq = _seq;
+  }
+  bool operator< (const CollMsgKey &rhs) const {
+    if(rank != rhs.rank) return rank < rhs.rank;
+    else if(comm != rhs.comm) return comm < rhs.comm;
+    else return seq < rhs.seq;
+  }
+  ~CollMsgKey() { }
+};
+typedef std::map< CollMsgKey, std::list<int> > CollKeyType;
+
 class PE {
   public:
     PE();
@@ -85,6 +101,7 @@ class PE {
     //handling collectives
     std::vector<int64_t> collectiveSeq;
     std::map<int64_t, std::map<int64_t, std::map<int, int> > > pendingCollMsgs;
+    CollKeyType pendingRCollMsgs;
     int64_t currentCollComm, currentCollSeq, currentCollTask;
     int currentCollRank, currentCollPartner, currentCollSize;
 };
