@@ -7,6 +7,7 @@
 #define VERBOSE_L3 0
 
 extern JobInf *jobs;
+extern tw_stime soft_delay_mpi;
 
 static OTF2_CallbackCode
 callbackDefLocations(void*                 userData,
@@ -230,7 +231,7 @@ callbackSendEvt(OTF2_LocationRef locationID,
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_SEND_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
@@ -261,7 +262,7 @@ callbackIsendEvt(OTF2_LocationRef locationID,
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_SEND_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
@@ -288,7 +289,7 @@ callbackIsendCompEvt(OTF2_LocationRef locationID,
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_SEND_COMP_EVT;
   new_task.req_id = requestID;
   ld->lastLogTime = time;
@@ -310,7 +311,7 @@ callbackRecvEvt(OTF2_LocationRef locationID,
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_RECV_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
@@ -337,7 +338,7 @@ callbackIrecv(OTF2_LocationRef locationID,
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_RECV_POST_EVT;
   new_task.req_id = requestID;
   new_task.isNonBlocking = true;;
@@ -362,7 +363,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
-  new_task.execTime = 0;
+  new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_RECV_COMP_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
