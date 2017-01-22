@@ -1124,7 +1124,7 @@ static void handle_recv_post_event(
       ns->my_pe->pendingRMsgs.erase(it);
     }
   }
-#if 1 || DEBUG_PRINT
+#if DEBUG_PRINT
   printf("%d: Recv post recevied %d %d %d %d, found %d %d\n", ns->my_pe_num, 
       m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq, b->c2, m->executed.taskid);
 #endif
