@@ -481,6 +481,18 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     new_task.myEntry.node = 0;
     new_task.myEntry.thread = 0;
     new_task.isNonBlocking = false;
+  } else if(collectiveOp == OTF2_COLLECTIVE_OP_ALLGATHER ||
+            collectiveOp == OTF2_COLLECTIVE_OP_ALLGATHERV) {
+    ld->tasks.push_back(Task());
+    Task &new_task = ld->tasks[ld->tasks.size() - 1];
+    new_task.execTime = 0;
+    new_task.event_id = TRACER_COLL_EVT;
+    Group& group = globalData->groups[globalData->communicators[communicator]];
+    new_task.myEntry.msgId.size = sizeSent/group.members.size();
+    new_task.myEntry.msgId.comm = communicator;
+    new_task.myEntry.msgId.coll_type = OTF2_COLLECTIVE_OP_ALLGATHER;
+    new_task.myEntry.thread = 0;
+    new_task.isNonBlocking = false;
   }
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;

@@ -59,6 +59,8 @@ enum proc_event
     COLL_REDUCTION, /* Collective impl for reduction */
     COLL_A2A, /* Collective impl for a2a */
     COLL_A2A_SEND_DONE, 
+    COLL_ALLGATHER, /* Collective impl for allgather */
+    COLL_ALLGATHER_SEND_DONE, 
     RECV_COLL_POST,
     COLL_COMPLETE
 };
@@ -120,6 +122,11 @@ static void handle_a2a_send_comp_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_allgather_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 static void handle_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -158,6 +165,11 @@ static void handle_send_comp_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_a2a_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_allgather_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -272,6 +284,14 @@ static void perform_allreduce(
     tw_bf * b,
     int isEvent);
 
+static void perform_allgather(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void handle_coll_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -324,6 +344,14 @@ static void perform_a2a_rev(
     int isEvent);
 
 static void perform_allreduce_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_allgather_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
