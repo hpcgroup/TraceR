@@ -1274,7 +1274,7 @@ static tw_stime exec_task(
        (t->event_id == TRACER_RECV_POST_EVT || needPost)) {
       m->model_net_calls++;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, seq,  
-        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay+rdma_delay, RECV_POST, lp);
+        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay, RECV_POST, lp);
 #if DEBUG_PRINT
       printf("%d: Recv post %d %d %d %d\n", ns->my_pe_num, 
           t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, 
@@ -1735,9 +1735,8 @@ static void enqueue_coll_msg(
       m_local.proc_event_type = lookUpTable[index].local_event;
 
       model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
-          sendOffset + copyTime*(isEager?1:0) + rdma_delay*(isEager?0:1), 
-          sizeof(proc_msg), (const void*)&m_remote, 
-          sizeof(proc_msg), &m_local, lp);
+          sendOffset + copyTime*(isEager?1:0), sizeof(proc_msg), 
+          (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);
       m->model_net_calls++;
       ns->msg_sent_count++;
       if(!isEager) {
@@ -1811,9 +1810,8 @@ static void handle_coll_recv_post_event(
     m_local.proc_event_type = lookUpTable[index].local_event;
 
     model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_job), 
-        t->myEntry.msgId.size, nic_delay + rdma_delay,
-        sizeof(proc_msg), (const void*)&m_remote, 
-        sizeof(proc_msg), &m_local, lp);
+        t->myEntry.msgId.size, nic_delay, sizeof(proc_msg), 
+        (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);
     it->second.pop_front();
     if(it->second.size() == 0) {
       ns->my_pe->pendingRCollMsgs.erase(it);
@@ -2264,7 +2262,7 @@ static void perform_a2a(
       t->myEntry.msgId.pe = ns->my_pe_num;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
         ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
-        nic_delay+rdma_delay, RECV_COLL_POST, lp);
+        nic_delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
     delay += copyTime;
@@ -2497,7 +2495,7 @@ static void perform_allgather(
       t->myEntry.msgId.pe = ns->my_pe_num;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
         ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
-        nic_delay+rdma_delay, RECV_COLL_POST, lp);
+        nic_delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = saved_pe;
       //printf("%d Send MSG to %d %d %lld\n", ns->my_pe_num, src, g.members[src], ns->my_pe->currentCollSeq);
     }
