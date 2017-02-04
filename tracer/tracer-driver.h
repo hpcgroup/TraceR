@@ -39,6 +39,7 @@ struct proc_msg
     int iteration;
     TaskPair executed;
     int fwd_dep_count;
+    int saved_task;
     MsgID msgId;
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
@@ -199,7 +200,7 @@ static int send_msg(
     int size,
     int iter,
     MsgID *msgId,
-    uint64_t seq,
+    int64_t seq,
     int dest_id,
     tw_stime timeOffset,
     enum proc_event evt_type,
@@ -210,7 +211,7 @@ static void enqueue_msg(
     int size,
     int iter,
     MsgID *msgId,
-    uint64_t seq,
+    int64_t seq,
     int dest_id,
     tw_stime sendOffset,
     enum proc_event evt_type,

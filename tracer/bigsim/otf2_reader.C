@@ -339,7 +339,7 @@ callbackIrecv(OTF2_LocationRef locationID,
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = soft_delay_mpi;
-  new_task.event_id = TRACER_RECV_POST_EVT;
+  new_task.event_id = TRACER_USER_EVT;
   new_task.req_id = requestID;
   new_task.isNonBlocking = true;;
   ((AllData *)userData)->matchRecvIds[requestID] = ld->tasks.size() - 1;
@@ -379,6 +379,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   std::map<int, int>::iterator it = ((AllData *)userData)->matchRecvIds.find(requestID);
   assert(it != ((AllData *)userData)->matchRecvIds.end());
   Task &postTask = ld->tasks[it->second];
+  postTask.event_id = TRACER_RECV_POST_EVT;
   postTask.myEntry.msgId.pe = locationID;
   postTask.myEntry.msgId.id = msgTag;
   postTask.myEntry.msgId.size = msgLength;

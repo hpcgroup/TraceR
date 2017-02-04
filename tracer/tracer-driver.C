@@ -134,7 +134,6 @@ int main(int argc, char **argv)
     sync_mode = atoi(&argv[1][(strlen(argv[1])-1)]);
 
     tw_opt_add(app_opt);
-    //g_tw_lookahead = 0.0001;
     g_tw_lookahead = 0.1;
     tw_init(&argc, &argv);
 
@@ -373,7 +372,7 @@ int main(int argc, char **argv)
         char eName[256];
         fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime);
         if(!rank)
-          printf("Will make all events with name %s run for %lf s for job %d\n", 
+          printf("Will make all events with name %s run for %lf s for job %d; if scale_all, events will be scaled down\n", 
             eName, etime, jobid);
         addEventSub(jobid, eName, etime, num_jobs);
       }
@@ -719,6 +718,7 @@ static void handle_kickoff_event(
     assert(PE_is_busy(ns->my_pe) == false);
     TaskPair pair;
     pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
+    ns->my_pe->currentTask = -1;
     exec_task(ns, pair, lp, m, b);
 }
 
@@ -765,13 +765,16 @@ static void handle_recv_event(
     task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
 #else
 #if DEBUG_PRINT
-    printf("[%d:%d] RECD MSG: %d %d %d %d\n", ns->my_job,
+    if(ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+    printf("%d RECD MSG: %d %d %d %lld\n", 
         ns->my_pe_num, m->msgId.pe, m->msgId.id, m->msgId.comm,
         m->msgId.seq);
+    }
 #endif
     MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
-    if(it == ns->my_pe->pendingMsgs.end()) {
+    assert((it == ns->my_pe->pendingMsgs.end()) || (it->second.size() != 0));
+    if(it == ns->my_pe->pendingMsgs.end() || it->second.front() == -1) {
       task_id = -1;
       ns->my_pe->pendingMsgs[key].push_back(task_id);
       b->c2 = 1;
@@ -811,6 +814,11 @@ static void handle_recv_event(
       return;
     }
 #endif
+#if DEBUG_PRINT
+    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+    printf("%d Recv  busy %d %d\n", ns->my_pe_num, isBusy, task_id);
+    }
+#endif
     m->incremented_flag = isBusy;
     m->executed.taskid = -1;
     if(task_id>=0){
@@ -841,10 +849,8 @@ static void handle_recv_event(
         if(!isBusy){
             TaskPair buffd_task = PE_getNextBuffedMsg(ns->my_pe);
             //Store the executed_task id for reverse handler msg
-            if(sync_mode == 3){
-                m->executed = buffd_task;
-                m->fwd_dep_count = 0;
-            }
+            m->executed = buffd_task;
+            m->fwd_dep_count = 0;
             if(buffd_task.taskid != -1){
                 exec_task(ns, buffd_task, lp, m, b);
             }
@@ -878,12 +884,19 @@ static void handle_recv_rev_event(
       return;
     }
 #endif
+#if TRACER_BIGSIM_TRACES
     if(m->executed.taskid == -2) {
         return;
     }
+#endif
     bool wasBusy = m->incremented_flag;
     int iter = m->iteration;
     PE_set_busy(ns->my_pe, wasBusy);
+#if DEBUG_PRINT
+    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+    printf("%d Recv rev busy %d %d\n", ns->my_pe_num, wasBusy, m->executed.taskid);
+    }
+#endif
 
 #if TRACER_BIGSIM_TRACES
     int task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
@@ -912,6 +925,9 @@ static void handle_recv_rev_event(
     if(!wasBusy){
         //if the task that I executed was not me
         if(m->executed.taskid != task_id && m->executed.taskid != -1){
+#if TRACER_OTF_TRACES
+        assert(0);
+#endif
             PE_addToFrontBuffer(ns->my_pe, &m->executed);    
             TaskPair pair;
             pair.iter = iter; pair.taskid = task_id;
@@ -974,7 +990,17 @@ static void handle_exec_event(
     //For exec complete event msgId contains the task_id for convenience
     int task_id = m->msgId.id;
     int iter = m->iteration;
+    if(task_id != ns->my_pe->currentTask || 
+       PE_get_taskDone(ns->my_pe, iter, task_id)) {
+      b->c2 = 1;
+      return;
+    }
     PE_set_busy(ns->my_pe, false);
+#if DEBUG_PRINT
+    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+      printf("%d Set busy false %d\n", ns->my_pe_num, task_id);
+    }
+#endif
     //Mark the task as done
     PE_set_taskDone(ns->my_pe, iter, task_id, true);
 
@@ -1025,10 +1051,8 @@ static void handle_exec_event(
 
     TaskPair buffd_task = PE_getNextBuffedMsg(ns->my_pe);
     //Store the executed_task id for reverse handler msg
-    if(sync_mode == 3){
-        m->fwd_dep_count = counter;
-        m->executed = buffd_task;
-    }
+    m->fwd_dep_count = counter;
+    m->executed = buffd_task;
     if(buffd_task.taskid != -1){
         exec_task(ns, buffd_task, lp, m, b); //we don't care about the return value?
     }
@@ -1040,10 +1064,16 @@ static void handle_exec_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+    if(b->c2) return;
     int task_id = m->msgId.id;
 
     //Reverse the state: set the PE as busy, task is not completed yet
     PE_set_busy(ns->my_pe, true);
+#if DEBUG_PRINT
+    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+      printf("%d Rev Set busy true %d\n", ns->my_pe_num, task_id);
+    }
+#endif
 
 #if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n",
@@ -1061,6 +1091,9 @@ static void handle_exec_rev_event(
     if(m->fwd_dep_count > PE_getBufferSize(ns->my_pe)) {
         PE_clearMsgBuffer(ns->my_pe);
     } else {
+#if TRACER_OTF_TRACES
+        if(m->fwd_dep_count != 0) assert(0);
+#endif
         PE_resizeBuffer(ns->my_pe, m->fwd_dep_count);
         if(m->executed.taskid != -1) {
             PE_addToFrontBuffer(ns->my_pe, &m->executed);
@@ -1115,6 +1148,7 @@ static void handle_recv_post_event(
     ns->my_pe->pendingRMsgs[key].push_back(-1);
   } else {
     b->c2 = 1;
+    assert(it->second.size() != 0);
     Task *t = &ns->my_pe->myTasks[it->second.front()];
     m->model_net_calls = 1;
     delegate_send_msg(ns, lp, m, b, t, it->second.front(), 0);
@@ -1184,7 +1218,7 @@ static tw_stime exec_task(
             tw_bf * b)
 {
     m->model_net_calls = 0;
-    if(((PE*)(ns->my_pe))->taskExecuted[task_id.iter][task_id.taskid]) {
+    if(ns->my_pe->taskExecuted[task_id.iter][task_id.taskid]) {
       b->c10 = 1;
       return;
     }
@@ -1220,16 +1254,25 @@ static tw_stime exec_task(
       b->c11 = 1;
       perform_collective(ns, task_id.taskid, lp, m, b);
       ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = true;
+      m->saved_task = ns->my_pe->currentTask;
+      ns->my_pe->currentTask = task_id.taskid;
       return 0;
     }
 
     //else continue
     bool needPost = false, returnAtEnd = false;
-    uint64_t seq;
+    int64_t seq;
     if(t->event_id == TRACER_RECV_POST_EVT) {
       seq = ns->my_pe->recvSeq[t->myEntry.node];
       ns->my_pe->pendingRReqs[t->req_id] = seq;
       ns->my_pe->recvSeq[t->myEntry.node]++;
+#if DEBUG_PRINT
+      if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
+        printf("%d Post Irecv: %d - %d %d %d %lld \n", ns->my_pe_num, 
+            t->req_id, t->myEntry.node, t->myEntry.msgId.id,
+            t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
+      }
+#endif
     }
     if((t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT) 
        && !PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)) {
@@ -1249,11 +1292,14 @@ static tw_stime exec_task(
       }
       KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
       if(it == ns->my_pe->pendingMsgs.end()) {
+        assert(PE_is_busy(ns->my_pe) == false);
         ns->my_pe->pendingMsgs[key].push_back(task_id.taskid);
 #if DEBUG_PRINT
-        printf("[%d:%d] PUSH TASK: %d - %d %d %d %d\n", ns->my_job,
-          ns->my_pe_num, task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
-            t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
+        if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+        printf("%d PUSH recv: %d - %d %d %d %lld %lld %d\n", ns->my_pe_num, 
+            task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
+            t->myEntry.msgId.comm, seq, ns->my_pe->recvSeq[t->myEntry.node]-1, t->event_id == TRACER_RECV_EVT);
+        }
 #endif
         b->c21 = 1;
         if(!needPost) {
@@ -1263,6 +1309,14 @@ static tw_stime exec_task(
         }
       } else {
         b->c22 = 1;
+#if DEBUG_PRINT
+        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
+        printf("%d Recv matched: %d - %d %d %d %lld, %lld %d\n", ns->my_pe_num, 
+            task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
+            t->myEntry.msgId.comm, seq, ns->my_pe->recvSeq[t->myEntry.node]-1, t->event_id == TRACER_RECV_EVT);
+        }
+#endif
+        assert(it->second.front() == -1);
         ns->my_pe->pendingMsgs[key].pop_front();
         if(it->second.size() == 0) {
           ns->my_pe->pendingMsgs.erase(it);
@@ -1287,9 +1341,16 @@ static tw_stime exec_task(
 
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
+#if DEBUG_PRINT
+    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+      printf("%d Set busy true %d\n", ns->my_pe_num, task_id.taskid);
+    }
+#endif
     //Mark the execution time of the task
     tw_stime time = PE_getTaskExecTime(ns->my_pe, task_id.taskid);
     ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = true;
+    m->saved_task = ns->my_pe->currentTask;
+    ns->my_pe->currentTask = task_id.taskid;
 
 #if TRACER_BIGSIM_TRACES
     //For each entry of the task, create a recv event and send them out to
@@ -1446,8 +1507,10 @@ static tw_stime exec_task(
         sendFinishTime = sendOffset + copyTime;
       } else {
 #if DEBUG_PRINT
-        printf("[%d:%d] SEND TO: %d - %d %d %d\n", ns->my_job, ns->my_pe_num,
-          node, taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
+        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
+          printf("%d SEND to: %d  %d %d %lld\n", ns->my_pe_num, node, 
+            taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
+        }
 #endif
 
         if(isCopying) {
@@ -1546,6 +1609,7 @@ static void exec_task_rev(
   if(b->c11) {
     perform_collective_rev(ns, task_id.taskid, lp, m, b);
     ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = false;
+    ns->my_pe->currentTask = m->saved_task;
     return;
   }
   
@@ -1555,7 +1619,7 @@ static void exec_task_rev(
     ns->my_pe->recvSeq[t->myEntry.node]--;
   }
 
-  uint64_t seq;
+  int64_t seq;
   if(b->c7) {
     if(t->event_id == TRACER_RECV_COMP_EVT) {
       ns->my_pe->pendingRReqs[t->req_id] = t->myEntry.msgId.seq;
@@ -1589,6 +1653,7 @@ static void exec_task_rev(
 #endif
 
   ns->my_pe->taskExecuted[task_id.iter][task_id.taskid] = false;
+  ns->my_pe->currentTask = m->saved_task;
   codes_local_latency_reverse(lp);
 #if TRACER_OTF_TRACES
   if(b->c23) {
@@ -1628,7 +1693,7 @@ static int send_msg(
         int size,
         int iter,
         MsgID *msgId,
-        uint64_t seq,
+        int64_t seq,
         int dest_id,
         tw_stime sendOffset,
         enum proc_event evt_type,
@@ -1664,7 +1729,7 @@ static void enqueue_msg(
         int size,
         int iter,
         MsgID *msgId,
-        uint64_t seq,
+        int64_t seq,
         int dest_id,
         tw_stime sendOffset,
         enum proc_event evt_type,
@@ -1695,7 +1760,7 @@ static void enqueue_coll_msg(
         int size,
         int iter,
         MsgID *msgId,
-        uint64_t seq,
+        int64_t seq,
         int dest,
         tw_stime sendOffset,
         tw_stime copyTime,
@@ -1753,7 +1818,7 @@ static void enqueue_coll_msg_rev(
         int index,
         proc_state * ns,
         MsgID *msgId,
-        uint64_t seq,
+        int64_t seq,
         int dest,
         tw_lp * lp,
         proc_msg *m,
@@ -2746,6 +2811,12 @@ static int exec_comp(
     m->iteration = iter;
     if(recv) {
         m->proc_event_type = RECV_MSG;
+#if DEBUG_PRINT
+        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
+          printf("%d Sending to %d %d %d %lld\n", ns->my_pe_num, ns->my_pe_num,
+            m->msgId.id, m->msgId.comm, m->msgId.seq);
+        }
+#endif
     }
     else 
         m->proc_event_type = EXEC_COMPLETE;

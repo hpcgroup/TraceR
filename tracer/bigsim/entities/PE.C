@@ -84,7 +84,7 @@ void PE::printStat()
     }
   }
   if(countTask != 0) {
-    printf("PE%d: not done count:%d out of %d \n ",myNum, countTask, tasksCount);
+    printf("PE%d: not done count:%d out of %d \n",myNum, countTask, tasksCount);
   }
 }
 

@@ -33,7 +33,7 @@ struct MsgID {
 #endif
 #if TRACER_OTF_TRACES
     int comm, coll_type;
-    uint64_t seq;
+    int64_t seq;
 #endif
 };
 

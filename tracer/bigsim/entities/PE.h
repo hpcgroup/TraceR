@@ -29,15 +29,16 @@ class Task;
 class MsgKey {
   public:
   uint32_t rank, comm, tag;
-  uint64_t seq;
-  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm, uint64_t _seq) {
+  int64_t seq;
+  MsgKey(uint32_t _rank, uint32_t _tag, uint32_t _comm, int64_t _seq) {
     rank = _rank; tag = _tag; comm = _comm; seq = _seq;
   }
   bool operator< (const MsgKey &rhs) const {
     if(rank != rhs.rank) return rank < rhs.rank;
     else if(tag != rhs.tag) return tag < rhs.tag;
-    else if(comm != rhs.comm) return comm < rhs.comm;
-    else return seq < rhs.seq;
+    else return comm < rhs.comm;
+    //else if(comm != rhs.comm) return comm < rhs.comm;
+    //else return seq < rhs.seq;
   }
   ~MsgKey() { }
 };
@@ -46,8 +47,8 @@ typedef std::map< MsgKey, std::list<int> > KeyType;
 class CollMsgKey {
   public:
   uint32_t rank, comm;
-  uint64_t seq;
-  CollMsgKey(uint32_t _rank, uint32_t _comm, uint64_t _seq) {
+  int64_t seq;
+  CollMsgKey(uint32_t _rank, uint32_t _comm, int64_t _seq) {
     rank = _rank; comm = _comm; seq = _seq;
   }
   bool operator< (const CollMsgKey &rhs) const {

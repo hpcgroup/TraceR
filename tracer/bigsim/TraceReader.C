@@ -336,6 +336,25 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->collectiveSeq.resize(num_communicators, 0);
   pe->currentCollComm = pe->currentCollSeq = pe->currentCollTask = -1;
   pe->currentCollRank = pe->currentCollPartner = pe->currentCollSize = -1;
+ 
+  double user_timing, scaling_factor;
+  bool isScaling = false;
+
+  if(eventSubs != NULL) {
+    std::map<std::string, double>::iterator loc1 =
+      eventSubs[pe->jobNum].find("scale_all");
+    if(loc1 != eventSubs[pe->jobNum].end()) {
+      scaling_factor = loc1->second/TIME_MULT;
+      isScaling = true;
+    }
+    std::map<std::string, double>::iterator loc2 =
+      eventSubs[pe->jobNum].find("user_code");
+    if(loc2 != eventSubs[pe->jobNum].end()) {
+      if(!isScaling) { 
+        user_timing = loc2->second;
+      }
+    }
+  }
 
   for(int logInd = 0; logInd  < pe->tasksCount; logInd++)
   {
@@ -345,10 +364,10 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
     } 
     
     if(eventSubs != NULL && t->event_id == TRACER_USER_EVT) {
-      std::map<std::string, double>::iterator loc =
-        eventSubs[pe->jobNum].find("user_code");
-      if(loc != eventSubs[pe->jobNum].end()) {
-        t->execTime = loc->second;
+      if(isScaling) {
+        t->execTime = t->execTime/scaling_factor;
+      } else {
+        t->execTime = user_timing;
       }
     }
 
