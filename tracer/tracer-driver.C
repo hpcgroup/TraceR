@@ -1855,6 +1855,7 @@ static void handle_coll_recv_post_event(
     //printf("%d Added recv post %d %d %d\n",  ns->my_pe_num, m->msgId.pe, m->msgId.comm, m->msgId.seq);
   } else {
     b->c2 = 1;
+    assert(ns->my_pe->currentCollTask >= 0);
     Task *t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
     m->model_net_calls = 1;
     assert(ns->my_pe->currentCollSeq == m->msgId.seq);
@@ -2391,6 +2392,11 @@ static void handle_a2a_send_comp_event(
 		tw_lp * lp)
 {
   int recvCount;
+  if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollPartner == (ns->my_pe->currentCollSize - 1))) {
+    b->c13 = 1;
+    return;
+  }
   ns->my_pe->currentCollPartner++;
   int partner;
   if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
@@ -2442,6 +2448,7 @@ static void handle_a2a_send_comp_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+  if(b->c13) return;
   int comm = ns->my_pe->currentCollComm;
   int64_t collSeq = ns->my_pe->currentCollSeq;
   ns->my_pe->currentCollPartner--;
@@ -2632,6 +2639,11 @@ static void handle_allgather_send_comp_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+  if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollPartner == (ns->my_pe->currentCollSize - 1))) {
+    b->c13 = 1;
+    return;
+  }
   int recvCount;
   ns->my_pe->currentCollPartner++;
   int partner = ns->my_pe->currentCollPartner;
@@ -2680,6 +2692,7 @@ static void handle_allgather_send_comp_rev_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
+  if(b->c13) return;
   int comm = ns->my_pe->currentCollComm;
   int64_t collSeq = ns->my_pe->currentCollSeq;
   ns->my_pe->currentCollPartner--;
@@ -2694,6 +2707,10 @@ static void handle_coll_complete_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
+  if(ns->my_pe->currentCollSeq == -1) {
+    b->c3 = 1;
+    return;
+  }
   Task *t = &ns->my_pe->myTasks[m->executed.taskid];
   //printf("%d coll complete %d %d\n", ns->my_pe_num, ns->my_pe->currentCollComm,
   //    ns->my_pe->currentCollSeq);
@@ -2729,6 +2746,9 @@ static void handle_coll_complete_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
+  if(b->c3) {
+    return;
+  }
   if(b->c2) {
     perform_bcast_rev(ns, m->executed.taskid, lp, m, b, 0);
   }

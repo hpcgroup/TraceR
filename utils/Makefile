@@ -22,7 +22,7 @@ PGMS=$(SRCS:.C=)
 all: $(PGMS)
 
 %: %.C
-	$(CC) -O3 ${EXTRA} -o $@ $<
+	$(CC) -g ${EXTRA} -o $@ $<
 
 clean:
 	rm -f $(PGMS)
