@@ -21,11 +21,15 @@ git clone https://xgitlab.cels.anl.gov/codes/codes.git
 ```
 Latest verfied commit: 2f6fc4ac652b1ef53d8b0df68b1a98ed9bbe7fbf
 
-* Download and build Charm++ with bgampi target:
+* Download and build Charm++ with bigemulator as a build option:
 ```
 git clone http://charm.cs.uiuc.edu/gerrit/charm
 ```
-Follow instructions in the [Charm++ manual](http://charm.cs.illinois.edu/manuals/html/charm++/A.html). Replace the "charm++" target with bgampi.
+Follow instructions in the [Charm++ manual](http://charm.cs.illinois.edu/manuals/html/charm++/A.html). 
+
+Use "charm++" as target for compiling TraceR.
+Use "bgampi" as target for buidling AMPI used for collecting traces.
+In both of cases above, pass "bigemulator" as a build option.
 
 * Set the appropriate paths CHARMPATH, ROSS, BASE_DIR/CODES in tracer/Makefile.common and then:
 ```
