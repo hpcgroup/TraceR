@@ -12,14 +12,15 @@ Computing applications on interconnection networks.
 ```
 git clone https://github.com/carothersc/ROSS
 ```
-Latest verified commit: 8af4b4167859d68a4d838d88d35b41791612a110
+Latest verified commit: de26e581a312fd122a4c06917bf0f3d21f38a24b
 
 * Download and install CODES:
 ```
 Website: https://xgitlab.cels.anl.gov/codes/codes
 git clone https://xgitlab.cels.anl.gov/codes/codes.git
 ```
-Latest verfied commit: 2f6fc4ac652b1ef53d8b0df68b1a98ed9bbe7fbf
+Latest verfied commit: 8f56c9608eb07922971242d76bae88ad0c7aa789
+Pending pull request: https://xgitlab.cels.anl.gov/codes/codes/merge_requests/21
 
 * Trace format choice (pick one): 
 
@@ -35,14 +36,14 @@ In both of cases above, pass "bigemulator" as a build option.
 
 2) Down and build scoreP for OTF2 support:
 
-Follow instruction at http://www.vi-hps.org/projects/score-p/
+Follow instructions at http://www.vi-hps.org/projects/score-p/
 
 
-* Set the appropriate paths ROSS, BASE_DIR/CODES in tracer/Makefile.common. If 
+* Set the appropriate paths: ROSS, BASE_DIR/CODES in tracer/Makefile.common. If 
 using BigSim format, uncomment SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1,
-otherwise SELECT_TRACE = -DTRACER_OTF_TRACES=1 should be left uncomment (one of
-two). Either set CHARMPATH or ensure that otf2-config (which is inside the bin
-directory of scoreP install) is in your path. Then,
+otherwise SELECT_TRACE = -DTRACER_OTF_TRACES=1 should be left uncommented (one of
+two). Accordingly, either set CHARMPATH or ensure that otf2-config (which is 
+inside the bin directory of scoreP install) is in your path. Then,
 ```
 cd tracer
 make
