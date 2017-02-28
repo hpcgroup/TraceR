@@ -53,6 +53,7 @@ typedef struct proc_msg proc_msg;
 typedef struct proc_state proc_state;
 
 static int sync_mode = 0;
+unsigned int print_frequency = 5000;
 
 char tracer_input[256];
 proc_state *ns_5 = NULL;
@@ -107,6 +108,7 @@ const tw_optdef app_opt [] =
 {
     TWOPT_GROUP("Model net test case" ),
     TWOPT_CHAR("lp-io-dir", lp_io_dir, "Where to place io output (unspecified -> tracer-out"),
+    TWOPT_UINT("timer-frequency", print_frequency, "Frequency for printing timers, #tasks (unspecified -> 5000"),
     TWOPT_END()
 };
 
@@ -671,6 +673,35 @@ static void proc_finalize(
           ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
 
     PE_printStat(ns->my_pe);
+
+    if(ns->my_pe->pendingMsgs.size() != 0 ||
+       ns->my_pe->pendingRMsgs.size() != 0) {
+      printf("%d psize %d pRsize %d\n", ns->my_pe_num, 
+        ns->my_pe->pendingMsgs.size(), ns->my_pe->pendingRMsgs.size());
+    }
+
+    if(ns->my_pe->pendingReqs.size() != 0 ||
+      ns->my_pe->pendingRReqs.size() != 0) {
+      printf("%d rsize %d rRsize %d\n", ns->my_pe_num, 
+        ns->my_pe->pendingReqs.size(), ns->my_pe->pendingRReqs.size());
+    }
+
+    if(ns->my_pe->pendingRCollMsgs.size() != 0) {
+      printf("%d rcollsize %d \n", ns->my_pe_num, 
+        ns->my_pe->pendingRCollMsgs.size());
+    }
+
+    int count = 0;
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.begin();
+    while(it != ns->my_pe->pendingCollMsgs.end()) {
+      count += it->second.size();
+      it++;
+    }
+
+    if(count != 0) {
+      printf("%d collsize %d \n", ns->my_pe_num, count);
+    }
 
     if(jobTime > jobTimes[ns->my_job]) {
         jobTimes[ns->my_job] = jobTime;
@@ -1560,13 +1591,20 @@ static tw_stime exec_task(
     if(t->event_id >= 0) {
       char str[1000];
       if(t->beginEvent) {
-        strcpy(str, "[%d %d : Begin %s %f]\n");
+        strcpy(str, "[ %d %d : Begin %s %f ]\n");
       } else {
-        strcpy(str, "[%d %d : End %s %f]\n");
+        strcpy(str, "[ %d %d : End %s %f ]\n");
       }
       tw_output(lp, str, ns->my_job, ns->my_pe_num, 
           jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
           tw_now(lp)/((double)TIME_MULT));
+    }
+
+    if(ns->my_pe_num == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
+      char str[1000];
+      strcpy(str, "[ %d %d : time at task %d %f ]\n");
+      tw_output(lp, str, ns->my_job, ns->my_pe_num, 
+          ns->my_pe->currentTask, tw_now(lp)/((double)TIME_MULT));
     }
 
     if(t->loopStartEvent) {
@@ -2274,8 +2312,10 @@ static void perform_a2a(
       int comm = m->msgId.comm;
       int64_t collSeq = m->msgId.seq;
       ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
-      if(comm != ns->my_pe->currentCollComm ||
-          collSeq != ns->my_pe->currentCollSeq || ns->my_pe->currentCollTask == -1) {
+      if(comm != ns->my_pe->currentCollComm 
+          || collSeq != ns->my_pe->currentCollSeq 
+          || ns->my_pe->currentCollTask == -1
+          || ns->my_pe->currentCollPartner == 0) {
         b->c12 = 1;
         return;
       }
@@ -2305,7 +2345,7 @@ static void perform_a2a(
     }
   }
 
-  if(ns->my_pe->currentCollPartner != ns->my_pe->currentCollSize - 1) {
+  if(ns->my_pe->currentCollPartner < ns->my_pe->currentCollSize - 1) {
     b->c13 = 1;
     int dest, src;
     if((ns->my_pe->currentCollSize & (ns->my_pe->currentCollSize - 1)) == 0) {
@@ -2317,6 +2357,10 @@ static void perform_a2a(
       src = (ns->my_pe->currentCollRank - ns->my_pe->currentCollPartner - 1
         + ns->my_pe->currentCollSize) %  ns->my_pe->currentCollSize;
     }
+    assert(dest >= 0);
+    assert(dest < ns->my_pe->currentCollSize);
+    assert(src >= 0);
+    assert(src < ns->my_pe->currentCollSize);
     dest = g.members[dest];
     m->coll_info = dest;
     tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
@@ -2374,6 +2418,7 @@ static void perform_a2a_rev(
 
   if(b->c13) {
     if(isEvent) {
+       assert(ns->my_pe->currentCollTask >= 0);
        t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];  
     }
     enqueue_coll_msg_rev(TRACER_A2A, ns, &t->myEntry.msgId, seq, m->coll_info, 
