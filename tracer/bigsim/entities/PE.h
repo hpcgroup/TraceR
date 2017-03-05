@@ -103,8 +103,9 @@ class PE {
     std::vector<int64_t> collectiveSeq;
     std::map<int64_t, std::map<int64_t, std::map<int, int> > > pendingCollMsgs;
     CollKeyType pendingRCollMsgs;
-    int64_t currentCollComm, currentCollSeq, currentCollTask;
+    int64_t currentCollComm, currentCollSeq, currentCollTask, currentCollMsgSize;
     int currentCollRank, currentCollPartner, currentCollSize;
+    int currentCollSendCount, currentCollRecvCount;
 };
 
 #endif /* PE_H_ */

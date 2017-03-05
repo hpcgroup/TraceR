@@ -43,7 +43,7 @@ struct proc_msg
     MsgID msgId;
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
-    int coll_info;
+    unsigned int coll_info;
 };
 
 /* types of events that will constitute triton requests */
@@ -62,6 +62,10 @@ enum proc_event
     COLL_A2A_SEND_DONE, 
     COLL_ALLGATHER, /* Collective impl for allgather */
     COLL_ALLGATHER_SEND_DONE, 
+    COLL_BRUCK,
+    COLL_BRUCK_SEND_DONE,
+    COLL_A2A_BLOCKED,
+    COLL_A2A_BLOCKED_SEND_DONE,
     RECV_COLL_POST,
     COLL_COMPLETE
 };
@@ -128,6 +132,16 @@ static void handle_allgather_send_comp_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_bruck_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
+static void handle_a2a_blocked_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 static void handle_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -175,6 +189,16 @@ static void handle_allgather_send_comp_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+static void handle_bruck_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_a2a_blocked_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void handle_recv_post_rev_event(
     proc_state * ns,
     tw_bf * b,
@@ -204,7 +228,9 @@ static int send_msg(
     int dest_id,
     tw_stime timeOffset,
     enum proc_event evt_type,
-    tw_lp * lp);
+    tw_lp * lp,
+    bool fillSz = false,
+    int64_t size2 = 0);
 
 static void enqueue_msg(
     proc_state * ns,
@@ -293,6 +319,22 @@ static void perform_allgather(
     tw_bf * b,
     int isEvent);
 
+static void perform_bruck(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_a2a_blocked(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void handle_coll_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -353,6 +395,22 @@ static void perform_allreduce_rev(
     int isEvent);
 
 static void perform_allgather_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_bruck_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_a2a_blocked_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,

@@ -336,6 +336,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->collectiveSeq.resize(num_communicators, 0);
   pe->currentCollComm = pe->currentCollSeq = pe->currentCollTask = -1;
   pe->currentCollRank = pe->currentCollPartner = pe->currentCollSize = -1;
+  pe->currentCollMsgSize = pe->currentCollSendCount = pe->currentCollRecvCount = -1;
  
   double user_timing, scaling_factor;
   bool isScaling = false;
