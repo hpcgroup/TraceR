@@ -1885,6 +1885,7 @@ static void enqueue_coll_msg(
       m_remote.iteration = iter;
 
       m_local.proc_event_type = lookUpTable[index].local_event;
+      m_local.executed.taskid = ns->my_pe->currentCollTask;
 
       model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
           sendOffset + copyTime*(isEager?1:0), sizeof(proc_msg), 
@@ -1961,6 +1962,7 @@ static void handle_coll_recv_post_event(
     m_remote.iteration = ns->my_pe->currIter;
 
     m_local.proc_event_type = lookUpTable[index].local_event;
+    m_local.executed.taskid = ns->my_pe->currentCollTask;
     int64_t size = t->myEntry.msgId.size;
     if((t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL && 
         t->myEntry.msgId.size <= TRACER_A2A_ALG_CUTOFF) ||
@@ -2516,6 +2518,7 @@ static void handle_a2a_send_comp_event(
 {
   int recvCount;
   if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollTask != m->executed.taskid) || 
      (ns->my_pe->currentCollPartner == (ns->my_pe->currentCollSize - 1))) {
     b->c13 = 1;
     return;
@@ -2763,6 +2766,7 @@ static void handle_allgather_send_comp_event(
 		tw_lp * lp)
 {
   if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollTask != m->executed.taskid) || 
      (ns->my_pe->currentCollPartner == (ns->my_pe->currentCollSize - 1))) {
     b->c13 = 1;
     return;
@@ -3005,6 +3009,7 @@ static void handle_bruck_send_comp_event(
 {
   int recvCount;
   if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollTask != m->executed.taskid) || 
      (ns->my_pe->currentCollPartner >= (ns->my_pe->currentCollSize/2))) {
     b->c13 = 1;
     return;
@@ -3241,6 +3246,7 @@ static void handle_a2a_blocked_send_comp_event(
 {
   int recvCount;
   if(ns->my_pe->currentCollTask == -1 ||
+     (ns->my_pe->currentCollTask != m->executed.taskid) || 
      (ns->my_pe->currentCollPartner == (ns->my_pe->currentCollSize - 1))) {
     b->c13 = 1;
     return;
