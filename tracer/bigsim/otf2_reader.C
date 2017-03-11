@@ -156,6 +156,17 @@ addUserEvt(void*               userData,
   new_task.event_id = TRACER_USER_EVT;
 }
 
+static void 
+addEmptyUserEvt(void* userData)
+{
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+  ld->tasks.push_back(Task());
+  Task &new_task = ld->tasks[ld->tasks.size() - 1];
+  new_task.execTime = 0;
+  new_task.event_id = TRACER_USER_EVT;
+}
+
+
 static OTF2_CallbackCode
 callbackEvtBegin( OTF2_LocationRef    location,
                   OTF2_TimeStamp      time,
@@ -228,6 +239,9 @@ callbackSendEvt(OTF2_LocationRef locationID,
                 uint64_t msgLength)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -242,6 +256,7 @@ callbackSendEvt(OTF2_LocationRef locationID,
   new_task.myEntry.node = group.members[receiver];
   new_task.myEntry.thread = 0;
   new_task.isNonBlocking = false;
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -259,6 +274,9 @@ callbackIsendEvt(OTF2_LocationRef locationID,
                  uint64_t requestID)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -274,6 +292,7 @@ callbackIsendEvt(OTF2_LocationRef locationID,
   new_task.myEntry.thread = 0;
   new_task.isNonBlocking = true;
   new_task.req_id = requestID;
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -287,11 +306,15 @@ callbackIsendCompEvt(OTF2_LocationRef locationID,
                     uint64_t requestID)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = soft_delay_mpi;
   new_task.event_id = TRACER_SEND_COMP_EVT;
   new_task.req_id = requestID;
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -308,6 +331,9 @@ callbackRecvEvt(OTF2_LocationRef locationID,
                 uint64_t msgLength)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -322,6 +348,7 @@ callbackRecvEvt(OTF2_LocationRef locationID,
   new_task.myEntry.node = group.members[sender];
   new_task.myEntry.thread = 0;
   new_task.isNonBlocking = false;
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -336,6 +363,9 @@ callbackIrecv(OTF2_LocationRef locationID,
                  uint64_t requestID)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = soft_delay_mpi;
@@ -343,6 +373,7 @@ callbackIrecv(OTF2_LocationRef locationID,
   new_task.req_id = requestID;
   new_task.isNonBlocking = true;;
   ((AllData *)userData)->matchRecvIds[requestID] = ld->tasks.size() - 1;
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -360,6 +391,9 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
                  uint64_t requestID)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   AllData *globalData = (AllData *)userData;
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
@@ -387,7 +421,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   postTask.myEntry.msgId.coll_type = -1;
   postTask.myEntry.node = new_task.myEntry.node;
   ((AllData *)userData)->matchRecvIds.erase(it);
-
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
@@ -417,6 +451,9 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
                          uint64_t sizeReceived)
 {
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+#if NO_COMM_BUILD
+  addEmptyUserEvt(userData);
+#else
   AllData *globalData = (AllData *)userData;
   if(collectiveOp == OTF2_COLLECTIVE_OP_BCAST) {
     ld->tasks.push_back(Task());
@@ -505,6 +542,7 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     new_task.myEntry.thread = 0;
     new_task.isNonBlocking = false;
   } 
+#endif
   ld->lastLogTime = time;
   return OTF2_CALLBACK_SUCCESS;
 }
