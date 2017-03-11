@@ -20,6 +20,7 @@ Website: https://xgitlab.cels.anl.gov/codes/codes
 git clone https://xgitlab.cels.anl.gov/codes/codes.git
 ```
 Latest verfied commit: 8f56c9608eb07922971242d76bae88ad0c7aa789
+
 Pending pull request: https://xgitlab.cels.anl.gov/codes/codes/merge_requests/21
 
 * Trace format choice (pick one): 
@@ -36,8 +37,7 @@ In both of cases above, pass "bigemulator" as a build option.
 
 2) Down and build scoreP for OTF2 support:
 
-Follow instructions at http://www.vi-hps.org/projects/score-p/
-
+Refer to README.OTF2 file in this directory.
 
 * Set the appropriate paths: ROSS, BASE_DIR/CODES in tracer/Makefile.common. If 
 using BigSim format, uncomment SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1,

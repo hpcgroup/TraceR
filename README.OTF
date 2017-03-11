@@ -1,0 +1,11 @@
+Installation of scoreP
+
+1. Download from http://www.vi-hps.org/projects/score-p/.
+2. tar -xvzf scorep-3.0.tar.gz
+3. cd scorep-3.0
+4. CC=mpicc CFLAGS="-O2" CXX=mpicxx CXXFLAGS="-O2" FC=mpif90 F77=mpif77 ./configure --without-gui --prefix=<SCOREP_INSTALL> 
+5. make
+6. make install
+
+
+
