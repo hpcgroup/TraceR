@@ -66,8 +66,10 @@ Format of trace_config:
 ...
 ```
 If "global map file" is not needed, use NA for it and "map file for job*".
-For generating simple global and job map file, use the code in utils.
-More information on how to set up network config files can be found at
+For generating  global and job map file, please refer to README inside
+utils for the format and sample map generation code.
+
+More information on workflow of TraceR and network config files can be found at
 docs/UserWriteUp.txt and in CODES:codes/src/networks/model-net/doc
 
 Example files for BigSim are in jacobi2d, while for OTF2 are in  Sample run command:
