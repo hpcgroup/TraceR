@@ -7,5 +7,42 @@ Installation of scoreP
 5. make
 6. make install
 
+Generating OTF2 traces with an MPI program using ScoreP:
+Detailed instructions are available at
+https://silc.zih.tu-dresden.de/scorep-current/pdf/scorep.pdf.
 
 
+Quick start:
+1. Add $SCOREP_INSTALL/bin to your PATH for convenience. Example:
+export SCOREP_INSTALL=/g/g92/jain6/workspace/scoreP/scorep-3.0/install
+export PATH=$SCOREP_INSTALL/bin:$PATH
+
+2. Add following compile time flags to the application:
+-I$SCOREP_INSTALL/include -I$SCOREP_INSTALL/include/scorep -DSCOREP_USER_ENABLE
+
+3. Add #include <scorep/SCOREP_User.h> to all files where you plan to add any of
+the following scoreP calls (optional step):
+SCOREP_RECORDING_OFF(); - stop recording
+SCOREP_RECORDING_ON(); - start recoding
+
+Marking special regions: SCOREP_USER_REGION_BY_NAME_BEGIN( regionname, SCOREP_USER_REGION_TYPE_COMMON) and SCOREP_USER_REGION_BY_NAME_END(regionname).
+Region name beginning with TRACER_WallTime_ are special: using TRACER_WallTime_<any_name> prints current time during simulation with tag <any_name>. 
+
+For example:
+SCOREP_USER_REGION_BY_NAME_BEGIN("TRACER_WallTime_MainLoop", SCOREP_USER_REGION_TYPE_COMMON); - place at the beginning of main time step loop
+SCOREP_USER_REGION_BY_NAME_END("TRACER_WallTime_MainLoop"); - place at the end of main time step loop
+
+4. For the link step, prefix the following to the linker line:
+LD = scorep --user --nocompiler --noopenmp --nopomp --nocuda --noopenacc --noopencl --nomemory <your_linker>
+
+5. For running, set:
+export SCOREP_ENABLE_TRACING=1
+export SCOREP_ENABLE_PROFILING=0
+export SCOREP_REDUCE_PROBE_TEST=1
+export SCOREP_MPI_ENABLE_GROUPS=ENV,P2P,COLL,XNONBLOCK
+
+If ScoreP prints warning about flushing traces during run, you may use to avoid them:
+export SCOREP_TOTAL_MEMORY=256M
+export SCOREP_EXPERIMENT_DIRECTORY=/p/lscratchd/<username>/...
+
+Run the binary and traces should generated in a folder named scorep-*.

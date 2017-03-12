@@ -6,14 +6,15 @@ prototype systems, i.e., if control flow of an application, which includes
 expected computation tasks, communication routines, and their dependencies, is
 provided to TraceR, it will mimic the flow on a hypothetical system with a given
 compute and communication capability. As of now, the control flow is captured by
-emulating applications using BigSim. CODES is used for simulating the
-communication on the network.
+ether emulating applications using BigSim or by linking with ScoreP. CODES 
+is used for simulating the communication on the network.
 
 Expected work flow:
 
-1) Write an MPI application. Avoid global variables so that the application be
-run with virtualization.
+1) Write an MPI application. (Avoid global variables so that the application be
+run with virtualization if using BigSim).
 
+If using BigSim follows steps 2-4, else follow step 5.
 2) Compile BigSim/Charm++ for emulation. Use any one of the following commands:
 
 - To use UDP as BigSim/Charm++'s communication layer:
@@ -74,15 +75,16 @@ plus one. Their names are bgTrace, bgTrace0, bgTrace1, so on.
 
 Create a new folder and move all bgTrace to that folder.
 
-5) Simulation. To run simulation, 2 files are needed: a tracer config file, a
-and codes config file. Optionally, mapping files can also be provided.
+5) Following instructions in README.OTF to generate OTF2 traces.
 
-Tracer config file: sample found at tracer/jacobi2d/tracer_config
-Format (expected content on each line of the file):
+6) Simulation. To run simulation, 2 files are needed: a tracer config file, 
+and a codes config file. Optionally, mapping files can also be provided.
+
+Tracer config file: sample found at tracer/jacobi2d/tracer_config (BigSim) or tracer/stencil4d-otf/tracer_config (OTF) Format (expected content on each line of the file):
 <global_map file>
 <num jobs>
-<Trace folder for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
-<Trace folder for job1> <map file for job1> <number of ranks in job1> <iterations (use 1 if running in normal mode)>
+<Trace path for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
+<Trace path for job1> <map file for job1> <number of ranks in job1> <iterations (use 1 if running in normal mode)>
 ...
 ```
 If <global_map file> is not needed, use NA for it and <map file for job*>.

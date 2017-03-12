@@ -85,11 +85,9 @@ Any published work that utilizes this software should include the following
 reference:
 
 ```
-Bilge Acun, Nikhil Jain, Abhinav Bhatele, Misbah Mubarak, Christopher D.
-Carothers, and Laxmikant V. Kale. Preliminary evaluation of a parallel trace
-replay tool for HPC network simulations. In Proceedings of the 3rd Workshop on
-Parallel and Distributed Agent-Based Simulations, PADABS '15, August 2015.
-LLNL-CONF-667225.
+Nikhil Jain, Abhinav Bhatele, Sam White, Todd Gamblin, and Laxmikant Kale.
+Evaluating HPC Networks via Simulation of Parallel Workloads. SC 2016.
+
 ```
 
 ### Release

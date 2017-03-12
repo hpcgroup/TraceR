@@ -1,0 +1,4 @@
+global_map.bin
+2
+traces-64/traces.otf2 job0 64 1
+traces-32/traces.otf2 job1 32 1
