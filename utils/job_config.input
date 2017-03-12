@@ -4,3 +4,12 @@
 <#ranks> <mapping type> <app dims - 3D> <within node dim - 3D> <router shape - 3D>
 <#ranks> <mapping type> <app dims - 3D> <within node dim - 3D> <router shape - 3D>
 
+For app dims, choose any 3 grid suitable for the application. If the dimensions
+do not matter, simply use "#ranks 1 1".
+
+For node dim, choose how you would like to arrange ranks with a node. If the
+dimensions do not matter, simply use "#ranks_per_node 1 1".
+
+For router shape, choose how you would like to arrange nodes with a router. If
+it does not matter, simply use "#nodes_per_router 1 1".
+

@@ -27,7 +27,7 @@ int main(int argc, char**argv) {
   FILE* out_files;
 
   if(argc < 6) {
-    printf("Correct usage: %s <global_file_name> <total ranks> <nodes per router> <cores per node> <nodes to skip after>\n",
+    printf("Correct usage: %s <global_file_name> <sum of ranks used by all jobs> <nodes per router> <servers/cores per node> [optional <nodes within routers to skip after>]\n",
         argv[0]);
     exit(1);
   }
@@ -39,7 +39,10 @@ int main(int argc, char**argv) {
   int numAllocCores = atoi(argv[2]);
   int rr_group = atoi(argv[3]);
   int rr = atoi(argv[4]);
-  int skip = atoi(argv[5]);
+  int skip = rr_group;
+  if(argc > 5) {
+    skip = atoi(argv[5]);
+  }
   int local_rank = 0;
   
   for(int i = 0; ; i += rr_group*rr) {

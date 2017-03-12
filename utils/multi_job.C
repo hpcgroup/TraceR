@@ -43,8 +43,9 @@ int main(int argc, char**argv) {
   if(argc < 11) {
     printf("Correct usage: %s <global_file_name> <router_distribution_type> <num jobs> <routers per job> <nodes per router> <cores per node> <nodes to skip after> <number of groups> <number of routers per group> <job config>\n",
         argv[0]);
-    printf("Router distribution type: 1 - LINEAR, 2 - Random router\n");
-    printf("Within-Job distribution types: 1 - LINEAR, 2 - Blocked, 3 - Blocked random\n");
+    printf("Router distribution type: 1 - Linear, 2 - Random router, 3 - Clustered\n");
+    printf("Within-Job distribution types: 1 - Linear, 2 - Blocked, 3 - Blocked random\n");
+    printf("job_config.input shows the information needed in job config.");
     exit(1);
   }
 
