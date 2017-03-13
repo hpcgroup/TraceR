@@ -30,7 +30,7 @@
 #define J_BLOCKED 2
 #define J_RAND_BLOCKED 3
 
-#define FILL_SPACE 1
+#define FILL_SPACE 0
 
 using namespace std;
 void allocateJob(int job_num, vector<int> &routers);
@@ -84,7 +84,13 @@ int main(int argc, char**argv) {
       fillSpaceNodes[inc++] = i;
   }
   assert(inc == totalNodesNeeded);
+#else 
+  int *fillSpaceNodes = new int[totalNodes];
+  for(int i = 0; i < totalNodes; i++) {
+    fillSpaceNodes[i] = (i / skip) * rr_group + (i % skip);
+  }
 #endif
+
 
   if(node_dist == LINEAR) {
     int node = 0;
@@ -257,7 +263,9 @@ void allocateJob(int job_num, vector<int> &nodes) {
     for(int i = 0; i < numAllocCores; i++) {
       localRanks[i] = i;
     }
+    prod_xyz = rr;
   } else if(map_type == J_BLOCKED || map_type == J_RAND_BLOCKED) {
+    assert(prod_xyz == rr);
     int bigger_box =  r_x*r_y*r_z * prod_xyz;
     int bbx = box_x/(r_x*s_x);
     int bby = box_y/(r_y*s_y);

@@ -237,7 +237,9 @@ void allocateJob(int job_num, vector<int> &routers) {
     for(int i = 0; i < numAllocCores; i++) {
       localRanks[i] = i;
     }
+    prod_xyz = rr;
   } else if(map_type == J_BLOCKED || map_type == J_RAND_BLOCKED) {
+    assert(prod_xyz == rr);
     int bigger_box =  r_x*r_y*r_z * prod_xyz;
     int bbx = box_x/(r_x*s_x);
     int bby = box_y/(r_y*s_y);
