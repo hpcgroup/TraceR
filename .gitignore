@@ -26,6 +26,7 @@
 *.o
 *.a
 *.d
+tracer/traceR
 
 # hide backups
 *~
@@ -42,3 +43,23 @@ modelnet-test-6*
 modelnet-test-7*
 modelnet-test-8*
 modelnet-test-9*
+
+# util binaries
+
+utils/core_random_mapping
+utils/def_lin_mapping
+utils/dfly_node_random_mapping
+utils/dfly_node_rr_mapping
+utils/dfly_router_rr_mapping
+utils/many_job
+utils/multi_job
+utils/node_mapping
+utils/router_random_mapping
+utils/spread_nodes
+utils/stencil_block_block_mapping
+utils/stencil_block_block_random_mapping
+utils/stencil_block_mapping
+utils/stencil_block_node_random_mapping
+utils/stencil_block_torus_mapping
+utils/torus_block_mapping
+utils/torus_node_random_mapping
