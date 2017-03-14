@@ -1644,9 +1644,9 @@ static tw_stime exec_task(
 
     if(ns->my_pe_num == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
       char str[1000];
-      strcpy(str, "[ %d %d : time at task %d %f ]\n");
+      strcpy(str, "[ %d %d : time at task %d/%d %f ]\n");
       tw_output(lp, str, ns->my_job, ns->my_pe_num, 
-          ns->my_pe->currentTask, tw_now(lp)/((double)TIME_MULT));
+          ns->my_pe->currentTask, PE_get_tasksCount(ns->my_pe), tw_now(lp)/((double)TIME_MULT));
     }
 
     if(t->loopStartEvent) {

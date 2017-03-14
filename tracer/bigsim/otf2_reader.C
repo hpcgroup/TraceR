@@ -439,6 +439,19 @@ callbackCollectiveBegin(OTF2_LocationRef locationID,
 }
 
 static OTF2_CallbackCode 
+callbackMeasurement(OTF2_LocationRef locationID,
+                        OTF2_TimeStamp time,
+                        uint64_t evtPos,
+                        void * userData,
+                        OTF2_AttributeList * attributeList,
+                        OTF2_MeasurementMode mode)
+{
+  LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
+  ld->lastLogTime = time;
+  return OTF2_CALLBACK_SUCCESS;
+}
+
+static OTF2_CallbackCode 
 callbackCollectiveEnd(OTF2_LocationRef locationID,
                          OTF2_TimeStamp time,
                          uint64_t evtPos,
@@ -647,6 +660,8 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
       event_callbacks, &callbackCollectiveBegin);
   OTF2_EvtReaderCallbacks_SetMpiCollectiveEndCallback(
       event_callbacks, &callbackCollectiveEnd);
+  OTF2_EvtReaderCallbacks_SetMeasurementOnOffCallback(
+      event_callbacks, &callbackMeasurement);
   
   allData->ld = ld;
   ld->lastLogTime = 0;
