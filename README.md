@@ -23,9 +23,9 @@ Latest verfied commit (from master): 8f56c9608eb07922971242d76bae88ad0c7aa789
 
 Pending pull request (with new features): https://xgitlab.cels.anl.gov/codes/codes/merge_requests/21
 
-* Trace format choice (pick one): 
+* Trace format choice (TraceR v2 only works with OTF2 right now, so chose 2 here): 
 
-1) Download and build Charm++ with bgampi target:
+1) AMPI-based BigSim format: download and build Charm++ with bgampi target:
 ```
 git clone http://charm.cs.uiuc.edu/gerrit/charm
 ```
@@ -35,7 +35,7 @@ Use "charm++" as target for compiling TraceR.
 Use "bgampi" as target for buidling AMPI used for collecting traces.
 In both of cases above, pass "bigemulator" as a build option.
 
-2) Down and build scoreP for OTF2 support:
+2) OTF2: download and build scoreP for OTF2 support:
 
 Refer to README.OTF2 file in this directory.
 
