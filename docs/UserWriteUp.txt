@@ -90,11 +90,12 @@ Tracer config file: sample found at tracer/jacobi2d/tracer_config (BigSim) or tr
 If <global_map file> is not needed, use NA for it and <map file for job*>.
 For generating simple global and job map file, use the code in utils.
 
-CODES config files: samples at tracer/conf/tracer-torus.conf,
-tracer/conf/tracer-dragonfly.conf, tracer/conf/tracer-fattree-type2.conf
-(only these three networks have been improved and tested). Additional ReadMe on
-format of the CODES config file can be found in the CODES repository. Brief
-summary follows:
+CODES config files: samples in tracer/conf 
+
+Additional documentation on format of the CODES config file can be found in the
+CODES distribution at: CODES/src/networks/model-net/doc
+
+Brief summary follows:
 
 LPGROUPS, MODELNET_GRP, PARAMS are keywords and should be used as in.  Each
 repetition in the MODELNET_GRP describes a router and its associated component.
@@ -108,10 +109,7 @@ on the number of levels in the fat-tree. Note that the total number of cores
 specified in the CODES config file can be greater than the number of MPI
 processes being simulated (specified in the tracer config file).
 
-More details for network models can be found in CODES distribution at:
-CODES/src/networks/model-net/doc
-
-Brief on other common parameters:
+Other common parameters:
 packet_size/chunk_size (both should have the same value): size of the packets
 created by NIC for transmission on the network. Smaller the packet size, longer
 the time for which simulation will run (in real time). Larger the packet size,
