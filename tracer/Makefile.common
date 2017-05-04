@@ -49,6 +49,8 @@ endif
 
 CODES_CFLAGS = -I${CODES}/install-mod/include -I${ROSS}/include
 #Enable one of the following:
+#TraceR-2.x works with OTF2 only. Support for BigSim will be fixed soon; for now
+#use TraceR-1.x if BigSim support is desired.
 #SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
 SELECT_TRACE = -DTRACER_OTF_TRACES=1
 
