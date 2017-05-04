@@ -33,11 +33,11 @@ endif
 CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator
 
 #ross install directory
-ROSS = /p/lscratchf/jain6/migrate-tracer/ROSS/install
+ROSS = /p/lscratchf/jain6/migrate-tracer/ROSS-rebase/install
 #base directory of this code
 BASE_DIR = /p/lscratchf/jain6/migrate-tracer
-CODES = ${BASE_DIR}/codes
-CODES_LIBS = -L${CODES}/install/lib -Wl,-rpath=${CODES}/install/lib
+CODES = ${BASE_DIR}/codes-rebase
+CODES_LIBS = -L${CODES}/install-mod/lib -Wl,-rpath=${CODES}/install-mod/lib
 CODES_LIBS += -L${ROSS}/lib -Wl,-rpath=${ROSS}/lib
 CODES_LIBS += -lcodes -lROSS -lm
 
@@ -47,13 +47,15 @@ else
 ARCH_FLAGS = -Wall 
 endif
 
-CODES_CFLAGS = -I${CODES}/install/include -I${ROSS}/include
+CODES_CFLAGS = -I${CODES}/install-mod/include -I${ROSS}/include
 #Enable one of the following:
 #SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
 SELECT_TRACE = -DTRACER_OTF_TRACES=1
 
-CFLAGS = -O3 -g -Wall
-CXXFLAGS = -O3 -g -Wall
+#CFLAGS = -O2 -g -Wall -DNO_COMM_BUILD=1
+#CXXFLAGS = -O2 -g -Wall -DNO_COMM_BUILD=1
+CFLAGS = -O2 -g -Wall 
+CXXFLAGS = -O2 -g -Wall 
 LDFLAGS = -g
 OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS} ${SELECT_TRACE}
 BASE_INCS= -Ibigsim -I.
