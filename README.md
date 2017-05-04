@@ -72,7 +72,7 @@ utils for the format and sample map generation code.
 More information on workflow of TraceR and network config files can be found at
 docs/UserWriteUp.txt and in CODES:codes/src/networks/model-net/doc
 
-Example files for BigSim are in jacobi2d, while for OTF2 are in  Sample run command:
+Example files for BigSim are in jacobi2d, while for OTF2 are in tracer/stencil4d-otf. Sample run command:
 ```
 mpirun -np 8 ../traceR --sync=3  --nkp=16  -- ../conf/tracer-torus.conf tracer_config
 ```
