@@ -37,7 +37,10 @@ In both of cases above, pass "bigemulator" as a build option.
 
 2) OTF2: download and build scoreP for OTF2 support:
 
-Refer to README.OTF2 file in this directory.
+Refer to README.OTF2 file in this directory. Simulation of the following most
+commonly used collectives using algorithms used in MPICH is supported in this
+trace format: Barrier, Bcast, (All)Reduce, Alltoall(v), and Allgather. In
+contrast, for BigSim traces, the simulation depends on AMPI's implementation.
 
 * Set the appropriate paths: ROSS, BASE_DIR/CODES in tracer/Makefile.common.
 Also set compilers and flags - CC, CXX, SEQ_CXX, CFLAGS, CXXFLAGS, LDFLAGS. 
