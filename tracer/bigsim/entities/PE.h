@@ -22,6 +22,7 @@
 #include "Task.h"
 #include <list>
 #include <map>
+#include <vector>
 #include "datatypes.h"
 
 class Task;

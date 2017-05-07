@@ -23,7 +23,7 @@ Latest verfied commit (from master): 8f56c9608eb07922971242d76bae88ad0c7aa789
 
 Pending pull request (with new features): https://xgitlab.cels.anl.gov/codes/codes/merge_requests/21
 
-* Trace format choice (TraceR v2 only works with OTF2 right now, so choose 2 here): 
+* Trace format choice (pick one of the following): 
 
 1) AMPI-based BigSim format: download and build Charm++ with bgampi target:
 ```

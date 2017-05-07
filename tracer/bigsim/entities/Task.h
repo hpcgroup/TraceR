@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <cstdio>
 #if TRACER_BIGSIM_TRACES
+#include <mpi.h>
 #include <ross.h>
 #endif
 

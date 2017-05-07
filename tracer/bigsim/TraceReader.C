@@ -126,6 +126,18 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   if(jobs[jobnum].skipMsgId == -2) {
      pe->firstTask = 0;
   }
+  
+  double scaling_factor;
+  bool isScaling = false;
+
+  if(eventSubs != NULL) {
+    std::map<std::string, double>::iterator loc1 =
+      eventSubs[pe->jobNum].find("scale_all");
+    if(loc1 != eventSubs[pe->jobNum].end()) {
+      scaling_factor = loc1->second/TIME_MULT;
+      isScaling = true;
+    }
+  }
 
   *startTime = 0;
 
@@ -150,7 +162,8 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
     }
 
     // first job's index is zero
-    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe, logInd);
+    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe, 
+      logInd, isScaling, scaling_factor);
 
     int sPe = bglog->msgId.pe();
     int smsgID = bglog->msgId.msgID();
@@ -176,9 +189,13 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   firstLog += tlinerec.length();
 }
 
-void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEmPE, int jobPEindex, PE* pe, int logInd)
+void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, 
+  int myEmPE, int jobPEindex, PE* pe, int logInd, bool isScaling, 
+  double scaling_factor)
 {
-  if(time_replace_limit != -1 && bglog->execTime >= time_replace_limit) {
+  if(isScaling) {
+    t->execTime = (double)TIME_MULT * bglog->execTime / scaling_factor;
+  } else if(time_replace_limit != -1 && bglog->execTime >= time_replace_limit) {
     t->execTime = (double)TIME_MULT * time_replace_by;
   } else {
     t->execTime = (double)TIME_MULT * bglog->execTime;
@@ -296,7 +313,7 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int myEm
       t->myBgPrints[pInd].time = (bglog->evts[i]->rTime);
       strcpy(t->myBgPrints[pInd].taskName, bglog->name);
       pInd++;
-    } else if(eventSubs != NULL) {
+    } else if(eventSubs != NULL && !isScaling) {
       std::map<std::string, double>::iterator loc =
         eventSubs[pe->jobNum].find(std::string((char *)bglog->evts[i]->data));
       if(loc != eventSubs[pe->jobNum].end()) {
@@ -339,7 +356,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->currentCollMsgSize = pe->currentCollSendCount = pe->currentCollRecvCount = -1;
  
   double user_timing, scaling_factor;
-  bool isScaling = false;
+  bool isScaling = false, isUserTiming = false;
 
   if(eventSubs != NULL) {
     std::map<std::string, double>::iterator loc1 =
@@ -352,6 +369,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
       eventSubs[pe->jobNum].find("user_code");
     if(loc2 != eventSubs[pe->jobNum].end()) {
       if(!isScaling) { 
+        isUserTiming = true;
         user_timing = loc2->second;
       }
     }
@@ -367,7 +385,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
     if(eventSubs != NULL && t->event_id == TRACER_USER_EVT) {
       if(isScaling) {
         t->execTime = t->execTime/scaling_factor;
-      } else {
+      } else if(isUserTiming) {
         t->execTime = user_timing;
       }
     }

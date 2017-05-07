@@ -17,16 +17,15 @@
 ifeq ($(ARCH),bgq)
 CC = mpixlc_r
 CXX = mpixlcxx_r
-SEQ_CXX = bgxlC
 else ifeq ($(ARCH),cray)
 CC = cc -std=gnu99
 CXX = CC
-SEQ_CXX = CC
 else
 CC = mpicc -std=gnu99
 CXX = mpicxx
-SEQ_CXX = icpc
 endif
+
+SEQ_CXX = ${CXX}
 
 #needed if using bigsim logs
 #CHARMPATH = /p/lscratchf/jain6/network-sim/charm/verbs-linux-x86_64-bigemulator-icc
@@ -49,8 +48,6 @@ endif
 
 CODES_CFLAGS = -I${CODES}/install-mod/include -I${ROSS}/include
 #Enable one of the following:
-#TraceR-2.x works with OTF2 only. Support for BigSim will be fixed soon; for now
-#use TraceR-1.x if BigSim support is desired.
 #SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
 SELECT_TRACE = -DTRACER_OTF_TRACES=1
 
