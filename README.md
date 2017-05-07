@@ -25,7 +25,7 @@ Pending pull request (with new features): https://xgitlab.cels.anl.gov/codes/cod
 
 * Trace format choice (pick one of the following): 
 
-1) AMPI-based BigSim format: download and build Charm++ with bgampi target:
+1) AMPI-based BigSim format: download and build Charm++.
 ```
 git clone http://charm.cs.uiuc.edu/gerrit/charm
 ```
@@ -35,7 +35,7 @@ Use "charm++" as target for compiling TraceR.
 Use "bgampi" as target for buidling AMPI used for collecting traces.
 In both of cases above, pass "bigemulator" as a build option.
 
-2) OTF2: download and build scoreP for OTF2 support:
+2) OTF2: download and build scoreP for OTF2 support.
 
 Refer to README.OTF2 file in this directory. Simulation of the following most
 commonly used collectives using algorithms used in MPICH is supported in this
