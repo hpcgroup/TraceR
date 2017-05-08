@@ -77,7 +77,7 @@ docs/UserWriteUp.txt and in CODES:codes/src/networks/model-net/doc
 
 Example files for BigSim are in tracer/jacobi2d, while for OTF2 are in tracer/stencil4d-otf. Sample run command:
 ```
-mpirun -np 8 ../traceR --sync=3 --nkp=16 --extramem=10000000 --max-opt-lookahead=1000000 --timer-frequency=1000 -- ../conf/tracer-torus.conf tracer_config
+mpirun -np 8 ../traceR --sync=3 --nkp=16 --extramem=100000 --max-opt-lookahead=1000000 --timer-frequency=1000 -- ../conf/tracer-torus.conf tracer_config
 ```
 
 Parameters:   
