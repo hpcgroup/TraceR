@@ -26,6 +26,7 @@
 #include <time.h>
 #include <signal.h>
 #include <algorithm>
+#include <endian.h>
 
 extern "C" {
 #include "codes/model-net.h"
@@ -309,6 +310,13 @@ int main(int argc, char **argv)
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
         while(fread(line_data, sizeof(int), 3, gfile) != 0) {
+#if __BYTE_ORDER == __BIG_ENDIAN 
+          for (int j = 0; j < 3; ++j) {
+            line_data[j] = le32toh(line_data[j]);
+          }
+#elif __BYTE_ORDER != __LITTLE_ENDIAN
+# error "Reading in the system byte order is not handled."
+#endif
           global_rank[line_data[0]].mapsTo = line_data[1];
           global_rank[line_data[0]].jobID = line_data[2];
 #if DEBUG_PRINT
@@ -416,6 +424,13 @@ int main(int argc, char **argv)
               MPI_Abort(MPI_COMM_WORLD, 1);
             }
             fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+#if __BYTE_ORDER == __BIG_ENDIAN 
+            for (int j = 0; j < num_workers; ++j) {
+              jobs[i].rankMap[j] = le32toh(jobs[i].rankMap[j]);
+            }
+#elif __BYTE_ORDER != __LITTLE_ENDIAN
+# error "Reading in the system byte order is not handled."
+#endif
             fclose(rfile);
           }
           MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
