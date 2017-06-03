@@ -26,6 +26,7 @@
 #include <time.h>
 #include <signal.h>
 #include <algorithm>
+#include <endian.h>
 
 extern "C" {
 #include "codes/model-net.h"
@@ -309,6 +310,13 @@ int main(int argc, char **argv)
           MPI_Abort(MPI_COMM_WORLD, 1);
         }
         while(fread(line_data, sizeof(int), 3, gfile) != 0) {
+#if __BYTE_ORDER == __BIG_ENDIAN 
+          for (int j = 0; j < 3; ++j) {
+            line_data[j] = le32toh(line_data[j]);
+          }
+#elif __BYTE_ORDER != __LITTLE_ENDIAN
+# error "Reading in the system byte order is not handled."
+#endif
           global_rank[line_data[0]].mapsTo = line_data[1];
           global_rank[line_data[0]].jobID = line_data[2];
 #if DEBUG_PRINT
@@ -416,6 +424,13 @@ int main(int argc, char **argv)
               MPI_Abort(MPI_COMM_WORLD, 1);
             }
             fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+#if __BYTE_ORDER == __BIG_ENDIAN 
+            for (int j = 0; j < num_workers; ++j) {
+              jobs[i].rankMap[j] = le32toh(jobs[i].rankMap[j]);
+            }
+#elif __BYTE_ORDER != __LITTLE_ENDIAN
+# error "Reading in the system byte order is not handled."
+#endif
             fclose(rfile);
           }
           MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
@@ -1300,7 +1315,7 @@ static tw_stime exec_task(
     m->model_net_calls = 0;
     if(ns->my_pe->taskExecuted[task_id.iter][task_id.taskid]) {
       b->c10 = 1;
-      return;
+      return 0;
     }
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
@@ -1630,7 +1645,7 @@ static tw_stime exec_task(
            taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
            taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
-          if(!t->isNonBlocking) return;
+          if(!t->isNonBlocking) return 0;
           sendFinishTime += sendOffset+copyTime+nic_delay;
         }
       }
@@ -1661,7 +1676,7 @@ static tw_stime exec_task(
           ns->my_pe->pendingReqs[t->req_id] = task_id.taskid;
         }
         b->c29 = 1;
-        return;
+        return 0;
       } 
     }
 #endif
