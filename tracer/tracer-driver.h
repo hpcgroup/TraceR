@@ -66,6 +66,7 @@ enum proc_event
     COLL_BRUCK_SEND_DONE,
     COLL_A2A_BLOCKED,
     COLL_A2A_BLOCKED_SEND_DONE,
+    COLL_SCATTER,
     RECV_COLL_POST,
     COLL_COMPLETE
 };
@@ -335,6 +336,14 @@ static void perform_a2a_blocked(
     tw_bf * b,
     int isEvent);
 
+static void perform_scatter(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void handle_coll_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -411,6 +420,14 @@ static void perform_bruck_rev(
     int isEvent);
 
 static void perform_a2a_blocked_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_scatter_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
