@@ -57,6 +57,7 @@ unsigned int print_frequency = 5000;
 #define TRACER_A2A_ALG_CUTOFF 512
 #define TRACER_ALLGATHER_ALG_CUTOFF 163840
 #define TRACER_BLOCK_SIZE 32
+#define TRACER_SCATTER_ALG_CUTOFF 0
 
 char tracer_input[256];
 proc_state *ns_5 = NULL;
@@ -66,10 +67,12 @@ proc_state *ns_5 = NULL;
 #define TRACER_ALLGATHER 1
 #define TRACER_BRUCK 2
 #define TRACER_BLOCKED 3
+#define TRACER_SCATTER 4
 Coll_lookup lookUpTable[] = { { COLL_A2A, COLL_A2A_SEND_DONE },
                               { COLL_ALLGATHER, COLL_ALLGATHER_SEND_DONE },
                               { COLL_BRUCK, COLL_BRUCK_SEND_DONE },
-                              { COLL_A2A_BLOCKED, COLL_A2A_BLOCKED_SEND_DONE }
+                              { COLL_A2A_BLOCKED, COLL_A2A_BLOCKED_SEND_DONE },
+                              { COLL_SCATTER, COLL_SCATTER_SEND_DONE }
                             };
 enum tracer_coll_type
 {
@@ -80,6 +83,8 @@ enum tracer_coll_type
   TRACER_COLLECTIVE_ALLTOALL_BLOCKED,
   TRACER_COLLECTIVE_ALL_BRUCK,
   TRACER_COLLECTIVE_ALLGATHER_LARGE,
+  TRACER_COLLECTIVE_SCATTER_SMALL,
+  TRACER_COLLECTIVE_SCATTER
 };
 
 CoreInf *global_rank;
@@ -372,12 +377,12 @@ int main(int argc, char **argv)
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
     }
+
     if (total_ranks > num_servers) {
       if (!rank)
         printf("Job requires %d servers, but the topology only contains %d. Aborting\n", total_ranks, num_servers);
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
-
 
     if(!rank) {
       printf("Done reading meta-information about jobs\n");
@@ -644,6 +649,15 @@ static void proc_event(
     case COLL_A2A_BLOCKED_SEND_DONE:
       handle_a2a_blocked_send_comp_event(ns, b, m, lp);
       break;
+    case COLL_SCATTER_SMALL:
+      perform_scatter_small(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_SCATTER:
+      perform_scatter(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_SCATTER_SEND_DONE:
+      handle_scatter_send_comp_event(ns, b, m, lp);
+      break;
     case RECV_COLL_POST:
       handle_coll_recv_post_event(ns, b, m, lp);
       break;
@@ -716,6 +730,15 @@ static void proc_rev_event(
       break;
     case COLL_A2A_BLOCKED_SEND_DONE:
       handle_a2a_blocked_send_comp_rev_event(ns, b, m, lp);
+      break;
+    case COLL_SCATTER_SMALL:
+      perform_scatter_small_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_SCATTER:
+      perform_scatter_rev(ns, -1, lp, m, b, 1);
+      break;
+    case COLL_SCATTER_SEND_DONE:
+      handle_scatter_send_comp_rev_event(ns, b, m, lp);
       break;
     case RECV_COLL_POST:
       handle_coll_recv_post_rev_event(ns, b, m, lp);
@@ -1911,6 +1934,12 @@ static void perform_a2a_blocked( proc_state * ns, int task_id, tw_lp * lp, proc_
 static void perform_a2a_blocked_rev( proc_state * ns, int task_id, tw_lp * lp, proc_msg *m, tw_bf * b, int isEvent) {} 
 static void handle_a2a_blocked_send_comp_event( proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
 static void handle_a2a_blocked_send_comp_rev_event( proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
+static void perform_scatter_small( proc_state * ns, int task_id, tw_lp * lp, proc_msg *m, tw_bf * b, int isEvent) {}
+static void perform_scatter_small_rev( proc_state * ns, int task_id, tw_lp * lp, proc_msg *m, tw_bf * b, int isEvent) {}
+static void perform_scatter( proc_state * ns, int task_id, tw_lp * lp, proc_msg *m, tw_bf * b, int isEvent) {}
+static void perform_scatter_rev( proc_state * ns, int task_id, tw_lp * lp, proc_msg *m, tw_bf * b, int isEvent) {}
+static void handle_scatter_send_comp_event( proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
+static void handle_scatter_send_comp_rev_event( proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
 static void handle_coll_complete_event(proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
 static void handle_coll_complete_rev_event(proc_state * ns, tw_bf * b, proc_msg * m, tw_lp * lp) {}
 static int send_coll_comp(proc_state *, tw_stime, int, tw_lp *, int, proc_msg*) {}
@@ -2046,7 +2075,9 @@ static void handle_coll_recv_post_event(
     if((t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL && 
         t->myEntry.msgId.size <= TRACER_A2A_ALG_CUTOFF) ||
        (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLGATHER &&
-        t->myEntry.msgId.size * ns->my_pe->currentCollSize <= TRACER_ALLGATHER_ALG_CUTOFF)) {
+        t->myEntry.msgId.size * ns->my_pe->currentCollSize <= TRACER_ALLGATHER_ALG_CUTOFF) ||
+       (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER &&
+        t->myEntry.msgId.size * ns->my_pe->currentCollSize > TRACER_SCATTER_ALG_CUTOFF)) {
       size = m->msgId.size;
       m_remote.msgId.size = size;
     }
@@ -2113,6 +2144,12 @@ static void perform_collective(
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLGATHER &&
             t->myEntry.msgId.size * g.members.size() <= TRACER_ALLGATHER_ALG_CUTOFF) {
     perform_bruck(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER &&
+            t->myEntry.msgId.size * g.members.size() <= TRACER_SCATTER_ALG_CUTOFF) {
+    perform_scatter_small(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER &&
+            t->myEntry.msgId.size * g.members.size() > TRACER_SCATTER_ALG_CUTOFF) {
+    perform_scatter(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -2146,6 +2183,12 @@ static void perform_collective_rev(
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLGATHER &&
             t->myEntry.msgId.size * g.members.size() <= TRACER_ALLGATHER_ALG_CUTOFF) {
     perform_bruck_rev(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER &&
+            t->myEntry.msgId.size * g.members.size() <= TRACER_SCATTER_ALG_CUTOFF) {
+    perform_scatter_small_rev(ns, taskid, lp, m, b, 0);
+  } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER &&
+            t->myEntry.msgId.size * g.members.size() > TRACER_SCATTER_ALG_CUTOFF) {
+    perform_scatter_rev(ns, taskid, lp, m, b, 0);
   } else {
     assert(0);
   }
@@ -3437,6 +3480,383 @@ static void handle_a2a_blocked_send_comp_rev_event(
   }
 }
 
+static void perform_scatter_small(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent)
+{
+  Task *t;
+  int recvCount;
+  if(!isEvent) {
+    PE_set_busy(ns->my_pe, true);
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    ns->my_pe->currentCollTask = taskid;
+    int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
+    ns->my_pe->currentCollSeq = collSeq;
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.find(t->myEntry.msgId.comm);
+    if(it == ns->my_pe->pendingCollMsgs.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int64_t, std::map<int, int> >::iterator cIt =
+        it->second.find(collSeq);
+      if(cIt == it->second.end()) {
+        recvCount = 0;
+      } else {
+        assert(cIt->second.size() > 0);
+        recvCount = cIt->second[0];
+      }
+    }
+  } else {
+      int comm = m->msgId.comm;
+      int64_t collSeq = m->msgId.seq;
+      if((comm != ns->my_pe->currentCollComm) ||
+         (collSeq != ns->my_pe->currentCollSeq) ||
+         (ns->my_pe->currentCollTask == -1)) {
+        if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
+          ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
+        } else {
+          ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
+        }
+        b->c12 = 1;
+        return;
+      }
+      t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+      recvCount = 1;
+  }
+
+  bool amIroot = (ns->my_pe->myNum == t->myEntry.msgId.pe);
+
+  if(recvCount == 0 && !amIroot) {
+    b->c13 = 1;
+    return;
+  }
+
+  if(!isEvent && !amIroot) {
+    b->c14 = 1;
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][0]--;
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][0] == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
+    }
+  }
+
+  int thisTreePe, index, maxSize;
+
+  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+  if(it == g.rmembers.end()) {
+    assert(0);
+  } else {
+    index = it->second;
+  }
+  maxSize = g.members.size();
+
+  thisTreePe = (index - t->myEntry.node + maxSize) % maxSize;
+
+  tw_stime delay = codes_local_latency(lp);
+  m->model_net_calls = 0;
+
+  int mask;
+  for(mask = 0x1; mask < maxSize; mask <<= 1) {
+    if (thisTreePe & mask) {
+      break;
+    }
+  }
+  mask >>= 1;
+  int remainingSize = amIroot ? (t->myEntry.msgId.size * maxSize) : m->msgId.size;
+  while(mask > 0) {
+    if(thisTreePe + mask < maxSize) {
+      int dest = g.members[(t->myEntry.node + thisTreePe + mask) % maxSize];
+      int sendSize = remainingSize - (t->myEntry.msgId.size * mask);
+      send_msg(ns, sendSize, ns->my_pe->currIter,
+        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
+        delay, COLL_SCATTER_SMALL, lp);
+      delay += copy_per_byte * sendSize;
+      m->model_net_calls++;
+      remainingSize -= sendSize;
+    }
+    mask >>= 1;
+  }
+  send_coll_comp(ns, delay, TRACER_COLLECTIVE_SCATTER_SMALL, lp, isEvent, m);
+}
+
+static void perform_scatter_small_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent)
+{
+  Task *t;
+  int comm = ns->my_pe->currentCollComm;
+  int64_t collSeq = ns->my_pe->currentCollSeq;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = -1;
+    ns->my_pe->currentCollTask = -1;
+    ns->my_pe->currentCollSeq = -1;
+    ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
+  } else {
+    if(b->c12) {
+      ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0]--;
+      if(ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][0] == 0) {
+        ns->my_pe->pendingCollMsgs[m->msgId.comm].erase(m->msgId.seq);
+      }
+      return;
+    }
+  }
+
+  if(b->c13) {
+    return;
+  }
+
+  if(b->c14) {
+    if(ns->my_pe->pendingCollMsgs[comm][collSeq].size()) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0]++;
+    } else {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][0] = 1;
+    }
+  }
+
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+  send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_SCATTER_SMALL, lp, isEvent, m);
+}
+
+static void perform_scatter(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent)
+{
+  Task *t;
+  int recvCount;
+  if(!isEvent) {
+    PE_set_busy(ns->my_pe, true);
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = t->myEntry.msgId.comm;
+    ns->my_pe->currentCollTask = taskid;
+    int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
+    ns->my_pe->currentCollSeq = collSeq;
+
+    int index, maxSize;
+    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+    std::map<int, int>::iterator it1 = g.rmembers.find(ns->my_pe_num);
+    if(it1 == g.rmembers.end()) {
+      assert(0);
+    } else {
+      index = it1->second;
+    }
+    maxSize = g.members.size();
+
+    ns->my_pe->currentCollRank = (index - t->myEntry.node + maxSize) % maxSize;
+    t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
+    ns->my_pe->currentCollSize = maxSize;
+    if (ns->my_pe->currentCollRank == 0) {
+      ns->my_pe->currentCollMsgSize = t->myEntry.msgId.size * maxSize;
+    }
+
+    int partner;
+    for(partner = 0x1; partner < maxSize; partner <<= 1) {
+      if (ns->my_pe->currentCollRank & partner) {
+        break;
+      }
+    }
+    ns->my_pe->currentCollPartner = partner >> 1;
+    partner = (ns->my_pe->currentCollRank - partner + maxSize) % maxSize;
+
+    std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
+      ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
+    if(it == ns->my_pe->pendingCollMsgs.end()) {
+      recvCount = 0;
+    } else {
+      std::map<int64_t, std::map<int, int> >::iterator cIt =
+        it->second.find(ns->my_pe->currentCollSeq);
+      if(cIt == it->second.end()) {
+        recvCount = 0;
+      } else {
+        std::map<int, int>::iterator c2It = cIt->second.find(partner);
+        if(c2It == cIt->second.end()) {
+          recvCount = 0;
+        } else {
+          recvCount = c2It->second;
+        }
+      }
+    }
+    assert(recvCount >= 0);
+  } else {
+    int comm = m->msgId.comm;
+    int64_t collSeq = m->msgId.seq;
+    if((m->msgId.pe != ns->my_pe->currentCollRank) ||
+       (comm != ns->my_pe->currentCollComm) ||
+       (collSeq != ns->my_pe->currentCollSeq)) {
+      ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
+      if((comm != ns->my_pe->currentCollComm) ||
+         (collSeq != ns->my_pe->currentCollSeq) ||
+         (ns->my_pe->currentCollTask == -1)) {
+        b->c12 = 1;
+        return;
+      }
+    }
+    t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+    if(m->msgId.pe != ns->my_pe->currentCollRank) {
+      b->c13 = 1;
+      ns->my_pe->currentCollMsgSize = m->msgId.size;
+    }
+    recvCount = 1;
+  }
+
+  if((recvCount == 0) && (ns->my_pe->currentCollRank != 0)) {
+    b->c14 = 1;
+    return;
+  }
+
+  if(isEvent && (m->msgId.pe != ns->my_pe->currentCollRank)) {
+    ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe] == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(m->msgId.pe);
+    }
+  }
+
+  m->model_net_calls = 0;
+  tw_stime delay = codes_local_latency(lp);
+  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+
+  if((ns->my_pe->currentCollPartner > 0) &&
+     (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner < ns-> my_pe->currentCollSize)) {
+    b->c15 = 1;
+    int dest = (t->myEntry.node + ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner) % ns->my_pe->currentCollSize;
+    dest = g.members[dest];
+    m->coll_info = dest;
+    m->msgId.size = ns->my_pe->currentCollMsgSize;
+    ns->my_pe->currentCollMsgSize -= (t->myEntry.msgId.size * ns->my_pe->currentCollPartner);
+    tw_stime copyTime = copy_per_byte * ns->my_pe->currentCollMsgSize;
+    enqueue_coll_msg(TRACER_SCATTER, ns, ns->my_pe->currentCollMsgSize,
+        ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq,
+        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+    if(ns->my_pe->currentCollMsgSize > eager_limit) {
+      m->model_net_calls++;
+      t->myEntry.msgId.pe = ns->my_pe_num;
+      int src = (t->myEntry.node + ns->my_pe->currentCollRank) % ns->my_pe->currentCollSize;
+      src = g.members[src];
+      send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId,
+        ns->my_pe->currentCollSeq, pe_to_lpid(src, ns->my_job),
+        delay, RECV_COLL_POST, lp, true, ns->my_pe->currentCollMsgSize);
+    }
+    delay += copyTime;
+    ns->my_pe->currentCollMsgSize = m->msgId.size - ns->my_pe->currentCollMsgSize;
+  } else {
+    if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
+      ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm].erase(ns->my_pe->currentCollSeq);
+    }
+    send_coll_comp(ns, delay, TRACER_COLLECTIVE_SCATTER, lp, isEvent, m);
+  }
+}
+
+static void perform_scatter_rev(
+    proc_state * ns,
+    int taskid,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent)
+{
+  Task *t;
+  int64_t seq = ns->my_pe->currentCollSeq;
+  if(!isEvent) {
+    t = &ns->my_pe->myTasks[taskid];
+    ns->my_pe->currentCollComm = -1;
+    ns->my_pe->currentCollTask = -1;
+    ns->my_pe->currentCollSeq = -1;
+    ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]--;
+
+    ns->my_pe->currentCollRank = -1;
+    ns->my_pe->currentCollSize = -1;
+    ns->my_pe->currentCollMsgSize = -1;
+    ns->my_pe->currentCollPartner = -1;
+  } else {
+    if(b->c12) {
+      ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][m->msgId.pe]--;
+      if(ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][m->msgId.pe] == 0) {
+        ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq].erase(m->msgId.pe);
+      }
+      return;
+    }
+    t = &ns->my_pe->myTasks[ns->my_pe->currentCollTask];
+    if(b->c13) {
+      ns->my_pe->currentCollMsgSize = -1;
+    }
+  }
+
+  if(b->c14) {
+    return;
+  }
+
+  codes_local_latency_reverse(lp);
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+
+  if(b->c15) {
+    ns->my_pe->currentCollMsgSize = m->msgId.size;
+    enqueue_coll_msg_rev(TRACER_SCATTER, ns, &t->myEntry.msgId, seq, m->coll_info, lp, m, b);
+  } else {
+    send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_SCATTER, lp, isEvent, m);
+  }
+}
+
+static void handle_scatter_send_comp_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  if((ns->my_pe->currentCollTask == -1) ||
+     (ns->my_pe->currentCollTask != m->executed.taskid) ||
+     (ns->my_pe->currentCollPartner <= 0)) {
+    b->c18 = 1;
+    return;
+  }
+  ns->my_pe->currentCollPartner >>= 1;
+  //send to self
+  tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+  proc_msg *m_new = (proc_msg*)tw_event_data(e);
+  m_new->msgId.pe = ns->my_pe->currentCollRank;
+  m_new->msgId.comm = ns->my_pe->currentCollComm;
+  m_new->msgId.seq = ns->my_pe->currentCollSeq;
+  m_new->msgId.size = m->msgId.size;
+  m_new->proc_event_type = COLL_SCATTER;
+  tw_event_send(e);
+}
+
+static void handle_scatter_send_comp_rev_event(
+		proc_state * ns,
+		tw_bf * b,
+		proc_msg * m,
+		tw_lp * lp)
+{
+  if(b->c18) {
+    return;
+  }
+  if(ns->my_pe->currentCollPartner == 0) {
+    ns->my_pe->currentCollPartner = 0x1;
+  } else {
+    ns->my_pe->currentCollPartner <<= 1;
+  }
+  codes_local_latency_reverse(lp);
+}
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -3464,7 +3884,8 @@ static void handle_coll_complete_event(
       m->msgId.coll_type == TRACER_COLLECTIVE_BCAST) ||
      (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALL) ||
      (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLGATHER) ||
-     (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALLV)
+     (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLTOALLV) ||
+     (t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_SCATTER)
     ) {
     b->c1 = 1;
     exec_comp(ns, ns->my_pe->currIter, m->executed.taskid, 0,
@@ -3515,10 +3936,12 @@ static void handle_coll_complete_rev_event(
   if(m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALLGATHER_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALL_BRUCK ||
-     m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_BLOCKED) {
+     m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_BLOCKED ||
+     m->msgId.coll_type == TRACER_COLLECTIVE_SCATTER) {
     ns->my_pe->currentCollSize = g.members.size();
     ns->my_pe->currentCollPartner = m->fwd_dep_count;
-    if(m->msgId.coll_type == TRACER_COLLECTIVE_ALL_BRUCK) {
+    if(m->msgId.coll_type == TRACER_COLLECTIVE_ALL_BRUCK ||
+       m->msgId.coll_type == TRACER_COLLECTIVE_SCATTER) {
       ns->my_pe->currentCollMsgSize = m->msgId.size;
     }
     if(m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_BLOCKED) {
