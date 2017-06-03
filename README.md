@@ -12,7 +12,7 @@ Computing applications on interconnection networks.
 ```
 git clone https://github.com/carothersc/ROSS
 ```
-Latest verified commit: de26e581a312fd122a4c06917bf0f3d21f38a24b
+Latest verified commit: 53b7fcabcb9b8c015b1f17e3ce1a94298b06920d
 
 * Download and install CODES:
 ```
