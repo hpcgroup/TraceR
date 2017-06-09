@@ -66,7 +66,9 @@ enum proc_event
     COLL_BRUCK_SEND_DONE,
     COLL_A2A_BLOCKED,
     COLL_A2A_BLOCKED_SEND_DONE,
+    COLL_SCATTER_SMALL,
     COLL_SCATTER,
+    COLL_SCATTER_SEND_DONE,
     RECV_COLL_POST,
     COLL_COMPLETE
 };
@@ -143,6 +145,11 @@ static void handle_a2a_blocked_send_comp_event(
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
+static void handle_scatter_send_comp_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+   tw_lp * lp);
 static void handle_recv_post_event(
     proc_state * ns,
     tw_bf * b,
@@ -196,6 +203,11 @@ static void handle_bruck_send_comp_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_a2a_blocked_send_comp_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_scatter_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -336,6 +348,14 @@ static void perform_a2a_blocked(
     tw_bf * b,
     int isEvent);
 
+static void perform_scatter_small(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
 static void perform_scatter(
     proc_state * ns,
     int task_id,
@@ -420,6 +440,14 @@ static void perform_bruck_rev(
     int isEvent);
 
 static void perform_a2a_blocked_rev(
+    proc_state * ns,
+    int task_id,
+    tw_lp * lp,
+    proc_msg *m,
+    tw_bf * b,
+    int isEvent);
+
+static void perform_scatter_small_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
