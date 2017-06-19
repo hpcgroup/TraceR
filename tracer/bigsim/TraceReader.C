@@ -341,7 +341,8 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   readLocationTasks(my_job, jobs[my_job].reader, jobs[my_job].allData,
       my_pe_num, ld);
 
-  pe->myTasks = &(ld->tasks[0]);
+  pe->myTasks = new Task[ld->tasks.size()];
+  memcpy(pe->myTasks, &ld->tasks[0], ld->tasks.size() * sizeof(Task));
   pe->tasksCount = ld->tasks.size();
   pe->totalTasksCount = pe->tasksCount;
   pe->taskStatus= new bool*[jobs[pe->jobNum].numIters];
@@ -421,6 +422,8 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
       }
     }
   }
+
+  delete ld;
 }
 #endif
 

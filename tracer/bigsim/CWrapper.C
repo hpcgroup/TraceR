@@ -138,6 +138,7 @@ int PE_get_tasksCount(PE* p){return p->tasksCount;}
 int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
 void PE_printStat(PE* p){p->check();}
 int PE_get_numWorkThreads(PE* p){return p->numWth;}
+void deletePE(PE* p){delete p;}
 
 #if TRACER_BIGSIM_TRACES
 //TraceReader

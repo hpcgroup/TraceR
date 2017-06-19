@@ -363,7 +363,6 @@ int main(int argc, char **argv)
         fscanf(jobIn, "%d", &jobs[i].numRanks);
         fscanf(jobIn, "%d", &jobs[i].numIters);
         total_ranks += jobs[i].numRanks;
-        jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
         finalizeTimes[i] = 0;
@@ -423,6 +422,7 @@ int main(int argc, char **argv)
       next = ' ';
       fscanf(jobIn, "%c", &next);
     }
+    fclose(jobIn);
 
     int ranks_till_now = 0;
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
@@ -513,7 +513,28 @@ int main(int argc, char **argv)
         }
     }
     model_net_report_stats(net_id);
+    free(jobTimesMax);
+
+#if TRACER_OTF_TRACES
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+      closeReader(jobs[i].reader);
+      delete jobs[i].allData;
+    }
+#endif
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+      free(jobs[i].rankMap);
+    }
+    delete [] size_replace_limit;
+    delete [] size_replace_by;
+
+    free(finalizeTimes);
+    free(jobTimes);
+    free(jobs);
+
+    free(global_rank);
+
     tw_end();
+
     return 0;
 }
 
@@ -777,6 +798,13 @@ static void proc_finalize(
     if(finalTime > finalizeTimes[ns->my_job]) {
         finalizeTimes[ns->my_job] = finalTime;
     }
+
+    for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
+      delete [] ns->my_pe->taskStatus[i];
+      delete [] ns->my_pe->taskExecuted[i];
+      delete [] ns->my_pe->msgStatus[i];
+    }
+    deletePE(ns->my_pe);
 
     return;
 }
