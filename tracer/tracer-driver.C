@@ -519,7 +519,7 @@ int main(int argc, char **argv)
 
 #if TRACER_BIGSIM_TRACES
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
-      delete jobs[i].offsets;
+      delete [] jobs[i].offsets;
     }
 #else
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
