@@ -471,10 +471,12 @@ int main(int argc, char **argv)
         if(rank == 0){ //only rank 0 loads the offsets and broadcasts
             TraceReader_loadOffsets(t);
             jobs[i].offsets = TraceReader_getOffsets(t);
+            TraceReader_setOffsets(t, NULL);
         } else {
-            jobs[i].offsets = (int*) malloc(sizeof(int) * num_workers);
+            jobs[i].offsets = new int[num_workers];
         }
         MPI_Bcast(jobs[i].offsets, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
+        deleteTraceReader(t);
     }
 #else
     //Read in global definitions and Open event files
@@ -515,12 +517,17 @@ int main(int argc, char **argv)
     model_net_report_stats(net_id);
     free(jobTimesMax);
 
-#if TRACER_OTF_TRACES
+#if TRACER_BIGSIM_TRACES
+    for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
+      delete jobs[i].offsets;
+    }
+#else
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
       closeReader(jobs[i].reader);
       delete jobs[i].allData;
     }
 #endif
+
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
       free(jobs[i].rankMap);
     }
@@ -571,13 +578,15 @@ static void proc_init(
     ns->my_pe = newPE();
     tw_stime startTime=0;
 #if TRACER_BIGSIM_TRACES
-    ns->trace_reader = newTraceReader(jobs[ns->my_job].traceDir);
+    TraceReader* t = newTraceReader(jobs[ns->my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
-    TraceReader_loadTraceSummary(ns->trace_reader);
-    TraceReader_setOffsets(ns->trace_reader, &(jobs[ns->my_job].offsets));
+    TraceReader_loadTraceSummary(t);
+    TraceReader_setOffsets(t, jobs[ns->my_job].offsets);
 
-    TraceReader_readTrace(ns->trace_reader, &tot, &totn, &emPes, &nwth,
+    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth,
                          ns->my_pe, ns->my_pe_num,  ns->my_job, &startTime);
+    TraceReader_setOffsets(t, NULL);
+    deleteTraceReader(t);
 #else 
     TraceReader_readOTF2Trace(ns->my_pe, ns->my_pe_num, ns->my_job, &startTime);
 #endif

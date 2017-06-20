@@ -25,9 +25,6 @@ struct proc_state
     tw_stime start_ts;    /* time that we started sending requests */
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
-#if TRACER_BIGSIM_TRACES
-    TraceReader* trace_reader; /* for reading the bigsim traces */
-#endif
     clock_t sim_start;
     int my_pe_num, my_job;
 };
