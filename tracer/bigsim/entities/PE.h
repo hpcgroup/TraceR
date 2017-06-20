@@ -66,6 +66,9 @@ class PE {
     PE();
     ~PE();
     std::list<TaskPair> msgBuffer;
+#if TRACER_OTF_TRACES
+    LocationData* ld;
+#endif
     Task* myTasks;	// all tasks of this PE
     bool **taskStatus, **taskExecuted;
     bool **msgStatus;

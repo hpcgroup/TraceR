@@ -30,7 +30,6 @@ PE::PE() {
 
 PE::~PE() {
     msgBuffer.clear();
-    delete [] myTasks;
     delete [] taskStatus;
     delete [] taskExecuted;
     delete [] msgStatus;
@@ -38,7 +37,11 @@ PE::~PE() {
     delete [] sendSeq;
     delete [] recvSeq;
 #if TRACER_BIGSIM_TRACES
+    delete [] myTasks;
     delete [] msgDestLogs;
+#endif
+#if TRACER_OTF_TRACES
+    delete ld;
 #endif
 }
 
