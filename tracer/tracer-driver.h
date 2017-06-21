@@ -32,7 +32,8 @@ struct proc_state
 /* types of events that will constitute triton requests */
 enum proc_event
 {
-    KICKOFF=1,    /* initial event */
+    JOB_START=1,
+    KICKOFF,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast --> to be deprecated */
@@ -84,11 +85,21 @@ static void proc_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+static void proc_commit(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void proc_finalize(
     proc_state * ns,
     tw_lp * lp);
 
 //event handler declarations
+static void handle_job_start_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
@@ -146,6 +157,11 @@ static void handle_recv_post_event(
    tw_lp * lp);
 
 //reverse event handler declarations
+static void handle_job_start_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,

@@ -109,7 +109,7 @@ tw_lptype proc_lp = {
      (pre_run_f) NULL,
      (event_f) proc_event,
      (revent_f) proc_rev_event,
-     (commit_f) NULL,
+     (commit_f) proc_commit,
      (final_f)  proc_finalize, 
      (map_f) codes_mapping,
      sizeof(proc_state),
@@ -560,49 +560,19 @@ static void proc_init(
     tw_lp * lp) {
     tw_event *e;
     proc_msg *m;
-    tw_stime kickoff_time;
+    tw_stime start_time;
     
     memset(ns, 0, sizeof(*ns));
 
     if(dump_topo_only) return;
 
-    //Each server read it's trace
     ns->sim_start = clock();
-    ns->my_pe_num = lpid_to_pe(lp->gid);
-    ns->my_job = lpid_to_job(lp->gid);
 
-    if(ns->my_pe_num == -1) {
-        return;
-    }
-
-    ns->my_pe = newPE();
-    tw_stime startTime=0;
-#if TRACER_BIGSIM_TRACES
-    TraceReader* t = newTraceReader(jobs[ns->my_job].traceDir);
-    int tot=0, totn=0, emPes=0, nwth=0;
-    TraceReader_loadTraceSummary(t);
-    TraceReader_setOffsets(t, jobs[ns->my_job].offsets);
-
-    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth,
-                         ns->my_pe, ns->my_pe_num,  ns->my_job, &startTime);
-    TraceReader_setOffsets(t, NULL);
-    deleteTraceReader(t);
-#else 
-    TraceReader_readOTF2Trace(ns->my_pe, ns->my_pe_num, ns->my_job, &startTime);
-#endif
-
-    /* skew each kickoff event slightly to help avoid event ties later on */
-    kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
-    ns->end_ts = 0;
-    ns->my_pe->sendSeq = new int64_t[jobs[ns->my_job].numRanks];
-    ns->my_pe->recvSeq = new int64_t[jobs[ns->my_job].numRanks];
-    for(int i = 0; i < jobs[ns->my_job].numRanks; i++) {
-      ns->my_pe->sendSeq[i] = ns->my_pe->recvSeq[i] = 0;
-    }
-
-    e = codes_event_new(lp->gid, kickoff_time, lp);
+    /* skew each job start event slightly to help avoid event ties later on */
+    start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
+    e = codes_event_new(lp->gid, start_time, lp);
     m =  (proc_msg*)tw_event_data(e);
-    m->proc_event_type = KICKOFF;
+    m->proc_event_type = JOB_START;
     tw_event_send(e);
 
     return;
@@ -617,6 +587,9 @@ static void proc_event(
   fflush(stdout);
   switch (m->proc_event_type)
   {
+    case JOB_START:
+      handle_job_start_event(ns, b, m, lp);
+      break;
     case KICKOFF:
       handle_kickoff_event(ns, b, m, lp);
       break;
@@ -690,6 +663,9 @@ static void proc_rev_event(
 {
   switch (m->proc_event_type)
   {
+    case JOB_START:
+      handle_job_start_rev_event(ns, b, m, lp);
+      break;
     case KICKOFF:
       handle_kickoff_rev_event(ns, b, m, lp);
       break;
@@ -754,12 +730,24 @@ static void proc_rev_event(
   return;
 }
 
-static void proc_finalize(
+static void proc_commit(
     proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
     tw_lp * lp)
 {
-    if(ns->my_pe_num == -1) return;
-    if(dump_topo_only) return;
+    if(ns->my_pe == NULL ||
+       m->msgId.id != (ns->my_pe->tasksCount - 1) ||
+       m->iteration != (jobs[ns->my_pe->jobNum].numIters - 1) ||
+       !PE_get_taskDone(ns->my_pe, m->iteration, m->msgId.id) ||
+       m->proc_event_type != EXEC_COMPLETE) {
+        return;
+    }
+#if DEBUG_PRINT
+    printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
+           ns->my_pe_num, ns->my_job, m->proc_event_type, m->msgId.id, ns->my_pe->tasksCount);
+    fflush(stdout);
+#endif
 
     tw_stime jobTime = ns->end_ts ? ns->end_ts - ns->start_ts : 0;
     tw_stime finalTime = tw_now(lp);
@@ -814,6 +802,15 @@ static void proc_finalize(
       delete [] ns->my_pe->msgStatus[i];
     }
     deletePE(ns->my_pe);
+    ns->my_pe = NULL;
+}
+
+static void proc_finalize(
+    proc_state * ns,
+    tw_lp * lp)
+{
+    if(ns->my_pe_num == -1) return;
+    if(dump_topo_only) return;
 
     return;
 }
@@ -828,6 +825,71 @@ static tw_stime ns_to_s(tw_stime ns)
 static tw_stime s_to_ns(tw_stime s)
 {
     return(s * (1000.0 * 1000.0 * 1000.0));
+}
+
+static void handle_job_start_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp* lp)
+{
+    tw_event *e;
+    tw_stime kickoff_time;
+    //Each server read it's trace
+    ns->my_pe_num = lpid_to_pe(lp->gid);
+    ns->my_job = lpid_to_job(lp->gid);
+
+    if(ns->my_pe_num == -1) {
+        return;
+    }
+
+    ns->my_pe = newPE();
+    tw_stime startTime=0;
+
+    int my_job = ns->my_job;
+#if TRACER_BIGSIM_TRACES
+    TraceReader* t = newTraceReader(jobs[my_job].traceDir);
+    int tot=0, totn=0, emPes=0, nwth=0;
+    TraceReader_loadTraceSummary(t);
+    TraceReader_setOffsets(t, jobs[my_job].offsets);
+
+    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth,
+                         ns->my_pe, ns->my_pe_num, my_job, &startTime);
+    TraceReader_setOffsets(t, NULL);
+    deleteTraceReader(t);
+#else
+    TraceReader_readOTF2Trace(ns->my_pe, ns->my_pe_num, my_job, &startTime);
+#endif
+
+    /* skew each kickoff event slightly to help avoid event ties later on */
+    kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
+    ns->end_ts = 0;
+    ns->my_pe->sendSeq = new int64_t[jobs[my_job].numRanks];
+    ns->my_pe->recvSeq = new int64_t[jobs[my_job].numRanks];
+    for(int i = 0; i < jobs[my_job].numRanks; i++) {
+      ns->my_pe->sendSeq[i] = ns->my_pe->recvSeq[i] = 0;
+    }
+
+    e = codes_event_new(lp->gid, kickoff_time, lp);
+    m =  (proc_msg*)tw_event_data(e);
+    m->proc_event_type = KICKOFF;
+    tw_event_send(e);
+}
+
+static void handle_job_start_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp* lp)
+{
+    tw_rand_reverse_unif(lp->rng);
+    for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
+      delete [] ns->my_pe->taskStatus[i];
+      delete [] ns->my_pe->taskExecuted[i];
+      delete [] ns->my_pe->msgStatus[i];
+    }
+    deletePE(ns->my_pe);
+    ns->my_pe = NULL;
 }
 
 /* handle initial event */
