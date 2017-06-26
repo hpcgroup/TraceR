@@ -761,7 +761,7 @@ static void proc_finalize(
     if(ns->my_pe_num == -1) return;
     if(dump_topo_only) return;
 
-    tw_stime jobTime = ns->end_ts - ns->start_ts;
+    tw_stime jobTime = ns->end_ts ? ns->end_ts - ns->start_ts : 0;
     tw_stime finalTime = tw_now(lp);
 
     if(lpid_to_pe(lp->gid) == 0)
