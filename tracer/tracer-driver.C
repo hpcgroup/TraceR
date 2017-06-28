@@ -590,6 +590,9 @@ static void proc_event(
     case JOB_START:
       handle_job_start_event(ns, b, m, lp);
       break;
+    case JOB_END:
+      handle_job_end_event(ns, b, m, lp);
+      break;
     case KICKOFF:
       handle_kickoff_event(ns, b, m, lp);
       break;
@@ -666,6 +669,9 @@ static void proc_rev_event(
     case JOB_START:
       handle_job_start_rev_event(ns, b, m, lp);
       break;
+    case JOB_END:
+      handle_job_end_rev_event(ns, b, m, lp);
+      break;
     case KICKOFF:
       handle_kickoff_rev_event(ns, b, m, lp);
       break;
@@ -736,13 +742,9 @@ static void proc_commit(
     proc_msg * m,
     tw_lp * lp)
 {
-    if(ns->my_pe == NULL ||
-       m->msgId.id != (ns->my_pe->tasksCount - 1) ||
-       m->iteration != (jobs[ns->my_pe->jobNum].numIters - 1) ||
-       !PE_get_taskDone(ns->my_pe, m->iteration, m->msgId.id) ||
-       m->proc_event_type != EXEC_COMPLETE) {
-        return;
-    }
+  if(m->proc_event_type != JOB_END) {
+    return;
+  }
 #if DEBUG_PRINT
     printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
            ns->my_pe_num, ns->my_job, m->proc_event_type, m->msgId.id, ns->my_pe->tasksCount);
@@ -803,6 +805,9 @@ static void proc_commit(
     }
     deletePE(ns->my_pe);
     ns->my_pe = NULL;
+
+    ns->my_pe_num = -1;
+    ns->my_job = -1;
 }
 
 static void proc_finalize(
@@ -890,6 +895,25 @@ static void handle_job_start_rev_event(
     }
     deletePE(ns->my_pe);
     ns->my_pe = NULL;
+
+    ns->my_pe_num = -1;
+    ns->my_job = -1;
+}
+
+static void handle_job_end_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp* lp)
+{
+}
+
+static void handle_job_end_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp* lp)
+{
 }
 
 /* handle initial event */
@@ -1253,6 +1277,15 @@ static void handle_exec_event(
     m->executed = buffd_task;
     if(buffd_task.taskid != -1){
         exec_task(ns, buffd_task, lp, m, b); //we don't care about the return value?
+    }
+    if(ns->my_pe->currentTask == (ns->my_pe->tasksCount - 1) &&
+       ns->my_pe->currIter == (jobs[ns->my_pe->jobNum].numIters - 1) &&
+       PE_get_taskDone(ns->my_pe, ns->my_pe->currIter, ns->my_pe->currentTask)) {
+
+      tw_event *e = codes_event_new(lp->gid, g_tw_lookahead, lp);
+      m =  (proc_msg*)tw_event_data(e);
+      m->proc_event_type = JOB_END;
+      tw_event_send(e);
     }
 }
 

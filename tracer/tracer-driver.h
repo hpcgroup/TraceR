@@ -33,6 +33,7 @@ struct proc_state
 enum proc_event
 {
     JOB_START=1,
+    JOB_END,
     KICKOFF,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
@@ -100,6 +101,11 @@ static void handle_job_start_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+static void handle_job_end_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 static void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
@@ -158,6 +164,11 @@ static void handle_recv_post_event(
 
 //reverse event handler declarations
 static void handle_job_start_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_job_end_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
