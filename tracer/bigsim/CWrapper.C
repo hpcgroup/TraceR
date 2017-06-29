@@ -148,8 +148,8 @@ void TraceReader_loadOffsets(TraceReader* t){t->loadOffsets();}
 int* TraceReader_getOffsets(TraceReader* t){return t->allNodeOffsets;}
 void TraceReader_setOffsets(TraceReader* t, int* offsets){t->allNodeOffsets = offsets;}
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
-    empes, int* nwth, PE* pe, int penum, int jobnum, double* startTime){
-  t->readTrace(tot, numnodes, empes, nwth, pe, penum, jobnum, startTime);
+    empes, int* nwth, PE* pe, double* startTime){
+  t->readTrace(tot, numnodes, empes, nwth, pe, startTime);
 }
 int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
 void deleteTraceReader(TraceReader* t){delete t;}

@@ -747,7 +747,7 @@ static void proc_commit(
   }
 #if DEBUG_PRINT
     printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
-           ns->my_pe_num, ns->my_job, m->proc_event_type, m->msgId.id, ns->my_pe->tasksCount);
+           ns->my_pe->myNum, ns->my_pe->jobNum, m->proc_event_type, m->msgId.id, ns->my_pe->tasksCount);
     fflush(stdout);
 #endif
 
@@ -755,8 +755,8 @@ static void proc_commit(
     tw_stime finalTime = tw_now(lp);
 
     if(lpid_to_pe(lp->gid) == 0)
-        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
-          ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
+        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_pe->jobNum,
+          ns->my_pe->myNum, ns_to_s(tw_now(lp)-ns->start_ts));
 
 #if TRACER_OTF_TRACES
     PE_printStat(ns->my_pe);
@@ -764,18 +764,18 @@ static void proc_commit(
 
     if(ns->my_pe->pendingMsgs.size() != 0 ||
        ns->my_pe->pendingRMsgs.size() != 0) {
-      printf("%d psize %d pRsize %d\n", ns->my_pe_num, 
+      printf("%d psize %d pRsize %d\n", ns->my_pe->myNum,
         ns->my_pe->pendingMsgs.size(), ns->my_pe->pendingRMsgs.size());
     }
 
     if(ns->my_pe->pendingReqs.size() != 0 ||
       ns->my_pe->pendingRReqs.size() != 0) {
-      printf("%d rsize %d rRsize %d\n", ns->my_pe_num, 
+      printf("%d rsize %d rRsize %d\n", ns->my_pe->myNum,
         ns->my_pe->pendingReqs.size(), ns->my_pe->pendingRReqs.size());
     }
 
     if(ns->my_pe->pendingRCollMsgs.size() != 0) {
-      printf("%d rcollsize %d \n", ns->my_pe_num, 
+      printf("%d rcollsize %d \n", ns->my_pe->myNum,
         ns->my_pe->pendingRCollMsgs.size());
     }
 
@@ -788,14 +788,14 @@ static void proc_commit(
     }
 
     if(count != 0) {
-      printf("%d collsize %d \n", ns->my_pe_num, count);
+      printf("%d collsize %d \n", ns->my_pe->myNum, count);
     }
 
-    if(jobTime > jobTimes[ns->my_job]) {
-        jobTimes[ns->my_job] = jobTime;
+    if(jobTime > jobTimes[ns->my_pe->jobNum]) {
+        jobTimes[ns->my_pe->jobNum] = jobTime;
     }
-    if(finalTime > finalizeTimes[ns->my_job]) {
-        finalizeTimes[ns->my_job] = finalTime;
+    if(finalTime > finalizeTimes[ns->my_pe->jobNum]) {
+        finalizeTimes[ns->my_pe->jobNum] = finalTime;
     }
 
     for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
@@ -805,16 +805,13 @@ static void proc_commit(
     }
     deletePE(ns->my_pe);
     ns->my_pe = NULL;
-
-    ns->my_pe_num = -1;
-    ns->my_job = -1;
 }
 
 static void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
 {
-    if(ns->my_pe_num == -1) return;
+    if(ns->my_pe == NULL) return;
     if(dump_topo_only) return;
 
     return;
@@ -841,29 +838,30 @@ static void handle_job_start_event(
     tw_event *e;
     tw_stime kickoff_time;
     //Each server read it's trace
-    ns->my_pe_num = lpid_to_pe(lp->gid);
-    ns->my_job = lpid_to_job(lp->gid);
+    int my_job = lpid_to_job(lp->gid);
+    int my_pe_num = lpid_to_pe(lp->gid);
 
-    if(ns->my_pe_num == -1) {
+    if(my_pe_num == -1) {
         return;
     }
 
     ns->my_pe = newPE();
+    ns->my_pe->jobNum = my_job;
+    ns->my_pe->myNum = my_pe_num;
+
     tw_stime startTime=0;
 
-    int my_job = ns->my_job;
 #if TRACER_BIGSIM_TRACES
     TraceReader* t = newTraceReader(jobs[my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
     TraceReader_loadTraceSummary(t);
     TraceReader_setOffsets(t, jobs[my_job].offsets);
 
-    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth,
-                         ns->my_pe, ns->my_pe_num, my_job, &startTime);
+    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth, ns->my_pe, &startTime);
     TraceReader_setOffsets(t, NULL);
     deleteTraceReader(t);
 #else
-    TraceReader_readOTF2Trace(ns->my_pe, ns->my_pe_num, my_job, &startTime);
+    TraceReader_readOTF2Trace(ns->my_pe, &startTime);
 #endif
 
     /* skew each kickoff event slightly to help avoid event ties later on */
@@ -895,9 +893,6 @@ static void handle_job_start_rev_event(
     }
     deletePE(ns->my_pe);
     ns->my_pe = NULL;
-
-    ns->my_pe_num = -1;
-    ns->my_job = -1;
 }
 
 static void handle_job_end_event(
@@ -925,8 +920,8 @@ static void handle_kickoff_event(
 {
     ns->start_ts = tw_now(lp);
 
-    int my_pe_num = ns->my_pe_num;
-    int my_job = ns->my_job;
+    int my_pe_num = ns->my_pe->myNum;
+    int my_job = ns->my_pe->jobNum;
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
     if(my_pe_num == 0 && (my_job == 0 || my_job == num_jobs - 1)) {
         printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
@@ -953,7 +948,7 @@ static void handle_kickoff_rev_event(
 {
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
-    printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", ns->my_pe_num, now);
+    printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", ns->my_pe->myNum, now);
 #endif
     PE_set_busy(ns->my_pe, false);
     TaskPair pair;
@@ -987,9 +982,9 @@ static void handle_recv_event(
     task_id = PE_findTaskFromMsg(ns->my_pe, &m->msgId);
 #else
 #if DEBUG_PRINT
-    if(ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
+    if(ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
     printf("%d RECD MSG: %d %d %d %lld\n", 
-        ns->my_pe_num, m->msgId.pe, m->msgId.id, m->msgId.comm,
+        ns->my_pe->myNum, m->msgId.pe, m->msgId.id, m->msgId.comm,
         m->msgId.seq);
     }
 #endif
@@ -1009,8 +1004,8 @@ static void handle_recv_event(
         ns->my_pe->pendingMsgs.erase(it);
       }
 #if DEBUG_PRINT
-      printf("[%d:%d] RECD MSG FOUND TASK: %d %d %d %d - %d\n", ns->my_job,
-          ns->my_pe_num, m->msgId.pe, m->msgId.id, m->msgId.comm,
+      printf("[%d:%d] RECD MSG FOUND TASK: %d %d %d %d - %d\n", ns->my_pe->jobNum,
+          ns->my_pe->myNum, m->msgId.pe, m->msgId.id, m->msgId.comm,
           ns->my_pe->recvSeq[m->msgId.pe], task_id);
 #endif
     }
@@ -1019,7 +1014,7 @@ static void handle_recv_event(
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: handle_recv_event - received from %d id: %d for task: "
-        "%d. TIME now:%f.\n", ns->my_pe_num, m->msgId.pe, m->msgId.id,
+        "%d. TIME now:%f.\n", ns->my_pe->myNum, m->msgId.pe, m->msgId.id,
         task_id, now);
 #endif
     bool isBusy = PE_is_busy(ns->my_pe);
@@ -1037,8 +1032,8 @@ static void handle_recv_event(
     }
 #endif
 #if DEBUG_PRINT
-    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-    printf("%d Recv  busy %d %d\n", ns->my_pe_num, isBusy, task_id);
+    if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+    printf("%d Recv  busy %d %d\n", ns->my_pe->myNum, isBusy, task_id);
     }
 #endif
     m->incremented_flag = isBusy;
@@ -1046,14 +1041,14 @@ static void handle_recv_event(
     if(task_id>=0){
         //The matching task should not be already done
         if(PE_get_taskDone(ns->my_pe,iter,task_id)){ //TODO: check this
-          printf("[%d:%d] WARNING: MSG RECV TASK IS DONE: %d\n", ns->my_job,
-              ns->my_pe_num, task_id);
+          printf("[%d:%d] WARNING: MSG RECV TASK IS DONE: %d\n", ns->my_pe->jobNum,
+              ns->my_pe->myNum, task_id);
             assert(0);
         }
         PE_invertMsgPe(ns->my_pe, iter, task_id);
         if(m->msgId.size <= eager_limit && ns->my_pe->currIter == 0) {
           b->c1 = 1;
-          if(m->msgId.pe != ns->my_pe_num) {
+          if(m->msgId.pe != ns->my_pe->myNum) {
             PE_addTaskExecTime(ns->my_pe, task_id, nic_delay);
           }
           PE_addTaskExecTime(ns->my_pe, task_id, m->msgId.size * copy_per_byte);
@@ -1115,8 +1110,8 @@ static void handle_recv_rev_event(
     int iter = m->iteration;
     PE_set_busy(ns->my_pe, wasBusy);
 #if DEBUG_PRINT
-    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-    printf("%d Recv rev busy %d %d\n", ns->my_pe_num, wasBusy, m->executed.taskid);
+    if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+    printf("%d Recv rev busy %d %d\n", ns->my_pe->myNum, wasBusy, m->executed.taskid);
     }
 #endif
 
@@ -1134,11 +1129,11 @@ static void handle_recv_rev_event(
 #if DEBUG_PRINT
     tw_stime now = tw_now(lp);
     printf("PE%d: In reverse handler of recv message with id: %d  task_id: %d."
-    " wasBusy: %d. TIME now:%f\n", ns->my_pe_num, m->msgId.id, task_id,
+    " wasBusy: %d. TIME now:%f\n", ns->my_pe->myNum, m->msgId.id, task_id,
     wasBusy, now);
 #endif
     if(b->c1) {
-      if(m->msgId.pe != ns->my_pe_num) {
+      if(m->msgId.pe != ns->my_pe->myNum) {
         PE_addTaskExecTime(ns->my_pe, task_id, -1 * nic_delay);
       }
       PE_addTaskExecTime(ns->my_pe, task_id, -1 * (m->msgId.size * copy_per_byte));
@@ -1219,8 +1214,8 @@ static void handle_exec_event(
     }
     PE_set_busy(ns->my_pe, false);
 #if DEBUG_PRINT
-    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-      printf("%d Set busy false %d\n", ns->my_pe_num, task_id);
+    if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+      printf("%d Set busy false %d\n", ns->my_pe->myNum, task_id);
     }
 #endif
     //Mark the task as done
@@ -1231,7 +1226,7 @@ static void handle_exec_event(
     int fwd_dep_size = PE_getTaskFwdDepSize(ns->my_pe, task_id);
     int* fwd_deps = PE_getTaskFwdDep(ns->my_pe, task_id);
 
-    if(PE_isLoopEvent(ns->my_pe, task_id) && (PE_get_iter(ns->my_pe) != (jobs[ns->my_job].numIters - 1))) {
+    if(PE_isLoopEvent(ns->my_pe, task_id) && (PE_get_iter(ns->my_pe) != (jobs[ns->my_pe->jobNum].numIters - 1))) {
       b->c1 = 1;
       PE_mark_all_done(ns->my_pe, iter, task_id);
       PE_inc_iter(ns->my_pe);
@@ -1252,7 +1247,7 @@ static void handle_exec_event(
 #else 
     if(ns->my_pe->loop_start_task != -1 && 
        PE_isLoopEvent(ns->my_pe, task_id) && 
-       (PE_get_iter(ns->my_pe) != (jobs[ns->my_job].numIters - 1))) {
+       (PE_get_iter(ns->my_pe) != (jobs[ns->my_pe->jobNum].numIters - 1))) {
       b->c1 = 1;
       PE_mark_all_done(ns->my_pe, iter, task_id);
       PE_inc_iter(ns->my_pe);
@@ -1301,14 +1296,14 @@ static void handle_exec_rev_event(
     //Reverse the state: set the PE as busy, task is not completed yet
     PE_set_busy(ns->my_pe, true);
 #if DEBUG_PRINT
-    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-      printf("%d Rev Set busy true %d\n", ns->my_pe_num, task_id);
+    if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+      printf("%d Rev Set busy true %d\n", ns->my_pe->myNum, task_id);
     }
 #endif
 
 #if DEBUG_PRINT
     printf("PE%d: In reverse handler of exec task with task_id: %d\n",
-    ns->my_pe_num, task_id);
+    ns->my_pe->myNum, task_id);
 #endif
     
     //mark the task as not done
@@ -1399,7 +1394,7 @@ static void handle_recv_post_event(
     }
   }
 #if DEBUG_PRINT
-  printf("%d: Recv post recevied %d %d %d %d, found %d %d\n", ns->my_pe_num, 
+  printf("%d: Recv post recevied %d %d %d %d, found %d %d\n", ns->my_pe->myNum,
       m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq, b->c2, m->executed.taskid);
 #endif
 }
@@ -1445,7 +1440,7 @@ static void delegate_send_msg(proc_state *ns,
   MsgEntry *taskEntry = &t->myEntry;
   enqueue_msg(ns, MsgEntry_getSize(taskEntry),
       ns->my_pe->currIter, &taskEntry->msgId, taskEntry->msgId.seq,
-      pe_to_lpid(taskEntry->node, ns->my_job), nic_delay+rdma_delay+delay, 
+      pe_to_lpid(taskEntry->node, ns->my_pe->jobNum), nic_delay+rdma_delay+delay,
       RECV_MSG, &m_local, lp);
 }
 
@@ -1468,21 +1463,21 @@ static tw_stime exec_task(
     //If not, do nothing yet
     //If yes, execute the task
     if(!PE_noUnsatDep(ns->my_pe, task_id.iter, task_id.taskid)){
-        printf("[%d:%d] WARNING: TASK HAS TASK DEP: %d\n", ns->my_job,
-          ns->my_pe_num, task_id.taskid);
+        printf("[%d:%d] WARNING: TASK HAS TASK DEP: %d\n", ns->my_pe->jobNum,
+          ns->my_pe->myNum, task_id.taskid);
         assert(0);
     }
     //Check if the task is already done -- safety check?
     if(PE_get_taskDone(ns->my_pe, task_id.iter, task_id.taskid)){
-        printf("[%d:%d] WARNING: TASK IS ALREADY DONE: %d\n", ns->my_job,
-          ns->my_pe_num, task_id.taskid);
+        printf("[%d:%d] WARNING: TASK IS ALREADY DONE: %d\n", ns->my_pe->jobNum,
+          ns->my_pe->myNum, task_id.taskid);
         assert(0);
     }
 #if TRACER_BIGSIM_TRACES
     //Check the task does not have any message dependency
     if(!PE_noMsgDep(ns->my_pe, task_id.iter, task_id.taskid)){
-        printf("[%d:%d] WARNING: TASK HAS MESSAGE DEP: %d\n", ns->my_job,
-          ns->my_pe_num, task_id.taskid);
+        printf("[%d:%d] WARNING: TASK HAS MESSAGE DEP: %d\n", ns->my_pe->jobNum,
+          ns->my_pe->myNum, task_id.taskid);
         assert(0);
     }
 #endif
@@ -1509,8 +1504,8 @@ static tw_stime exec_task(
       ns->my_pe->pendingRReqs[t->req_id] = seq;
       ns->my_pe->recvSeq[t->myEntry.node]++;
 #if DEBUG_PRINT
-      if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
-        printf("%d Post Irecv: %d - %d %d %d %lld \n", ns->my_pe_num, 
+      if(ns->my_pe->myNum ==  1222 || ns->my_pe->myNum == 1217) {
+        printf("%d Post Irecv: %d - %d %d %d %lld \n", ns->my_pe->myNum,
             t->req_id, t->myEntry.node, t->myEntry.msgId.id,
             t->myEntry.msgId.comm, ns->my_pe->recvSeq[t->myEntry.node]-1);
       }
@@ -1537,8 +1532,8 @@ static tw_stime exec_task(
         assert(PE_is_busy(ns->my_pe) == false);
         ns->my_pe->pendingMsgs[key].push_back(task_id.taskid);
 #if DEBUG_PRINT
-        if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-        printf("%d PUSH recv: %d - %d %d %d %lld %lld %d\n", ns->my_pe_num, 
+        if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+        printf("%d PUSH recv: %d - %d %d %d %lld %lld %d\n", ns->my_pe->myNum,
             task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
             t->myEntry.msgId.comm, seq, ns->my_pe->recvSeq[t->myEntry.node]-1, t->event_id == TRACER_RECV_EVT);
         }
@@ -1552,8 +1547,8 @@ static tw_stime exec_task(
       } else {
         b->c22 = 1;
 #if DEBUG_PRINT
-        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
-        printf("%d Recv matched: %d - %d %d %d %lld, %lld %d\n", ns->my_pe_num, 
+        if(ns->my_pe->myNum ==  1222 || ns->my_pe->myNum == 1217) {
+        printf("%d Recv matched: %d - %d %d %d %lld, %lld %d\n", ns->my_pe->myNum,
             task_id.taskid, t->myEntry.node, t->myEntry.msgId.id,
             t->myEntry.msgId.comm, seq, ns->my_pe->recvSeq[t->myEntry.node]-1, t->event_id == TRACER_RECV_EVT);
         }
@@ -1565,14 +1560,14 @@ static tw_stime exec_task(
         }
       }
     }
-    if(t->myEntry.node != ns->my_pe_num && 
+    if(t->myEntry.node != ns->my_pe->myNum &&
        t->myEntry.msgId.size > eager_limit &&
        (t->event_id == TRACER_RECV_POST_EVT || needPost)) {
       m->model_net_calls++;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, seq,  
-        pe_to_lpid(t->myEntry.node, ns->my_job), nic_delay, RECV_POST, lp);
+        pe_to_lpid(t->myEntry.node, ns->my_pe->jobNum), nic_delay, RECV_POST, lp);
 #if DEBUG_PRINT
-      printf("%d: Recv post %d %d %d %d\n", ns->my_pe_num, 
+      printf("%d: Recv post %d %d %d %d\n", ns->my_pe->myNum,
           t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, 
           seq);
 #endif
@@ -1584,8 +1579,8 @@ static tw_stime exec_task(
     //Executing the task, set the pe as busy
     PE_set_busy(ns->my_pe, true);
 #if DEBUG_PRINT
-    if(1 || ns->my_pe_num == 1024 || ns->my_pe_num == 11788) {
-      printf("%d Set busy true %d\n", ns->my_pe_num, task_id.taskid);
+    if(1 || ns->my_pe->myNum == 1024 || ns->my_pe->myNum == 11788) {
+      printf("%d Set busy true %d\n", ns->my_pe->myNum, task_id.taskid);
     }
 #endif
     //Mark the execution time of the task
@@ -1598,7 +1593,7 @@ static tw_stime exec_task(
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
     int msgEntCount= PE_getTaskMsgEntryCount(ns->my_pe, task_id.taskid);
-    int myPE = ns->my_pe_num;
+    int myPE = ns->my_pe->myNum;
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
     tw_stime soft_latency = codes_local_latency(lp);
@@ -1626,13 +1621,13 @@ static tw_stime exec_task(
               destPE++;
               if(i == thread) continue;
               delay += copyTime;
-              if(destPE == ns->my_pe_num) {
+              if(destPE == ns->my_pe->myNum) {
                 exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     task_id.iter, &taskEntry->msgId, 0 /*not used */,
-                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    pe_to_lpid(destPE, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG,
                     lp);
               }
             }
@@ -1642,26 +1637,26 @@ static tw_stime exec_task(
             {
               destPE++;
               delay += copyTime;
-              if(destPE == ns->my_pe_num){
+              if(destPE == ns->my_pe->myNum){
                 exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    pe_to_lpid(destPE, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG,
                     lp);
               }
             }
           } else if(thread >= 0) {
             int destPE = myNode*nWth + thread;
             delay += copyTime;
-            if(destPE == ns->my_pe_num){
+            if(destPE == ns->my_pe->myNum){
               exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
             }else{
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
                   task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                  pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                  pe_to_lpid(destPE, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG,
                   lp);
             }
           } else if(thread==-1) { // broadcast to all work cores
@@ -1670,13 +1665,13 @@ static tw_stime exec_task(
             {
               destPE++;
               delay += copyTime;
-              if(destPE == ns->my_pe_num){
+              if(destPE == ns->my_pe->myNum){
                 exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 0, sendOffset+delay, 1, lp);
               }else{
                 m->model_net_calls++;
                 send_msg(ns, MsgEntry_getSize(taskEntry), 
                     task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                    pe_to_lpid(destPE, ns->my_job), sendOffset+delay, RECV_MSG,
+                    pe_to_lpid(destPE, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG,
                     lp);
               }
             }
@@ -1690,7 +1685,7 @@ static tw_stime exec_task(
             m->model_net_calls++;
             send_msg(ns, MsgEntry_getSize(taskEntry),
                 task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                pe_to_lpid(node, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+                pe_to_lpid(node, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG, lp);
           }
           else if(node == -1){
             bcast_msg(ns, MsgEntry_getSize(taskEntry),
@@ -1698,24 +1693,24 @@ static tw_stime exec_task(
                 sendOffset+delay, copyTime, lp, m);
           }
           else if(node <= -100 && thread == -1){
-            for(int j=0; j<jobs[ns->my_job].numRanks; j++){
+            for(int j=0; j<jobs[ns->my_pe->jobNum].numRanks; j++){
               if(j == -node-100 || j == myNode) continue;
               delay += copyTime;
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
                   task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                  pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+                  pe_to_lpid(j, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG, lp);
             }
 
           }
           else if(node <= -100){
-            for(int j=0; j<jobs[ns->my_job].numRanks; j++){
+            for(int j=0; j<jobs[ns->my_pe->jobNum].numRanks; j++){
               if(j == myNode) continue;
               delay += copyTime;
               m->model_net_calls++;
               send_msg(ns, MsgEntry_getSize(taskEntry),
                   task_id.iter, &taskEntry->msgId,  0 /*not used */,
-                  pe_to_lpid(j, ns->my_job), sendOffset+delay, RECV_MSG, lp);
+                  pe_to_lpid(j, ns->my_pe->jobNum), sendOffset+delay, RECV_MSG, lp);
             }
           }
           else{
@@ -1737,20 +1732,20 @@ static tw_stime exec_task(
       bool isCopying = true;
       tw_stime copyTime = copy_per_byte * MsgEntry_getSize(taskEntry);
       int node = MsgEntry_getNode(taskEntry);
-      if(MsgEntry_getSize(taskEntry) > eager_limit && node != ns->my_pe_num) {
+      if(MsgEntry_getSize(taskEntry) > eager_limit && node != ns->my_pe->myNum) {
         copyTime = soft_latency;
         isCopying = false;
       }
       sendOffset = soft_delay_mpi;
 
-      if(node == ns->my_pe_num) {
+      if(node == ns->my_pe->myNum) {
         exec_comp(ns, task_id.iter, MsgEntry_getID(taskEntry), 
           taskEntry->msgId.comm, sendOffset+copyTime+delay, 1, lp);
         sendFinishTime = sendOffset + copyTime;
       } else {
 #if DEBUG_PRINT
-        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
-          printf("%d SEND to: %d  %d %d %lld\n", ns->my_pe_num, node, 
+        if(ns->my_pe->myNum ==  1222 || ns->my_pe->myNum == 1217) {
+          printf("%d SEND to: %d  %d %d %lld\n", ns->my_pe->myNum, node,
             taskEntry->msgId.id, taskEntry->msgId.comm, ns->my_pe->sendSeq[node]);
         }
 #endif
@@ -1759,7 +1754,7 @@ static tw_stime exec_task(
           m->model_net_calls++;
           send_msg(ns, MsgEntry_getSize(taskEntry),
               task_id.iter, &taskEntry->msgId, ns->my_pe->sendSeq[node]++,
-              pe_to_lpid(node, ns->my_job), sendOffset+copyTime+nic_delay+delay, 
+              pe_to_lpid(node, ns->my_pe->jobNum), sendOffset+copyTime+nic_delay+delay,
               RECV_MSG, lp);
           sendFinishTime = sendOffset+copyTime;
         } else {
@@ -1788,7 +1783,7 @@ static tw_stime exec_task(
             }
           }
 #if DEBUG_PRINT
-          printf("%d: Send %d %d %d %d, nonblock %d/%d, wait %d, do %d, task %d\n", ns->my_pe_num, 
+          printf("%d: Send %d %d %d %d, nonblock %d/%d, wait %d, do %d, task %d\n", ns->my_pe->myNum,
            taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
            taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
@@ -1806,8 +1801,8 @@ static tw_stime exec_task(
       } else {
         strcpy(str, "[ %d %d : End %s %f ]\n");
       }
-      tw_output(lp, str, ns->my_job, ns->my_pe_num, 
-          jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
+      tw_output(lp, str, ns->my_pe->jobNum, ns->my_pe->myNum,
+          jobs[ns->my_pe->jobNum].allData->strings[jobs[ns->my_pe->jobNum].allData->regions[t->event_id].name].c_str(),
           tw_now(lp)/((double)TIME_MULT));
     }
 
@@ -1828,10 +1823,10 @@ static tw_stime exec_task(
     }
 #endif
     
-    if(ns->my_pe_num == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
+    if(ns->my_pe->myNum == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
       char str[1000];
       strcpy(str, "[ %d %d : time at task %d/%d %f ]\n");
-      tw_output(lp, str, ns->my_job, ns->my_pe_num, 
+      tw_output(lp, str, ns->my_pe->jobNum, ns->my_pe->myNum,
           ns->my_pe->currentTask, PE_get_tasksCount(ns->my_pe), tw_now(lp)/((double)TIME_MULT));
     }
 
@@ -2064,7 +2059,7 @@ static void enqueue_coll_msg(
     bool isEager = (size <= eager_limit) || useEager;
     //if(it != ns->my_pe->pendingRCollMsgs.end() && it->second.size() == 0) {
     //  CollKeyType::iterator it2 = ns->my_pe->pendingRCollMsgs.begin();
-    //  printf("%d enqueue %d %d %d -- %d %d -- %d %d %d %d \n", ns->my_pe_num, dest, 
+    //  printf("%d enqueue %d %d %d -- %d %d -- %d %d %d %d \n", ns->my_pe->myNum, dest,
     //  msgId->comm, seq, ns->my_pe->pendingRCollMsgs.size(), it->second.size(),
     //  it2->first.rank, it2->first.comm, it2->first.seq, it->second.size());
     //  fflush(stdout);
@@ -2074,7 +2069,7 @@ static void enqueue_coll_msg(
         it->second.front() != -1)) {
       b->c16 = 1;
       ns->my_pe->pendingRCollMsgs[key].push_back(index);
-      //printf("%d Added %d %d %d\n",  ns->my_pe_num, dest, msgId->comm, seq);
+      //printf("%d Added %d %d %d\n",  ns->my_pe->myNum, dest, msgId->comm, seq);
     } else {
       proc_msg m_remote, m_local;
       m_remote.proc_event_type = lookUpTable[index].remote_event;
@@ -2091,7 +2086,7 @@ static void enqueue_coll_msg(
       m_local.proc_event_type = lookUpTable[index].local_event;
       m_local.executed.taskid = ns->my_pe->currentCollTask;
 
-      model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
+      model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_pe->jobNum), size,
           sendOffset + copyTime*(isEager?1:0), sizeof(proc_msg), 
           (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);
       m->model_net_calls++;
@@ -2118,7 +2113,7 @@ static void enqueue_coll_msg_rev(
         tw_bf * b) {
   CollMsgKey key(dest, msgId->comm, seq);
   if(b->c16) {
-    //printf("%d Removing %d %d %d\n", ns->my_pe_num, dest, msgId->comm, seq);
+    //printf("%d Removing %d %d %d\n", ns->my_pe->myNum, dest, msgId->comm, seq);
     //fflush(stdout);
     assert(ns->my_pe->pendingRCollMsgs.find(key) != ns->my_pe->pendingRCollMsgs.end());
     ns->my_pe->pendingRCollMsgs[key].pop_back();
@@ -2137,7 +2132,7 @@ static void handle_coll_recv_post_event(
 		proc_msg * m,
 		tw_lp * lp)
 {
-  //printf("%d recv post %d %d %d\n", ns->my_pe_num, m->msgId.pe, m->msgId.comm, m->msgId.seq);
+  //printf("%d recv post %d %d %d\n", ns->my_pe->myNum, m->msgId.pe, m->msgId.comm, m->msgId.seq);
   //fflush(stdout);
   CollMsgKey key(m->msgId.pe, m->msgId.comm, m->msgId.seq);
   CollKeyType::iterator it = ns->my_pe->pendingRCollMsgs.find(key);
@@ -2145,7 +2140,7 @@ static void handle_coll_recv_post_event(
   if(it == ns->my_pe->pendingRCollMsgs.end() || it->second.front() == -1) {
     b->c1 = 1;
     ns->my_pe->pendingRCollMsgs[key].push_back(-1);
-    //printf("%d Added recv post %d %d %d\n",  ns->my_pe_num, m->msgId.pe, m->msgId.comm, m->msgId.seq);
+    //printf("%d Added recv post %d %d %d\n",  ns->my_pe->myNum, m->msgId.pe, m->msgId.comm, m->msgId.seq);
   } else {
     b->c2 = 1;
     assert(ns->my_pe->currentCollTask >= 0);
@@ -2155,7 +2150,7 @@ static void handle_coll_recv_post_event(
     assert(ns->my_pe->currentCollComm == m->msgId.comm);
     int index = it->second.front();
     m->coll_info = index;
-    //printf("%d Sending coll %d %d\n", ns->my_pe_num, index, m->msgId.pe);
+    //printf("%d Sending coll %d %d\n", ns->my_pe->myNum, index, m->msgId.pe);
     proc_msg m_remote, m_local;
     m_remote.proc_event_type = lookUpTable[index].remote_event;
     m_remote.src = lp->gid;
@@ -2176,7 +2171,7 @@ static void handle_coll_recv_post_event(
       size = m->msgId.size;
       m_remote.msgId.size = size;
     }
-    model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_job), 
+    model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_pe->jobNum),
         size, nic_delay, sizeof(proc_msg), 
         (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);
     it->second.pop_front();
@@ -2194,7 +2189,7 @@ static void handle_coll_recv_post_rev_event(
 {
   CollMsgKey key(m->msgId.pe, m->msgId.comm, m->msgId.seq);
   if(b->c1) {
-    //printf("%d Removing recv post %d %d %d\n", ns->my_pe_num, m->msgId.pe, m->msgId.comm, m->msgId.seq);
+    //printf("%d Removing recv post %d %d %d\n", ns->my_pe->myNum, m->msgId.pe, m->msgId.comm, m->msgId.seq);
     //fflush(stdout);
     assert(ns->my_pe->pendingRCollMsgs.find(key) != ns->my_pe->pendingRCollMsgs.end());
     ns->my_pe->pendingRCollMsgs[key].pop_back();
@@ -2218,7 +2213,7 @@ static void perform_collective(
             tw_bf * b) {
   Task *t = &ns->my_pe->myTasks[taskid];
   assert(t->event_id == TRACER_COLL_EVT);
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[t->myEntry.msgId.comm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[t->myEntry.msgId.comm]];
   if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
     perform_bcast(ns, taskid, lp, m, b, 0);
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
@@ -2251,7 +2246,7 @@ static void perform_collective_rev(
     proc_msg *m,
     tw_bf * b) {
   Task *t = &ns->my_pe->myTasks[taskid];
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[t->myEntry.msgId.comm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[t->myEntry.msgId.comm]];
   if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_BCAST) {
     perform_bcast_rev(ns, taskid, lp, m, b, 0);
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_REDUCE) {
@@ -2343,8 +2338,8 @@ static void perform_bcast(
   int myChildren[BCAST_DEGREE];
   int thisTreePe, index, maxSize;
 
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
   if(it == g.rmembers.end()) {
     assert(0);
   } else {
@@ -2369,7 +2364,7 @@ static void perform_bcast(
   for(int i = 0; i < numValidChildren; i++) {
     int dest = g.members[myChildren[i]];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
-      &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
+      &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_pe->jobNum),
       delay, COLL_BCAST, lp);
     delay += copyTime;
     m->model_net_calls++;
@@ -2470,8 +2465,8 @@ static void perform_reduction(
   int numValidChildren = 0;
   int thisTreePe, index, maxSize;
 
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+  std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
   if(it == g.rmembers.end()) {
     assert(0);
   } else {
@@ -2510,7 +2505,7 @@ static void perform_reduction(
   if(!amIroot) {
     int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
-        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
+        &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_pe->jobNum),
         delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0), COLL_REDUCTION, lp);
     m->model_net_calls++;
   }
@@ -2577,8 +2572,8 @@ static void perform_a2a(
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
     int index, maxSize;
-    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+    Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
     if(it == g.rmembers.end()) {
       assert(0);
     } else {
@@ -2621,7 +2616,7 @@ static void perform_a2a(
 
   m->model_net_calls = 0;
   tw_stime delay = codes_local_latency(lp);
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
 
   if(isEvent && m->msgId.pe != ns->my_pe->currentCollRank) {
     ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
@@ -2654,9 +2649,9 @@ static void perform_a2a(
         dest, delay + nic_delay, copyTime, lp, m, b);
     if(t->myEntry.msgId.size > eager_limit) {
       m->model_net_calls++;
-      t->myEntry.msgId.pe = ns->my_pe_num;
+      t->myEntry.msgId.pe = ns->my_pe->myNum;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
-        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
+        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_pe->jobNum),
         delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
@@ -2825,8 +2820,8 @@ static void perform_allgather(
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
     int index, maxSize;
-    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+    Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
     if(it == g.rmembers.end()) {
       assert(0);
     } else {
@@ -2838,7 +2833,7 @@ static void perform_allgather(
     ns->my_pe->currentCollPartner = 0;
     ns->my_pe->currentCollSize = maxSize;
     t->myEntry.msgId.pe = 0;
-    //printf("%d New coll %d %d %d\n", ns->my_pe_num, index, ns->my_pe->currentCollComm,
+    //printf("%d New coll %d %d %d\n", ns->my_pe->myNum, index, ns->my_pe->currentCollComm,
      //ns->my_pe->currentCollSeq);
   } else {
     if((m->msgId.pe != 0) || 
@@ -2863,7 +2858,7 @@ static void perform_allgather(
 
   m->model_net_calls = 0;
   tw_stime delay = codes_local_latency(lp);
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
 
   if(isEvent && m->msgId.pe != 0) {
     ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
@@ -2882,9 +2877,9 @@ static void perform_allgather(
     m->coll_info = dest;
     tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
     t->myEntry.msgId.pe++;
-    //if(ns->my_pe_num == 23) {
+    //if(ns->my_pe->myNum == 23) {
     //  CollKeyType::iterator it = ns->my_pe->pendingRCollMsgs.begin();
-    //  printf("%d enqueue -- %d %d -- %d %d %d \n", ns->my_pe_num,
+    //  printf("%d enqueue -- %d %d -- %d %d %d \n", ns->my_pe->myNum,
     //  ns->my_pe->pendingRCollMsgs.size(), it->second.size(),
     //  it->first.rank, it->first.comm, it->first.seq);
     //  fflush(stdout);
@@ -2895,16 +2890,16 @@ static void perform_allgather(
     if(t->myEntry.msgId.size > eager_limit) {
       m->model_net_calls++;
       int saved_pe = t->myEntry.msgId.pe;
-      t->myEntry.msgId.pe = ns->my_pe_num;
+      t->myEntry.msgId.pe = ns->my_pe->myNum;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
-        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
+        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_pe->jobNum),
         delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = saved_pe;
-      //printf("%d Send MSG to %d %d %lld\n", ns->my_pe_num, src, g.members[src], ns->my_pe->currentCollSeq);
+      //printf("%d Send MSG to %d %d %lld\n", ns->my_pe->myNum, src, g.members[src], ns->my_pe->currentCollSeq);
     }
-    //if(ns->my_pe_num == 23) {
+    //if(ns->my_pe->myNum == 23) {
     //  CollKeyType::iterator it = ns->my_pe->pendingRCollMsgs.begin();
-    //  printf("%d after enqueue -- %d %d -- %d %d %d \n", ns->my_pe_num,
+    //  printf("%d after enqueue -- %d %d -- %d %d %d \n", ns->my_pe->myNum,
     //  ns->my_pe->pendingRCollMsgs.size(), it->second.size(),
     //  it->first.rank, it->first.comm, it->first.seq);
     //  fflush(stdout);
@@ -2981,7 +2976,7 @@ static void handle_allgather_send_comp_event(
   int partner = ns->my_pe->currentCollPartner;
   std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
     ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
-  //printf("%d Coll send complete %d %d %d\n", ns->my_pe_num, ns->my_pe->currentCollComm, 
+  //printf("%d Coll send complete %d %d %d\n", ns->my_pe->myNum, ns->my_pe->currentCollComm,
   //  ns->my_pe->currentCollSeq, partner);
   if(it == ns->my_pe->pendingCollMsgs.end()) {
     recvCount = 0;
@@ -3050,8 +3045,8 @@ static void perform_bruck(
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
     int index, maxSize;
-    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+    Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
     if(it == g.rmembers.end()) {
       assert(0);
     } else {
@@ -3105,7 +3100,7 @@ static void perform_bruck(
 
   m->model_net_calls = 0;
   tw_stime delay = codes_local_latency(lp);
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
 
   if(isEvent && m->msgId.pe != ns->my_pe->currentCollRank) {
     ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
@@ -3144,9 +3139,9 @@ static void perform_bruck(
         dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
     if(ns->my_pe->currentCollMsgSize > eager_limit) {
       m->model_net_calls++;
-      t->myEntry.msgId.pe = ns->my_pe_num;
+      t->myEntry.msgId.pe = ns->my_pe->myNum;
       send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId, 
-        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_job), 
+        ns->my_pe->currentCollSeq, pe_to_lpid(g.members[src], ns->my_pe->jobNum),
         delay, RECV_COLL_POST, lp, true,  ns->my_pe->currentCollMsgSize);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
@@ -3309,8 +3304,8 @@ static void perform_a2a_blocked(
     int64_t collSeq = ns->my_pe->collectiveSeq[t->myEntry.msgId.comm]++;
     ns->my_pe->currentCollSeq = collSeq;
     int index, maxSize;
-    Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
-    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe_num);
+    Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
+    std::map<int, int>::iterator it = g.rmembers.find(ns->my_pe->myNum);
     if(it == g.rmembers.end()) {
       assert(0);
     } else {
@@ -3374,7 +3369,7 @@ static void perform_a2a_blocked(
 
   m->model_net_calls = 0;
   tw_stime delay = codes_local_latency(lp);
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
 
   if(ns->my_pe->currentCollPartner < ns->my_pe->currentCollSize - 1) {
     b->c13 = 1;
@@ -3563,6 +3558,7 @@ static void handle_a2a_blocked_send_comp_rev_event(
   }
 }
 
+
 static void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
@@ -3573,7 +3569,7 @@ static void handle_coll_complete_event(
     return;
   }
   Task *t = &ns->my_pe->myTasks[m->executed.taskid];
-  //printf("%d coll complete %d %d\n", ns->my_pe_num, ns->my_pe->currentCollComm,
+  //printf("%d coll complete %d %d\n", ns->my_pe->myNum, ns->my_pe->currentCollComm,
   //    ns->my_pe->currentCollSeq);
   m->msgId.seq = ns->my_pe->currentCollSeq;
   m->msgId.comm = ns->my_pe->currentCollComm;
@@ -3604,15 +3600,15 @@ static void handle_coll_complete_event(
       } else {
         strcpy(str, "[ %d %d : End %s %f ]\n");
       }
-      tw_output(lp, str, ns->my_job, ns->my_pe_num, 
-          jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
+      tw_output(lp, str, ns->my_pe->jobNum, ns->my_pe->myNum,
+          jobs[ns->my_pe->jobNum].allData->strings[jobs[ns->my_pe->jobNum].allData->regions[t->event_id].name].c_str(),
           tw_now(lp)/((double)TIME_MULT));
     }
 
-    if(ns->my_pe_num == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
+    if(ns->my_pe->myNum == 0 && (ns->my_pe->currentTask % print_frequency == 0)) {
       char str[1000];
       strcpy(str, "[ %d %d : time at task %d %f ]\n");
-      tw_output(lp, str, ns->my_job, ns->my_pe_num, 
+      tw_output(lp, str, ns->my_pe->jobNum, ns->my_pe->myNum,
           ns->my_pe->currentTask, tw_now(lp)/((double)TIME_MULT));
     }
   } else if(t->myEntry.msgId.coll_type == OTF2_COLLECTIVE_OP_ALLREDUCE &&
@@ -3637,7 +3633,7 @@ static void handle_coll_complete_rev_event(
   ns->my_pe->currentCollComm = m->msgId.comm;
   ns->my_pe->currentCollRank = m->coll_info;
   Task *t = &ns->my_pe->myTasks[m->executed.taskid];
-  Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
+  Group &g = jobs[ns->my_pe->jobNum].allData->groups[jobs[ns->my_pe->jobNum].allData->communicators[ns->my_pe->currentCollComm]];
   if(m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALLGATHER_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALL_BRUCK ||
@@ -3709,15 +3705,15 @@ static int bcast_msg(
 
     int numValidChildren = 0;
     int myChildren[BCAST_DEGREE];
-    int thisTreePe = (ns->my_pe_num - msgId->pe + jobs[ns->my_job].numRanks) %
-                      jobs[ns->my_job].numRanks;
+    int thisTreePe = (ns->my_pe->myNum - msgId->pe + jobs[ns->my_pe->jobNum].numRanks) %
+                      jobs[ns->my_pe->jobNum].numRanks;
 
     for(int i = 0; i < BCAST_DEGREE; i++) {
       int next_child = BCAST_DEGREE * thisTreePe + i + 1;
-      if(next_child >= jobs[ns->my_job].numRanks) {
+      if(next_child >= jobs[ns->my_pe->jobNum].numRanks) {
         break;
       }
-      myChildren[i] = (msgId->pe + next_child) % jobs[ns->my_job].numRanks;
+      myChildren[i] = (msgId->pe + next_child) % jobs[ns->my_pe->jobNum].numRanks;
       numValidChildren++;
     }
     
@@ -3725,7 +3721,7 @@ static int bcast_msg(
 
     for(int i = 0; i < numValidChildren; i++) {
       send_msg(ns, size, iter, msgId,  0 /*not used */, 
-        pe_to_lpid(myChildren[i], ns->my_job), sendOffset + delay, BCAST, lp);
+        pe_to_lpid(myChildren[i], ns->my_pe->jobNum), sendOffset + delay, BCAST, lp);
       delay += copyTime;
       m->model_net_calls++;
     }
@@ -3751,20 +3747,20 @@ static int exec_comp(
     e = codes_event_new(lp->gid, sendOffset, lp);
     m = (proc_msg*)tw_event_data(e);
     m->msgId.size = 0;
-    m->msgId.pe = ns->my_pe_num;
+    m->msgId.pe = ns->my_pe->myNum;
     m->msgId.id = task_id;
 #if TRACER_OTF_TRACES
     m->msgId.comm = comm_id;
     if(recv) {
-      m->msgId.seq = ns->my_pe->sendSeq[ns->my_pe_num]++;
+      m->msgId.seq = ns->my_pe->sendSeq[ns->my_pe->myNum]++;
     }
 #endif
     m->iteration = iter;
     if(recv) {
         m->proc_event_type = RECV_MSG;
 #if DEBUG_PRINT
-        if(ns->my_pe_num ==  1222 || ns->my_pe_num == 1217) {
-          printf("%d Sending to %d %d %d %lld\n", ns->my_pe_num, ns->my_pe_num,
+        if(ns->my_pe->myNum ==  1222 || ns->my_pe->myNum == 1217) {
+          printf("%d Sending to %d %d %d %lld\n", ns->my_pe->myNum, ns->my_pe->myNum,
             m->msgId.id, m->msgId.comm, m->msgId.seq);
         }
 #endif

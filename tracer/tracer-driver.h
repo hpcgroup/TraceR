@@ -26,7 +26,6 @@ struct proc_state
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     clock_t sim_start;
-    int my_pe_num, my_job;
 };
 
 /* types of events that will constitute triton requests */

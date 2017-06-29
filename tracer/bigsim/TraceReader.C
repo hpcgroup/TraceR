@@ -73,9 +73,7 @@ void TraceReader::loadOffsets(){
   allNodeOffsets = BgLoadOffsets(totalWorkerProcs,numEmPes);
 }
 
-void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
-    int penum, int jobnum, double* startTime)
-{
+void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe, double* startTime){
   *nwth = numWth;
   *tot = totalWorkerProcs;
   *totn= totalNodes;
@@ -85,7 +83,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   firstLog=0;
   totalTlineLength=0;
 
-  int nodeNum = penum/numWth;
+  int nodeNum = pe->myNum/numWth;
   int myEmulPe = nodeNum%numEmPes;
 
   traceFileName = tracePath;
@@ -94,34 +92,32 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   pe->numWth = numWth;
   pe->numEmPes = numEmPes;
 
-  if(jobs[jobnum].skipMsgId == -1) {
+  if(jobs[pe->jobNum].skipMsgId == -1) {
     BgTimeLineRec tlinerec2;
     BgReadProc( 0, numWth , numEmPes, totalWorkerProcs, allNodeOffsets, tlinerec2);
     for(int j = 0; j < tlinerec2.length(); j++) {
       BgTimeLog *bglog = tlinerec2[j];
       if(bglog->isStartEvent()) {
-        jobs[jobnum].skipMsgId = bglog->msgs[0]->msgID;
+        jobs[pe->jobNum].skipMsgId = bglog->msgs[0]->msgID;
         break;
       }
     }
-    if(jobs[jobnum].skipMsgId == -1) {
-      jobs[jobnum].skipMsgId = -2;
+    if(jobs[pe->jobNum].skipMsgId == -1) {
+      jobs[pe->jobNum].skipMsgId = -2;
     }
   }
 
   BgTimeLineRec tlinerec; // Time line (list of logs)
-  int status = BgReadProc( penum, numWth , numEmPes, totalWorkerProcs,
+  int status = BgReadProc( pe->myNum, numWth , numEmPes, totalWorkerProcs,
       allNodeOffsets, tlinerec);
   assert(status!=-1);
-  pe->myNum = penum;
-  pe->jobNum = jobnum;
-  pe->myEmPE = (penum/numWth)%numEmPes;
+  pe->myEmPE = (pe->myNum/numWth)%numEmPes;
   pe->myTasks= new Task[tlinerec.length()];
-  pe->taskStatus= new bool*[jobs[jobnum].numIters];
-  pe->taskExecuted= new bool*[jobs[jobnum].numIters];
-  pe->msgStatus= new bool*[jobs[jobnum].numIters];
-  pe->allMarked= new bool[jobs[jobnum].numIters];
-  for(int i = 0; i < jobs[jobnum].numIters; i++) {
+  pe->taskStatus= new bool*[jobs[pe->jobNum].numIters];
+  pe->taskExecuted= new bool*[jobs[pe->jobNum].numIters];
+  pe->msgStatus= new bool*[jobs[pe->jobNum].numIters];
+  pe->allMarked= new bool[jobs[pe->jobNum].numIters];
+  for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
     pe->taskStatus[i] = new bool[tlinerec.length()];
     pe->taskExecuted[i] = new bool[tlinerec.length()];
     pe->msgStatus[i] = new bool[tlinerec.length()];
@@ -131,7 +127,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
   pe->totalTasksCount = tlinerec.length();
   pe->firstTask = -1;
 
-  if(jobs[jobnum].skipMsgId == -2) {
+  if(jobs[pe->jobNum].skipMsgId == -2) {
      pe->firstTask = 0;
   }
   
@@ -154,10 +150,10 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
     BgTimeLog *bglog=tlinerec[logInd];
 
     if(pe->firstTask == -1) {
-      if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == jobs[jobnum].skipMsgId) {
+      if(bglog->msgId.pe() == 0 && bglog->msgId.msgID() == jobs[pe->jobNum].skipMsgId) {
         pe->firstTask = logInd;
       } else {
-        for(int i = 0; i < jobs[jobnum].numIters; i++) {
+        for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
           pe->taskStatus[i][logInd] = true;
           pe->taskExecuted[i][logInd] = true;
         }
@@ -170,7 +166,7 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
     }
 
     // first job's index is zero
-    setTaskFromLog(&(pe->myTasks[logInd]), bglog, penum, pe->myEmPE, 0, pe, 
+    setTaskFromLog(&(pe->myTasks[logInd]), bglog, pe->myNum, pe->myEmPE, 0, pe,
       logInd, isScaling, scaling_factor);
 
     int sPe = bglog->msgId.pe();
@@ -183,13 +179,13 @@ void TraceReader::readTrace(int* tot, int* totn, int* emPes, int* nwth, PE* pe,
             pe->msgDestLogs[(sPe/numWth)%numEmPes].insert(std::pair<int,int>(smsgID, logInd + firstLog));
         } else{
             // it may be a broadcast
-            printf(" %d I should never come here, please fix me %d\n", penum, it->second);
+            printf(" %d I should never come here, please fix me %d\n", pe->myNum, it->second);
             assert(0);
             it->second = -100;
         }
     }
     if(logInd == pe->firstTask) {
-      for(int i = 0; i < jobs[jobnum].numIters; i++) {
+      for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
         pe->msgStatus[i][logInd] = true;
       }
     }
@@ -333,13 +329,11 @@ void TraceReader::setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE,
 
 #elif TRACER_OTF_TRACES
 #include "otf2_reader.h"
-void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startTime) {
-  pe->myNum = my_pe_num;
-  pe->jobNum = my_job;
+void TraceReader_readOTF2Trace(PE* pe, double *startTime) {
   pe->ld = new LocationData;
   
-  readLocationTasks(my_job, jobs[my_job].reader, jobs[my_job].allData,
-      my_pe_num, pe->ld);
+  readLocationTasks(pe->jobNum, jobs[pe->jobNum].reader, jobs[pe->jobNum].allData,
+      pe->myNum, pe->ld);
 
   pe->myTasks = &(pe->ld->tasks[0]);
   pe->tasksCount = pe->ld->tasks.size();
@@ -357,7 +351,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->firstTask = 0;
   *startTime = 0;
 
-  int num_communicators = jobs[my_job].allData->communicators.size();
+  int num_communicators = jobs[pe->jobNum].allData->communicators.size();
   pe->collectiveSeq.resize(num_communicators, 0);
   pe->currentCollComm = pe->currentCollSeq = pe->currentCollTask = -1;
   pe->currentCollRank = pe->currentCollPartner = pe->currentCollSize = -1;

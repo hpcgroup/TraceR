@@ -34,8 +34,7 @@ public:
 #if TRACER_BIGSIM_TRACES
     void loadOffsets();
     void loadTraceSummary();
-    void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe,
-        int penum, int jobnum, double* startTime);
+    void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe, double* startTime);
     void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe, int, bool, double);
 #endif
 

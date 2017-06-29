@@ -95,7 +95,7 @@ void TraceReader_loadOffsets(TraceReader* t);
 int* TraceReader_getOffsets(TraceReader* t);
 void TraceReader_setOffsets(TraceReader* t, int* offsets);
 void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
-    int* nwth, PE* pe, int penum, int jobnum, double* startTime);
+    int* nwth, PE* pe, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
 void deleteTraceReader(TraceReader* t);
 #endif
@@ -103,5 +103,5 @@ void addEventSub(int job, char *key, double val, int numjobs);
 void addMsgSizeSub(int job, int64_t key, int64_t val, int numjobs);
 
 bool isPEonThisRank(int jobID, int i);
-void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startTime);
+void TraceReader_readOTF2Trace(PE* pe, double *startTime);
 #endif
