@@ -1277,7 +1277,7 @@ static void handle_exec_event(
        ns->my_pe->currIter == (jobs[ns->my_pe->jobNum].numIters - 1) &&
        PE_get_taskDone(ns->my_pe, ns->my_pe->currIter, ns->my_pe->currentTask)) {
 
-      tw_event *e = codes_event_new(lp->gid, g_tw_lookahead, lp);
+      tw_event *e = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
       m =  (proc_msg*)tw_event_data(e);
       m->proc_event_type = JOB_END;
       tw_event_send(e);
