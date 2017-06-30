@@ -41,10 +41,12 @@ extern "C" {
 static int net_id = 0;
 static int num_routers = 0;
 static int num_servers = 0;
+static int num_schedulers = 0;
 static int num_nics = 0;
 
 static int num_routers_per_rep = 0;
 static int num_servers_per_rep = 0;
+static int num_schedulers_per_rep = 0;
 static int num_nics_per_rep = 0;
 static int lps_per_rep = 0;
 static int total_lps = 0;
@@ -104,6 +106,17 @@ int rank;
 
 #define DEBUG_PRINT 0
 
+tw_lptype sched_lp = {
+     (init_f) sched_init,
+     (pre_run_f) NULL,
+     (event_f) sched_event,
+     (revent_f) sched_rev_event,
+     (commit_f) NULL,
+     (final_f)  sched_finalize,
+     (map_f) codes_mapping,
+     sizeof(sched_state),
+};
+
 tw_lptype proc_lp = {
      (init_f) proc_init,
      (pre_run_f) NULL,
@@ -115,7 +128,9 @@ tw_lptype proc_lp = {
      sizeof(proc_state),
 };
 
+extern const tw_lptype* sched_get_lp_type();
 extern const tw_lptype* proc_get_lp_type();
+static void sched_add_lp_type();
 static void proc_add_lp_type();
 static tw_stime ns_to_s(tw_stime ns);
 static tw_stime s_to_ns(tw_stime ns);
@@ -129,6 +144,7 @@ const tw_optdef app_opt [] =
     TWOPT_END()
 };
 
+static inline int sched_lpid();
 static inline int pe_to_lpid(int pe, int job);
 static inline int pe_to_job(int pe);
 static inline int lpid_to_pe(int lp_gid);
@@ -184,10 +200,13 @@ int main(int argc, char **argv)
     free(net_ids);
 
     proc_add_lp_type();
+    sched_add_lp_type();
     
     codes_mapping_setup();
     
     num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
+            NULL, 1);
+    num_schedulers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "scheduler",
             NULL, 1);
 
     if(net_id == TORUS) {
@@ -254,9 +273,12 @@ int main(int argc, char **argv)
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
         "server", NULL, 1);
+    num_schedulers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+        "scheduler", NULL, 1);
 
-    total_lps = num_servers + num_nics + num_routers;
-    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
+    total_lps = num_servers + num_schedulers + num_nics + num_routers;
+    lps_per_rep = num_servers_per_rep + num_schedulers_per_rep + num_nics_per_rep + num_routers_per_rep;
+
 
     configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
         &soft_delay_mpi);
@@ -351,6 +373,14 @@ int main(int argc, char **argv)
     finalizeTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
 
+    int simulated_ranks;
+    char buf[10];
+    if(fgets(buf, 10, jobIn) != NULL) {
+        if(sscanf(buf, "%d", &simulated_ranks) < 1) {
+            simulated_ranks = 0;
+        }
+    }
+
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
         char tempTrace[200];
@@ -361,6 +391,11 @@ int main(int argc, char **argv)
 #endif
         fscanf(jobIn, "%s", jobs[i].map_file);
         fscanf(jobIn, "%d", &jobs[i].numRanks);
+        if(simulated_ranks > 0 && jobs[i].numRanks > simulated_ranks) {
+            printf("Number of ranks required by job %d: %d is greater than simulated ranks: %d. Aborting\n",
+                   i, jobs[i].numRanks, simulated_ranks);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
         fscanf(jobIn, "%d", &jobs[i].numIters);
         total_ranks += jobs[i].numRanks;
         jobs[i].skipMsgId = -1;
@@ -370,6 +405,9 @@ int main(int argc, char **argv)
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
+    }
+    if(simulated_ranks != 0) {
+        total_ranks = simulated_ranks;
     }
 
     if(!rank) {
@@ -429,6 +467,9 @@ int main(int argc, char **argv)
         int num_workers = jobs[i].numRanks;
         jobs[i].rankMap = (int *) malloc(sizeof(int) * num_workers);
         if(default_mapping) {
+          if(ranks_till_now + num_workers > total_ranks) {
+              ranks_till_now = 0;
+          }
           for(int local_rank = 0; local_rank < num_workers; local_rank++,
             ranks_till_now++) {
             jobs[i].rankMap[local_rank] = ranks_till_now;
@@ -550,9 +591,140 @@ const tw_lptype* proc_get_lp_type()
     return(&proc_lp);
 }
 
+const tw_lptype* sched_get_lp_type()
+{
+    return(&sched_lp);
+}
+
 static void proc_add_lp_type()
 {
     lp_type_register("server", proc_get_lp_type());
+}
+
+static void sched_add_lp_type()
+{
+    lp_type_register("scheduler", sched_get_lp_type());
+}
+
+static int sched_jobs(
+    sched_state * ss,
+    tw_lp * lp)
+{
+    int last_job = ss->last_scheduled_job;
+    for(int j = ss->last_scheduled_job + 1; j < num_jobs; j++) {
+        for(int p = 0; p < jobs[j].numRanks; p++) {
+            if(ss->busy_lps.find(pe_to_lpid(p, j)) != ss->busy_lps.end()) {
+                return ss->last_scheduled_job - last_job;
+            }
+        }
+#if DEBUG_PRINT
+        printf("SCHED: Starting job %d\n", j);
+        fflush(stdout);
+#endif
+        for(int p = 0; p < jobs[j].numRanks; p++) {
+            /* skew each job start event slightly to help avoid event ties later on */
+            tw_stime start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
+            tw_event *e = codes_event_new(pe_to_lpid(p, j), start_time, lp);
+            proc_msg *m =  (proc_msg*)tw_event_data(e);
+            m->proc_event_type = JOB_START;
+            m->msgId.id = j;
+            m->msgId.pe = p;
+            tw_event_send(e);
+
+            ss->busy_lps.insert(pe_to_lpid(p, j));
+        }
+        ss->last_scheduled_job = j;
+        ss->completed_ranks[j] = 0;
+    }
+    return ss->last_scheduled_job - last_job;
+}
+
+static void sched_init(
+    sched_state * ss,
+    tw_lp * lp)
+{
+    if(dump_topo_only || lp->gid != sched_lpid()) {
+        return;
+    }
+
+    ss->completed_ranks = std::map<int, unsigned int>();
+    ss->busy_lps = std::set<tw_lpid>();
+    ss->last_scheduled_job = -1;
+
+    sched_jobs(ss, lp);
+}
+
+static void sched_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp)
+{
+    if(m->proc_event_type != JOB_END) {
+        return;
+    }
+
+    int job_num = m->msgId.id;
+    ss->completed_ranks[job_num]++;
+    if(ss->completed_ranks[job_num] == jobs[job_num].numRanks) {
+        ss->completed_ranks.erase(job_num);
+        for(int p = 0; p < jobs[job_num].numRanks; p++) {
+            ss->busy_lps.erase(pe_to_lpid(p, job_num));
+        }
+#if DEBUG_PRINT
+        printf("SCHED: Job %d finished executing\n", job_num);
+        fflush(stdout);
+#endif
+        m->saved_task = sched_jobs(ss, lp);
+    }
+}
+
+static void sched_rev_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp)
+{
+    if(m->proc_event_type != JOB_END) {
+        return;
+    }
+
+    int job_num = m->msgId.id;
+    if(ss->completed_ranks.find(job_num) == ss->completed_ranks.end()) {
+#if DEBUG_PRINT
+        printf("SCHED: Reversing job %d finish\n", job_num);
+        fflush(stdout);
+#endif
+        for(int j = ss->last_scheduled_job; j > m->saved_task; j--) {
+#if DEBUG_PRINT
+            printf("SCHED: Reversing job %d start\n", j);
+            fflush(stdout);
+#endif
+            for(int p = 0; p < jobs[j].numRanks; p++) {
+                tw_rand_reverse_unif(lp->rng);
+                ss->busy_lps.erase(pe_to_lpid(p, j));
+            }
+        }
+
+        ss->last_scheduled_job = m->saved_task;
+
+        ss->completed_ranks[job_num] = jobs[job_num].numRanks;
+        for(int p = 0; p < jobs[job_num].numRanks; p++) {
+            ss->busy_lps.insert(pe_to_lpid(p, job_num));
+        }
+    }
+    ss->completed_ranks[job_num]--;
+}
+
+static void sched_finalize(
+    sched_state * ss,
+    tw_lp * lp)
+{
+    if(dump_topo_only || lp->gid != sched_lpid()) {
+        return;
+    }
+
+    ss->completed_ranks.clear();
 }
 
 static void proc_init(
@@ -567,13 +739,7 @@ static void proc_init(
     if(dump_topo_only) return;
 
     ns->sim_start = clock();
-
-    /* skew each job start event slightly to help avoid event ties later on */
-    start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
-    e = codes_event_new(lp->gid, start_time, lp);
-    m =  (proc_msg*)tw_event_data(e);
-    m->proc_event_type = JOB_START;
-    tw_event_send(e);
+    ns->old_pes = std::map<int, PE*>();
 
     return;
 }
@@ -742,77 +908,81 @@ static void proc_commit(
     proc_msg * m,
     tw_lp * lp)
 {
-  if(m->proc_event_type != JOB_END) {
-    return;
-  }
+    if(m->proc_event_type != JOB_END) {
+        return;
+    }
+
+    int job_num = m->msgId.id;
+    PE* pe = ns->old_pes[job_num];
 #if DEBUG_PRINT
     printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
-           ns->my_pe->myNum, ns->my_pe->jobNum, m->proc_event_type, m->msgId.id, ns->my_pe->tasksCount);
+           pe->myNum, pe->jobNum, m->proc_event_type, m->saved_task, pe->tasksCount);
     fflush(stdout);
 #endif
 
     tw_stime jobTime = ns->end_ts ? ns->end_ts - ns->start_ts : 0;
     tw_stime finalTime = tw_now(lp);
 
-    if(lpid_to_pe(lp->gid) == 0)
-        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_pe->jobNum,
-          ns->my_pe->myNum, ns_to_s(tw_now(lp)-ns->start_ts));
+    if(m->msgId.pe == 0)
+        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", pe->jobNum,
+          pe->myNum, ns_to_s(tw_now(lp)-ns->start_ts));
 
 #if TRACER_OTF_TRACES
-    PE_printStat(ns->my_pe);
+    PE_printStat(pe);
 #endif
 
-    if(ns->my_pe->pendingMsgs.size() != 0 ||
-       ns->my_pe->pendingRMsgs.size() != 0) {
-      printf("%d psize %d pRsize %d\n", ns->my_pe->myNum,
-        ns->my_pe->pendingMsgs.size(), ns->my_pe->pendingRMsgs.size());
+    if(pe->pendingMsgs.size() != 0 ||
+       pe->pendingRMsgs.size() != 0) {
+      printf("%d psize %d pRsize %d\n", pe->myNum,
+        pe->pendingMsgs.size(), pe->pendingRMsgs.size());
     }
 
-    if(ns->my_pe->pendingReqs.size() != 0 ||
-      ns->my_pe->pendingRReqs.size() != 0) {
-      printf("%d rsize %d rRsize %d\n", ns->my_pe->myNum,
-        ns->my_pe->pendingReqs.size(), ns->my_pe->pendingRReqs.size());
+    if(pe->pendingReqs.size() != 0 ||
+      pe->pendingRReqs.size() != 0) {
+      printf("%d rsize %d rRsize %d\n", pe->myNum,
+        pe->pendingReqs.size(), pe->pendingRReqs.size());
     }
 
-    if(ns->my_pe->pendingRCollMsgs.size() != 0) {
-      printf("%d rcollsize %d \n", ns->my_pe->myNum,
-        ns->my_pe->pendingRCollMsgs.size());
+    if(pe->pendingRCollMsgs.size() != 0) {
+      printf("%d rcollsize %d \n", pe->myNum,
+        pe->pendingRCollMsgs.size());
     }
 
     int count = 0;
     std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
-      ns->my_pe->pendingCollMsgs.begin();
-    while(it != ns->my_pe->pendingCollMsgs.end()) {
+      pe->pendingCollMsgs.begin();
+    while(it != pe->pendingCollMsgs.end()) {
       count += it->second.size();
       it++;
     }
 
     if(count != 0) {
-      printf("%d collsize %d \n", ns->my_pe->myNum, count);
+      printf("%d collsize %d \n", pe->myNum, count);
     }
 
-    if(jobTime > jobTimes[ns->my_pe->jobNum]) {
-        jobTimes[ns->my_pe->jobNum] = jobTime;
+    if(jobTime > jobTimes[pe->jobNum]) {
+        jobTimes[pe->jobNum] = jobTime;
     }
-    if(finalTime > finalizeTimes[ns->my_pe->jobNum]) {
-        finalizeTimes[ns->my_pe->jobNum] = finalTime;
+    if(finalTime > finalizeTimes[pe->jobNum]) {
+        finalizeTimes[pe->jobNum] = finalTime;
     }
 
-    for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
-      delete [] ns->my_pe->taskStatus[i];
-      delete [] ns->my_pe->taskExecuted[i];
-      delete [] ns->my_pe->msgStatus[i];
+    for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
+        delete [] pe->taskStatus[i];
+        delete [] pe->taskExecuted[i];
+        delete [] pe->msgStatus[i];
     }
-    deletePE(ns->my_pe);
-    ns->my_pe = NULL;
+    deletePE(pe);
+    ns->old_pes.erase(job_num);
 }
 
 static void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
 {
-    if(ns->my_pe == NULL) return;
     if(dump_topo_only) return;
+
+    assert(ns->my_pe == NULL);
 
     return;
 }
@@ -838,8 +1008,8 @@ static void handle_job_start_event(
     tw_event *e;
     tw_stime kickoff_time;
     //Each server read it's trace
-    int my_job = lpid_to_job(lp->gid);
-    int my_pe_num = lpid_to_pe(lp->gid);
+    int my_job = m->msgId.id;
+    int my_pe_num = m->msgId.pe;
 
     if(my_pe_num == -1) {
         return;
@@ -887,9 +1057,9 @@ static void handle_job_start_rev_event(
 {
     tw_rand_reverse_unif(lp->rng);
     for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
-      delete [] ns->my_pe->taskStatus[i];
-      delete [] ns->my_pe->taskExecuted[i];
-      delete [] ns->my_pe->msgStatus[i];
+        delete [] ns->my_pe->taskStatus[i];
+        delete [] ns->my_pe->taskExecuted[i];
+        delete [] ns->my_pe->msgStatus[i];
     }
     deletePE(ns->my_pe);
     ns->my_pe = NULL;
@@ -900,16 +1070,14 @@ static void handle_job_end_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp* lp)
-{
-}
+{ }
 
 static void handle_job_end_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp* lp)
-{
-}
+{ }
 
 /* handle initial event */
 static void handle_kickoff_event(
@@ -1075,7 +1243,7 @@ static void handle_recv_event(
         return;
     }
     printf("PE%d: Going beyond hash look up on receiving a message %d:%d\n",
-      lpid_to_pe(lp->gid), m->msgId.pe, m->msgId.id);
+      ns->my_pe->myNum, m->msgId.pe, m->msgId.id);
     assert(0);
 }
 
@@ -1277,10 +1445,32 @@ static void handle_exec_event(
        ns->my_pe->currIter == (jobs[ns->my_pe->jobNum].numIters - 1) &&
        PE_get_taskDone(ns->my_pe, ns->my_pe->currIter, ns->my_pe->currentTask)) {
 
-      tw_event *e = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
-      m =  (proc_msg*)tw_event_data(e);
-      m->proc_event_type = JOB_END;
-      tw_event_send(e);
+        b->c3 = 1;
+
+        // Save the current task and job infromation for reversing
+        m->saved_task = m->msgId.id;
+        m->msgId.id = ns->my_pe->jobNum;
+
+        // Inform scheduler that the execution of this job has ended
+        tw_event *e_sched = codes_event_new(sched_lpid(), g_tw_lookahead + g_tw_lookahead, lp);
+        proc_msg *m_sched =  (proc_msg*)tw_event_data(e_sched);
+        m_sched->proc_event_type = JOB_END;
+        m_sched->src = lp->gid;
+        m_sched->msgId.id = ns->my_pe->jobNum;
+        m_sched->msgId.pe = ns->my_pe->myNum;
+        tw_event_send(e_sched);
+
+        // Send an event to self for cleaning up on commit
+        tw_event *e_self = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
+        proc_msg *m_self =  (proc_msg*)tw_event_data(e_self);
+        m_self->proc_event_type = JOB_END;
+        m_self->msgId.id = ns->my_pe->jobNum;
+        m_self->msgId.pe = ns->my_pe->myNum;
+        tw_event_send(e_self);
+
+        // Store this PE for cleanup during commit
+        ns->old_pes[ns->my_pe->jobNum] = ns->my_pe;
+        ns->my_pe = NULL;
     }
 }
 
@@ -1291,6 +1481,12 @@ static void handle_exec_rev_event(
 		tw_lp * lp)
 {
     if(b->c2) return;
+
+    if(b->c3) {
+        ns->my_pe = ns->old_pes[m->msgId.id];
+        ns->old_pes.erase(m->msgId.id);
+        m->msgId.id = m->saved_task;
+    }
     int task_id = m->msgId.id;
 
     //Reverse the state: set the PE as busy, task is not completed yet
@@ -3780,6 +3976,9 @@ static inline int pe_to_lpid(int pe, int job){
             (server_num % num_servers_per_rep);
 }
 
+static inline int sched_lpid(){
+    return (lps_per_rep - 1);
+}
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come first in lp registration in terms of global id
 static inline int lpid_to_pe(int lp_gid){

@@ -10,12 +10,22 @@
 #include "bigsim/otf2_reader.h"
 #endif
 
+#include <map>
+#include <set>
+
 #define BCAST_DEGREE  2
 #define REDUCE_DEGREE  2
 
 typedef struct CoreInf {
     int mapsTo, jobID;
 } CoreInf;
+
+struct sched_state
+{
+    std::map<int, unsigned int> completed_ranks;
+    std::set<tw_lpid> busy_lps;
+    int last_scheduled_job;
+};
 
 struct proc_state
 {
@@ -25,6 +35,7 @@ struct proc_state
     tw_stime start_ts;    /* time that we started sending requests */
     tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
+    std::map<int, PE*> old_pes;
     clock_t sim_start;
 };
 
@@ -71,6 +82,23 @@ struct proc_msg
 struct Coll_lookup {
   proc_event remote_event, local_event;
 };
+
+static void sched_init(
+    sched_state * ss,
+    tw_lp * lp);
+static void sched_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void sched_rev_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void sched_finalize(
+    sched_state * ss,
+    tw_lp * lp);
 
 static void proc_init(
     proc_state * ns,
