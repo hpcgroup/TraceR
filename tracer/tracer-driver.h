@@ -16,10 +16,6 @@
 #define BCAST_DEGREE  2
 #define REDUCE_DEGREE  2
 
-typedef struct CoreInf {
-    int mapsTo, jobID;
-} CoreInf;
-
 struct sched_state
 {
     std::map<int, unsigned int> completed_ranks;

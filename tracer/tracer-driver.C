@@ -84,7 +84,6 @@ enum tracer_coll_type
   TRACER_COLLECTIVE_ALLGATHER_LARGE,
 };
 
-CoreInf *global_rank;
 JobInf *jobs;
 int default_mapping;
 int total_ranks;
@@ -146,9 +145,6 @@ const tw_optdef app_opt [] =
 
 static inline int sched_lpid();
 static inline int pe_to_lpid(int pe, int job);
-static inline int pe_to_job(int pe);
-static inline int lpid_to_pe(int lp_gid);
-static inline int lpid_to_job(int lp_gid);
 
 void term_handler (int sig) {
     // Restore the default SIGABRT disposition
@@ -332,39 +328,11 @@ int main(int argc, char **argv)
     char globalIn[256];
     fscanf(jobIn, "%s", globalIn);
 
-    global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
-
-    for(int i = 0; i < num_servers; i++) {
-        global_rank[i].mapsTo = -1;
-        global_rank[i].jobID = -1;
-    }
-
     if(dump_topo_only || strcmp("NA", globalIn) == 0) {
       if(!rank) printf("Using default linear mapping of jobs\n");
       default_mapping = 1;
     } else {
-      if(!rank) printf("Reading %s\n", globalIn);
       default_mapping = 0;
-      if(rank == 0) {
-        int line_data[3], localCount = 0;;
-        FILE *gfile = fopen(globalIn, "rb");
-        if(gfile == NULL) {
-          printf("Unable to open global rank file %s. Aborting\n", globalIn);
-          MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-        while(fread(line_data, sizeof(int), 3, gfile) != 0) {
-          global_rank[line_data[0]].mapsTo = line_data[1];
-          global_rank[line_data[0]].jobID = line_data[2];
-#if DEBUG_PRINT
-          printf("Read %d/%d %d %d\n", line_data[0], num_servers,
-              global_rank[line_data[0]].mapsTo, global_rank[line_data[0]].jobID);
-#endif
-          localCount++;
-        }
-        printf("Read mapping of %d ranks\n", localCount);
-        fclose(gfile);
-      }
-      MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
     fscanf(jobIn, "%d", &num_jobs);
@@ -473,8 +441,6 @@ int main(int argc, char **argv)
           for(int local_rank = 0; local_rank < num_workers; local_rank++,
             ranks_till_now++) {
             jobs[i].rankMap[local_rank] = ranks_till_now;
-            global_rank[ranks_till_now].mapsTo = local_rank;
-            global_rank[ranks_till_now].jobID = i;
           }
         } else {
           if(!rank) printf("Loading map file for job %d from %s\n", i,
@@ -578,8 +544,6 @@ int main(int argc, char **argv)
     free(finalizeTimes);
     free(jobTimes);
     free(jobs);
-
-    free(global_rank);
 
     tw_end();
 
@@ -3978,21 +3942,6 @@ static inline int pe_to_lpid(int pe, int job){
 
 static inline int sched_lpid(){
     return (lps_per_rep - 1);
-}
-//Utility function to convert tw_lpid to simulated pe number
-//Assuming the servers come first in lp registration in terms of global id
-static inline int lpid_to_pe(int lp_gid){
-    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
-                      (lp_gid % lps_per_rep);
-    return global_rank[server_num].mapsTo;
-}
-static inline int lpid_to_job(int lp_gid){
-    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
-                      (lp_gid % lps_per_rep);
-    return global_rank[server_num].jobID;;
-}
-static inline int pe_to_job(int pe){
-    return global_rank[pe].jobID;;
 }
 
 bool isPEonThisRank(int jobID, int i) {
