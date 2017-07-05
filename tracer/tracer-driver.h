@@ -21,6 +21,8 @@ struct sched_state
     std::map<int, unsigned int> completed_ranks;
     std::set<tw_lpid> busy_lps;
     int last_scheduled_job;
+    tw_stime *start_times;
+    tw_stime *end_times;
 };
 
 struct proc_state
@@ -28,8 +30,6 @@ struct proc_state
     int msg_sent_count;   /* requests sent */
     int msg_recvd_count;  /* requests recvd */
     int local_recvd_count; /* number of local messages received */
-    tw_stime start_ts;    /* time that we started sending requests */
-    tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
     std::map<int, PE*> old_pes;
     clock_t sim_start;
@@ -88,6 +88,11 @@ static void sched_event(
     proc_msg * m,
     tw_lp * lp);
 static void sched_rev_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void sched_commit(
     sched_state * ss,
     tw_bf * b,
     proc_msg * m,

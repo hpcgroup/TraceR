@@ -85,8 +85,6 @@ enum tracer_coll_type
 
 JobInf *jobs;
 int default_mapping;
-tw_stime *jobTimes;
-tw_stime *finalizeTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 100;
 tw_stime nic_delay = 400;
@@ -108,7 +106,7 @@ tw_lptype sched_lp = {
      (pre_run_f) NULL,
      (event_f) sched_event,
      (revent_f) sched_rev_event,
-     (commit_f) NULL,
+     (commit_f) sched_commit,
      (final_f)  sched_finalize,
      (map_f) codes_mapping,
      sizeof(sched_state),
@@ -333,8 +331,6 @@ int main(int argc, char **argv)
 
     fscanf(jobIn, "%d", &num_jobs);
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
-    jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
-    finalizeTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
 
     // TODO: Added for testing purpose, remove later
     // This block can be used to reduce the count of servers
@@ -369,8 +365,6 @@ int main(int argc, char **argv)
         }
         fscanf(jobIn, "%d", &jobs[i].numIters);
         jobs[i].skipMsgId = -1;
-        jobTimes[i] = 0;
-        finalizeTimes[i] = 0;
         if(!rank) {
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
@@ -503,25 +497,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    tw_stime* jobTimesMax = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
-    MPI_Reduce(jobTimes, jobTimesMax, num_jobs, MPI_DOUBLE, MPI_MAX, 0,
-    MPI_COMM_WORLD);
-
-    if(rank == 0) {
-        for(int i = 0; i < num_jobs; i++) {
-            printf("Job %d Time %f s\n", i, ns_to_s(jobTimesMax[i]));
-        }
-    }
-    
-    MPI_Reduce(finalizeTimes, jobTimesMax, num_jobs, MPI_DOUBLE, MPI_MAX, 0,
-    MPI_COMM_WORLD);
-    if(rank == 0) {
-        for(int i = 0; i < num_jobs; i++) {
-            printf("Job %d Finalize Time %f s\n", i, ns_to_s(jobTimesMax[i]));
-        }
-    }
     model_net_report_stats(net_id);
-    free(jobTimesMax);
 
 #if TRACER_BIGSIM_TRACES
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {
@@ -540,8 +516,6 @@ int main(int argc, char **argv)
     delete [] size_replace_limit;
     delete [] size_replace_by;
 
-    free(finalizeTimes);
-    free(jobTimes);
     free(jobs);
 
     tw_end();
@@ -598,6 +572,7 @@ static void schedule_jobs(
         }
         ss->last_scheduled_job = j;
         ss->completed_ranks[j] = 0;
+        ss->start_times[j] = tw_now(lp);
     }
 }
 
@@ -614,8 +589,14 @@ static void sched_init(
     ss->completed_ranks = std::map<int, unsigned int>();
     ss->busy_lps = std::set<tw_lpid>();
     ss->last_scheduled_job = -1;
+    ss->start_times = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    ss->end_times = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    for(int j = 0; j < num_jobs; j++) {
+        ss->start_times[j] = 0.0;
+        ss->end_times[j] = 0.0;
+    }
 
-    sched_jobs(ss, lp);
+    schedule_jobs(ss, lp);
 }
 
 static void sched_event(
@@ -630,11 +611,15 @@ static void sched_event(
 
     int job_num = m->msgId.id;
     ss->completed_ranks[job_num]++;
+    m->incremented_flag = false;
     if(ss->completed_ranks[job_num] == jobs[job_num].numRanks) {
         ss->completed_ranks.erase(job_num);
         for(int p = 0; p < jobs[job_num].numRanks; p++) {
             ss->busy_lps.erase(pe_to_lpid(p, job_num));
         }
+        ss->end_times[job_num] = tw_now(lp);
+        m->incremented_flag = true;
+
 #if DEBUG_PRINT
         printf("SCHED: Job %d finished executing\n", job_num);
         fflush(stdout);
@@ -669,6 +654,7 @@ static void sched_rev_event(
                 tw_rand_reverse_unif(lp->rng);
                 ss->busy_lps.erase(pe_to_lpid(p, j));
             }
+            ss->start_times[j] = 0.0;
         }
 
         ss->last_scheduled_job = m->saved_task;
@@ -677,8 +663,25 @@ static void sched_rev_event(
         for(int p = 0; p < jobs[job_num].numRanks; p++) {
             ss->busy_lps.insert(pe_to_lpid(p, job_num));
         }
+        ss->end_times[job_num] = 0.0;
+        m->incremented_flag = false;
     }
     ss->completed_ranks[job_num]--;
+}
+
+static void sched_commit(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp)
+{
+    if(m->proc_event_type != JOB_END) {
+        return;
+    }
+
+    int job_num = m->msgId.id;
+    if(m->incremented_flag)
+        printf("Job[%d]: FINALIZE in %f seconds.\n", job_num, ns_to_s(ss->end_times[job_num] - ss->start_times[job_num]));
 }
 
 static void sched_finalize(
@@ -690,6 +693,12 @@ static void sched_finalize(
     }
 
     ss->completed_ranks.clear();
+
+    for(int j = 0; j < num_jobs; j++) {
+        printf("Job %d Start Time %f seconds and End Time %f seconds\n", j, ns_to_s(ss->start_times[j]), ns_to_s(ss->end_times[j]));
+    }
+    free(ss->start_times);
+    free(ss->end_times);
 }
 
 static void proc_init(
@@ -885,13 +894,6 @@ static void proc_commit(
     fflush(stdout);
 #endif
 
-    tw_stime jobTime = ns->end_ts ? ns->end_ts - ns->start_ts : 0;
-    tw_stime finalTime = tw_now(lp);
-
-    if(m->msgId.pe == 0)
-        printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", pe->jobNum,
-          pe->myNum, ns_to_s(tw_now(lp)-ns->start_ts));
-
 #if TRACER_OTF_TRACES
     PE_printStat(pe);
 #endif
@@ -923,13 +925,6 @@ static void proc_commit(
 
     if(count != 0) {
       printf("%d collsize %d \n", pe->myNum, count);
-    }
-
-    if(jobTime > jobTimes[pe->jobNum]) {
-        jobTimes[pe->jobNum] = jobTime;
-    }
-    if(finalTime > finalizeTimes[pe->jobNum]) {
-        finalizeTimes[pe->jobNum] = finalTime;
     }
 
     for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
@@ -1001,7 +996,6 @@ static void handle_job_start_event(
 
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
-    ns->end_ts = 0;
     ns->my_pe->sendSeq = new int64_t[jobs[my_job].numRanks];
     ns->my_pe->recvSeq = new int64_t[jobs[my_job].numRanks];
     for(int i = 0; i < jobs[my_job].numRanks; i++) {
@@ -1051,8 +1045,6 @@ static void handle_kickoff_event(
     proc_msg * m,
     tw_lp* lp)
 {
-    ns->start_ts = tw_now(lp);
-
     int my_pe_num = ns->my_pe->myNum;
     int my_job = ns->my_pe->jobNum;
     clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
@@ -1060,7 +1052,7 @@ static void handle_kickoff_event(
         printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
         "TASK: %d, RUN TIME TILL NOW=%f s, CURRENT SIM TIME %f\n", my_pe_num, 
         (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
-        (double)time_till_now, ns->start_ts);
+        (double)time_till_now, tw_now(lp));
     }
   
     //Safety check if the pe_to_lpid converter is correct
@@ -1994,9 +1986,6 @@ static tw_stime exec_task(
     //Complete the task
     tw_stime finish_time = codes_local_latency(lp) + sendFinishTime + recvFinishTime + time;
     exec_comp(ns, task_id.iter, task_id.taskid, 0, finish_time, 0, lp);
-    if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
-      ns->end_ts = tw_now(lp);
-    }
     //Return the execution time of the task
     return time;
 }
