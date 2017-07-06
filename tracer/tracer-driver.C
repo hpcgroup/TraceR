@@ -85,7 +85,6 @@ enum tracer_coll_type
 
 JobInf *jobs;
 int default_mapping;
-int total_ranks;
 tw_stime *jobTimes;
 tw_stime *finalizeTimes;
 int num_jobs = 0;
@@ -336,8 +335,11 @@ int main(int argc, char **argv)
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     finalizeTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
-    total_ranks = 0;
 
+    // TODO: Added for testing purpose, remove later
+    // This block can be used to reduce the count of servers
+    // to a specified number, provided in tracer_config file
+#if 0
     int simulated_ranks;
     char buf[10];
     if(fgets(buf, 10, jobIn) != NULL) {
@@ -345,6 +347,10 @@ int main(int argc, char **argv)
             simulated_ranks = 0;
         }
     }
+    if((simulated_ranks > 0) && (simulated_ranks < num_servers)) {
+        num_servers = simulated_ranks;
+    }
+#endif
 
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
@@ -356,13 +362,12 @@ int main(int argc, char **argv)
 #endif
         fscanf(jobIn, "%s", jobs[i].map_file);
         fscanf(jobIn, "%d", &jobs[i].numRanks);
-        if(simulated_ranks > 0 && jobs[i].numRanks > simulated_ranks) {
+        if(jobs[i].numRanks > num_servers) {
             printf("Number of ranks required by job %d: %d is greater than simulated ranks: %d. Aborting\n",
-                   i, jobs[i].numRanks, simulated_ranks);
+                   i, jobs[i].numRanks, num_servers);
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
         fscanf(jobIn, "%d", &jobs[i].numIters);
-        total_ranks += jobs[i].numRanks;
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
         finalizeTimes[i] = 0;
@@ -370,9 +375,6 @@ int main(int argc, char **argv)
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
-    }
-    if(simulated_ranks != 0) {
-        total_ranks = simulated_ranks;
     }
 
     if(!rank) {
@@ -432,7 +434,7 @@ int main(int argc, char **argv)
         int num_workers = jobs[i].numRanks;
         jobs[i].rankMap = (int *) malloc(sizeof(int) * num_workers);
         if(default_mapping) {
-          if(ranks_till_now + num_workers > total_ranks) {
+          if(ranks_till_now + num_workers > num_servers) {
               ranks_till_now = 0;
           }
           for(int local_rank = 0; local_rank < num_workers; local_rank++,
