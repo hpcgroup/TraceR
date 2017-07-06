@@ -569,7 +569,7 @@ static void sched_add_lp_type()
     lp_type_register("scheduler", sched_get_lp_type());
 }
 
-static int sched_jobs(
+static void schedule_jobs(
     sched_state * ss,
     tw_lp * lp)
 {
@@ -577,7 +577,7 @@ static int sched_jobs(
     for(int j = ss->last_scheduled_job + 1; j < num_jobs; j++) {
         for(int p = 0; p < jobs[j].numRanks; p++) {
             if(ss->busy_lps.find(pe_to_lpid(p, j)) != ss->busy_lps.end()) {
-                return ss->last_scheduled_job - last_job;
+                return;
             }
         }
 #if DEBUG_PRINT
@@ -599,7 +599,6 @@ static int sched_jobs(
         ss->last_scheduled_job = j;
         ss->completed_ranks[j] = 0;
     }
-    return ss->last_scheduled_job - last_job;
 }
 
 static void sched_init(
@@ -640,7 +639,8 @@ static void sched_event(
         printf("SCHED: Job %d finished executing\n", job_num);
         fflush(stdout);
 #endif
-        m->saved_task = sched_jobs(ss, lp);
+        m->saved_task = ss->last_scheduled_job;
+        schedule_jobs(ss, lp);
     }
 }
 
