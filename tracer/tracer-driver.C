@@ -41,12 +41,11 @@ extern "C" {
 static int net_id = 0;
 static int num_routers = 0;
 static int num_servers = 0;
-static int num_schedulers = 0;
 static int num_nics = 0;
+static int num_schedulers = 0;
 
 static int num_routers_per_rep = 0;
 static int num_servers_per_rep = 0;
-static int num_schedulers_per_rep = 0;
 static int num_nics_per_rep = 0;
 static int lps_per_rep = 0;
 static int total_lps = 0;
@@ -202,7 +201,7 @@ int main(int argc, char **argv)
     
     num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
             NULL, 1);
-    num_schedulers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "scheduler",
+    num_schedulers = codes_mapping_get_lp_count("SCHEDULER_GRP", 0, "scheduler",
             NULL, 1);
 
     if(net_id == TORUS) {
@@ -269,11 +268,9 @@ int main(int argc, char **argv)
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
         "server", NULL, 1);
-    num_schedulers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-        "scheduler", NULL, 1);
 
-    total_lps = num_servers + num_schedulers + num_nics + num_routers;
-    lps_per_rep = num_servers_per_rep + num_schedulers_per_rep + num_nics_per_rep + num_routers_per_rep;
+    total_lps = num_servers + num_nics + num_routers + num_schedulers;
+    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
 
 
     configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
@@ -607,7 +604,9 @@ static void sched_init(
     sched_state * ss,
     tw_lp * lp)
 {
-    if(dump_topo_only || lp->gid != sched_lpid()) {
+    // There should be only one scheduler LP
+    assert(lp->gid == sched_lpid());
+    if(dump_topo_only) {
         return;
     }
 
@@ -684,7 +683,7 @@ static void sched_finalize(
     sched_state * ss,
     tw_lp * lp)
 {
-    if(dump_topo_only || lp->gid != sched_lpid()) {
+    if(dump_topo_only) {
         return;
     }
 
@@ -3940,8 +3939,9 @@ static inline int pe_to_lpid(int pe, int job){
             (server_num % num_servers_per_rep);
 }
 
+//Assuming that the scheduler is the last to be registered
 static inline int sched_lpid(){
-    return (lps_per_rep - 1);
+    return total_lps - 1;
 }
 
 bool isPEonThisRank(int jobID, int i) {
