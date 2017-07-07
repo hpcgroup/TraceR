@@ -17,27 +17,24 @@
 #include "assert.h"
 #include "Task.h"
 
-Task::Task() {
-  execTime = -1;
-  endEvent = false;
-  loopEvent = false;
-  loopStartEvent = false;
+Task::Task()
+  : execTime(-1),
+    endEvent(false),
+    loopEvent(false),
+    loopStartEvent(false),
 #if TRACER_BIGSIM_TRACES
-  backwDepSize = 0;
-  forwDepSize = 0;
-  backwardDep = 0;
-  forwardDep = 0;
-  myEntries = 0;
-  msgEntCount = 0;
-  bgPrintCount = 0;
-
-  forwardDep = NULL;
-  backwardDep = NULL;
-  myBgPrints = NULL;
-  myEntries = NULL;
+    myEntries(),
+    msgEntCount(0),
+    forwardDep(),
+    forwDepSize(0),
+    backwardDep(),
+    backwDepSize(0),
+    myBgPrints(),
+    bgPrintCount(0)
 #else
-  beginEvent = false;
+    beginEvent(false)
 #endif
+{
 }
 
 #if TRACER_BIGSIM_TRACES
@@ -51,11 +48,5 @@ void Task::printEvt(tw_lp * lp, double startTime, int PEno, int jobNo)
 
 Task::~Task()
 {
-#if TRACER_BIGSIM_TRACES
-  delete[] forwardDep;
-  delete[] backwardDep;
-  delete[] myBgPrints;
-  delete[] myEntries;
-#endif
 }
 

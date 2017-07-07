@@ -547,7 +547,6 @@ static void schedule_jobs(
     sched_state * ss,
     tw_lp * lp)
 {
-    int last_job = ss->last_scheduled_job;
     for(int j = ss->last_scheduled_job + 1; j < num_jobs; j++) {
         for(int p = 0; p < jobs[j].numRanks; p++) {
             if(ss->busy_lps.find(pe_to_lpid(p, j)) != ss->busy_lps.end()) {
@@ -680,8 +679,10 @@ static void sched_commit(
     }
 
     int job_num = m->msgId.id;
-    if(m->incremented_flag)
+    if(m->incremented_flag) {
         printf("Job[%d]: FINALIZE in %f seconds.\n", job_num, ns_to_s(ss->end_times[job_num] - ss->start_times[job_num]));
+        fflush(stdout);
+    }
 }
 
 static void sched_finalize(
@@ -713,7 +714,7 @@ static void proc_init(
     if(dump_topo_only) return;
 
     ns->sim_start = clock();
-    ns->old_pes = std::map<int, PE*>();
+    ns->other_pes = std::map<int, PE*>();
 
     return;
 }
@@ -887,7 +888,7 @@ static void proc_commit(
     }
 
     int job_num = m->msgId.id;
-    PE* pe = ns->old_pes[job_num];
+    PE* pe = ns->other_pes[job_num];
 #if DEBUG_PRINT
     printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
            pe->myNum, pe->jobNum, m->proc_event_type, m->saved_task, pe->tasksCount);
@@ -927,13 +928,8 @@ static void proc_commit(
       printf("%d collsize %d \n", pe->myNum, count);
     }
 
-    for(int i = 0; i < jobs[pe->jobNum].numIters; i++) {
-        delete [] pe->taskStatus[i];
-        delete [] pe->taskExecuted[i];
-        delete [] pe->msgStatus[i];
-    }
     deletePE(pe);
-    ns->old_pes.erase(job_num);
+    ns->other_pes.erase(job_num);
 }
 
 static void proc_finalize(
@@ -943,6 +939,7 @@ static void proc_finalize(
     if(dump_topo_only) return;
 
     assert(ns->my_pe == NULL);
+    assert(ns->other_pes.size() == 0);
 
     return;
 }
@@ -979,33 +976,29 @@ static void handle_job_start_event(
     printf("PE%d: Job %d start\n", m->msgId.pe, m->msgId.id);
     fflush(stdout);
 #endif
-
-    ns->my_pe = newPE();
-    ns->my_pe->jobNum = my_job;
-    ns->my_pe->myNum = my_pe_num;
-
-    tw_stime startTime=0;
+    if(ns->other_pes.find(my_job) != ns->other_pes.end()) {
+      ns->my_pe = ns->other_pes[my_job];
+      ns->other_pes.erase(my_job);
+      assert(ns->my_pe->jobNum == my_job);
+      assert(ns->my_pe->myNum == my_pe_num);
+    } else {
+      ns->my_pe = newPE(my_job, my_pe_num);
 
 #if TRACER_BIGSIM_TRACES
-    TraceReader* t = newTraceReader(jobs[my_job].traceDir);
-    int tot=0, totn=0, emPes=0, nwth=0;
-    TraceReader_loadTraceSummary(t);
-    TraceReader_setOffsets(t, jobs[my_job].offsets);
+      TraceReader* t = newTraceReader(jobs[my_job].traceDir);
+      TraceReader_loadTraceSummary(t);
+      TraceReader_setOffsets(t, jobs[my_job].offsets);
 
-    TraceReader_readTrace(t, &tot, &totn, &emPes, &nwth, ns->my_pe, &startTime);
-    TraceReader_setOffsets(t, NULL);
-    deleteTraceReader(t);
+      TraceReader_readTrace(t, ns->my_pe);
+      TraceReader_setOffsets(t, NULL);
+      deleteTraceReader(t);
 #else
-    TraceReader_readOTF2Trace(ns->my_pe, &startTime);
+      TraceReader_readOTF2Trace(ns->my_pe);
 #endif
+    }
 
     /* skew each kickoff event slightly to help avoid event ties later on */
-    kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
-    ns->my_pe->sendSeq = new int64_t[jobs[my_job].numRanks];
-    ns->my_pe->recvSeq = new int64_t[jobs[my_job].numRanks];
-    for(int i = 0; i < jobs[my_job].numRanks; i++) {
-      ns->my_pe->sendSeq[i] = ns->my_pe->recvSeq[i] = 0;
-    }
+    kickoff_time = g_tw_lookahead + tw_rand_unif(lp->rng);
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
     m =  (proc_msg*)tw_event_data(e);
@@ -1023,17 +1016,13 @@ static void handle_job_start_rev_event(
         return;
     }
 #if DEBUG_PRINT
-    printf("PE%d: Rev Job %d start\n", m->msgId.pe, m->msgId.id);
+    printf("PE%d: Job %d start Rev\n", m->msgId.pe, m->msgId.id);
     fflush(stdout);
 #endif
-
     tw_rand_reverse_unif(lp->rng);
-    for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
-        delete [] ns->my_pe->taskStatus[i];
-        delete [] ns->my_pe->taskExecuted[i];
-        delete [] ns->my_pe->msgStatus[i];
-    }
-    deletePE(ns->my_pe);
+    assert(ns->other_pes.find(m->msgId.id) == ns->other_pes.end());
+    ns->my_pe->reset(jobs);
+    ns->other_pes[m->msgId.id] = ns->my_pe;
     ns->my_pe = NULL;
 }
 
@@ -1443,7 +1432,7 @@ static void handle_exec_event(
         fflush(stdout);
 #endif
         // Store this PE for cleanup during commit
-        ns->old_pes[ns->my_pe->jobNum] = ns->my_pe;
+        ns->other_pes[ns->my_pe->jobNum] = ns->my_pe;
         ns->my_pe = NULL;
     }
 }
@@ -1457,15 +1446,16 @@ static void handle_exec_rev_event(
     if(b->c2) return;
 
     if(b->c3) {
-        ns->my_pe = ns->old_pes[m->msgId.id];
-        ns->old_pes.erase(m->msgId.id);
+        ns->my_pe = ns->other_pes[m->msgId.id];
+        ns->other_pes.erase(m->msgId.id);
         m->msgId.id = m->saved_task;
 #if DEBUG_PRINT
-        printf("PE%d: Rev Job %d finish\n", ns->my_pe->myNum, ns->my_pe->jobNum);
+        printf("PE%d: Job %d finish Rev\n", ns->my_pe->myNum, ns->my_pe->jobNum);
         fflush(stdout);
 #endif
     }
     int task_id = m->msgId.id;
+    int iter = m->iteration;
 
     //Reverse the state: set the PE as busy, task is not completed yet
     PE_set_busy(ns->my_pe, true);
@@ -1481,7 +1471,6 @@ static void handle_exec_rev_event(
 #endif
     
     //mark the task as not done
-    int iter = m->iteration;
     PE_set_taskDone(ns->my_pe, iter, task_id, false);
      
     if(b->c1) {

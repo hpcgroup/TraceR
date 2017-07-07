@@ -31,7 +31,7 @@ struct proc_state
     int msg_recvd_count;  /* requests recvd */
     int local_recvd_count; /* number of local messages received */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
-    std::map<int, PE*> old_pes;
+    std::map<int, PE*> other_pes;
     clock_t sim_start;
 };
 
