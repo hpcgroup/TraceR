@@ -53,6 +53,7 @@ void addMsgSizeSub(int jobid, int64_t key, int64_t val, int numjobs) {
 #if TRACER_BIGSIM_TRACES
 TraceReader::TraceReader(char *s) {
   strncpy(tracePath, s, strlen(s) + 1);
+  allNodeOffsets = NULL;
   totalTlineLength=0;
 }
 

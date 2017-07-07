@@ -30,6 +30,11 @@ Task::Task() {
   myEntries = 0;
   msgEntCount = 0;
   bgPrintCount = 0;
+
+  forwardDep = NULL;
+  backwardDep = NULL;
+  myBgPrints = NULL;
+  myEntries = NULL;
 #else
   beginEvent = false;
 #endif
