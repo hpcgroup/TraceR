@@ -3758,7 +3758,7 @@ static int exec_comp(
     m->iteration = iter;
     if(recv) {
         m->proc_event_type = RECV_MSG;
-#if DEBUG_PRINT
+#if DEBUG_PRINT & TRACER_OTF_TRACES
         if(ns->my_pe->myNum ==  1222 || ns->my_pe->myNum == 1217) {
           printf("%d Sending to %d %d %d %lld\n", ns->my_pe->myNum, ns->my_pe->myNum,
             m->msgId.id, m->msgId.comm, m->msgId.seq);
