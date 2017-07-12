@@ -1300,7 +1300,7 @@ static tw_stime exec_task(
     m->model_net_calls = 0;
     if(ns->my_pe->taskExecuted[task_id.iter][task_id.taskid]) {
       b->c10 = 1;
-      return;
+      return 0;
     }
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
@@ -1630,7 +1630,7 @@ static tw_stime exec_task(
            taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
            taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
-          if(!t->isNonBlocking) return;
+          if(!t->isNonBlocking) return 0;
           sendFinishTime += sendOffset+copyTime+nic_delay;
         }
       }
@@ -1661,7 +1661,7 @@ static tw_stime exec_task(
           ns->my_pe->pendingReqs[t->req_id] = task_id.taskid;
         }
         b->c29 = 1;
-        return;
+        return 0;
       } 
     }
 #endif
