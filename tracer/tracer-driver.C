@@ -975,6 +975,11 @@ static void handle_job_start_event(
         return;
     }
 
+#if DEBUG_PRINT
+    printf("PE%d: Job %d start\n", m->msgId.pe, m->msgId.id);
+    fflush(stdout);
+#endif
+
     ns->my_pe = newPE();
     ns->my_pe->jobNum = my_job;
     ns->my_pe->myNum = my_pe_num;
@@ -1014,6 +1019,14 @@ static void handle_job_start_rev_event(
     proc_msg * m,
     tw_lp* lp)
 {
+    if(m->msgId.pe == -1) {
+        return;
+    }
+#if DEBUG_PRINT
+    printf("PE%d: Rev Job %d start\n", m->msgId.pe, m->msgId.id);
+    fflush(stdout);
+#endif
+
     tw_rand_reverse_unif(lp->rng);
     for(int i = 0; i < jobs[ns->my_pe->jobNum].numIters; i++) {
         delete [] ns->my_pe->taskStatus[i];
@@ -1425,6 +1438,10 @@ static void handle_exec_event(
         m_self->msgId.pe = ns->my_pe->myNum;
         tw_event_send(e_self);
 
+#if DEBUG_PRINT
+        printf("PE%d: Job %d finish\n", ns->my_pe->myNum, ns->my_pe->jobNum);
+        fflush(stdout);
+#endif
         // Store this PE for cleanup during commit
         ns->old_pes[ns->my_pe->jobNum] = ns->my_pe;
         ns->my_pe = NULL;
@@ -1443,6 +1460,10 @@ static void handle_exec_rev_event(
         ns->my_pe = ns->old_pes[m->msgId.id];
         ns->old_pes.erase(m->msgId.id);
         m->msgId.id = m->saved_task;
+#if DEBUG_PRINT
+        printf("PE%d: Rev Job %d finish\n", ns->my_pe->myNum, ns->my_pe->jobNum);
+        fflush(stdout);
+#endif
     }
     int task_id = m->msgId.id;
 
