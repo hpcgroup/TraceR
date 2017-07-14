@@ -562,9 +562,9 @@ static void schedule_jobs(
             tw_stime start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
             tw_event *e = codes_event_new(pe_to_lpid(p, j), start_time, lp);
             proc_msg *m =  (proc_msg*)tw_event_data(e);
-            m->proc_event_type = JOB_START;
-            m->msgId.id = j;
+            m->job = j;
             m->msgId.pe = p;
+            m->proc_event_type = JOB_START;
             tw_event_send(e);
 
             ss->busy_lps.insert(pe_to_lpid(p, j));
@@ -608,7 +608,7 @@ static void sched_event(
         return;
     }
 
-    int job_num = m->msgId.id;
+    int job_num = m->job;
     ss->completed_ranks[job_num]++;
     m->incremented_flag = false;
     if(ss->completed_ranks[job_num] == jobs[job_num].numRanks) {
@@ -638,7 +638,7 @@ static void sched_rev_event(
         return;
     }
 
-    int job_num = m->msgId.id;
+    int job_num = m->job;
     if(ss->completed_ranks.find(job_num) == ss->completed_ranks.end()) {
 #if DEBUG_PRINT
         printf("SCHED: Reversing job %d finish\n", job_num);
@@ -678,7 +678,7 @@ static void sched_commit(
         return;
     }
 
-    int job_num = m->msgId.id;
+    int job_num = m->job;
     if(m->incremented_flag) {
         printf("Job[%d]: FINALIZE in %f seconds.\n", job_num, ns_to_s(ss->end_times[job_num] - ss->start_times[job_num]));
         fflush(stdout);
@@ -726,6 +726,24 @@ static void proc_event(
     tw_lp * lp)
 {
   fflush(stdout);
+  if(ns->my_pe == NULL) {
+    // Only JOB_START messages should be processed at this point
+    // All other messages must have a corresponding reverse message enroute
+    // Therefore, they can be ignored
+    if((m->proc_event_type != JOB_START)) {
+#if DEBUG_PRINT
+      printf("In proc_event at time %f\n", tw_now(lp));
+      printf("lp->gid=%d: m->job=%d, m->src=%d, m->proc_event_type=%d, m->msgId.pe=%d, m->msgId.id=%d\n",
+              lp->gid, m->job, m->src, m->proc_event_type, m->msgId.pe, m->msgId.id);
+      fflush(stdout);
+#endif
+      return;
+    }
+  } else if(ns->my_pe->jobNum != m->job) {
+    // Again, these messages must have a reverse message enroute
+    // Can be ignored
+    return;
+  }
   switch (m->proc_event_type)
   {
     case JOB_START:
@@ -805,6 +823,24 @@ static void proc_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
+  if(ns->my_pe == NULL) {
+    // Only JOB_END messages should be processed at this point
+    // All other messages must have a corresponding forward message enroute
+    // Therefore, they can be ignored
+    if((m->proc_event_type != JOB_END)) {
+#if DEBUG_PRINT
+      printf("In proc_rev_event at time %f\n", tw_now(lp));
+      printf("lp->gid=%d: m->job=%d, m->src=%d, m->proc_event_type=%d, m->msgId.pe=%d, m->msgId.id=%d\n",
+              lp->gid, m->job, m->src, m->proc_event_type, m->msgId.pe, m->msgId.id);
+      fflush(stdout);
+#endif
+      return;
+    }
+  } else if(ns->my_pe->jobNum != m->job) {
+    // Again, these messages must have a forward message enroute
+    // Can be ignored
+    return;
+  }
   switch (m->proc_event_type)
   {
     case JOB_START:
@@ -887,7 +923,7 @@ static void proc_commit(
         return;
     }
 
-    int job_num = m->msgId.id;
+    int job_num = m->job;
     PE* pe = ns->other_pes[job_num];
 #if DEBUG_PRINT
     printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
@@ -965,7 +1001,7 @@ static void handle_job_start_event(
     tw_event *e;
     tw_stime kickoff_time;
     //Each server read it's trace
-    int my_job = m->msgId.id;
+    int my_job = m->job;
     int my_pe_num = m->msgId.pe;
 
     if(my_pe_num == -1) {
@@ -973,7 +1009,7 @@ static void handle_job_start_event(
     }
 
 #if DEBUG_PRINT
-    printf("PE%d: Job %d start\n", m->msgId.pe, m->msgId.id);
+    printf("PE%d: Job %d start\n", m->msgId.pe, m->job);
     fflush(stdout);
 #endif
     if(ns->other_pes.find(my_job) != ns->other_pes.end()) {
@@ -1002,6 +1038,7 @@ static void handle_job_start_event(
 
     e = codes_event_new(lp->gid, kickoff_time, lp);
     m =  (proc_msg*)tw_event_data(e);
+    m->job = my_job;
     m->proc_event_type = KICKOFF;
     tw_event_send(e);
 }
@@ -1016,13 +1053,13 @@ static void handle_job_start_rev_event(
         return;
     }
 #if DEBUG_PRINT
-    printf("PE%d: Job %d start Rev\n", m->msgId.pe, m->msgId.id);
+    printf("PE%d: Job %d start Rev\n", m->msgId.pe, m->job);
     fflush(stdout);
 #endif
     tw_rand_reverse_unif(lp->rng);
-    assert(ns->other_pes.find(m->msgId.id) == ns->other_pes.end());
+    assert(ns->other_pes.find(m->job) == ns->other_pes.end());
     ns->my_pe->reset(jobs);
-    ns->other_pes[m->msgId.id] = ns->my_pe;
+    ns->other_pes[m->job] = ns->my_pe;
     ns->my_pe = NULL;
 }
 
@@ -1031,14 +1068,30 @@ static void handle_job_end_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp* lp)
-{ }
+{
+#if DEBUG_PRINT
+    printf("PE%d: Job %d end\n", ns->my_pe->myNum, ns->my_pe->jobNum);
+    fflush(stdout);
+#endif
+    // Store this PE for cleanup during commit
+    ns->other_pes[ns->my_pe->jobNum] = ns->my_pe;
+    ns->my_pe = NULL;
+}
 
 static void handle_job_end_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp* lp)
-{ }
+{
+    // Restore the PE for this job
+    ns->my_pe = ns->other_pes[m->job];
+    ns->other_pes.erase(m->job);
+#if DEBUG_PRINT
+    printf("PE%d: Job %d end Rev\n", ns->my_pe->myNum, ns->my_pe->jobNum);
+    fflush(stdout);
+#endif
+}
 
 /* handle initial event */
 static void handle_kickoff_event(
@@ -1306,6 +1359,7 @@ static void handle_bcast_event(
 
   tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency + codes_local_latency(lp), lp);
   proc_msg * msg = (proc_msg*)tw_event_data(e);
+  msg->job = ns->my_pe->jobNum;
   memcpy(&msg->msgId, &m->msgId, sizeof(m->msgId));
   msg->iteration = m->iteration;
   msg->proc_event_type = RECV_MSG;
@@ -1404,36 +1458,22 @@ static void handle_exec_event(
        ns->my_pe->currIter == (jobs[ns->my_pe->jobNum].numIters - 1) &&
        PE_get_taskDone(ns->my_pe, ns->my_pe->currIter, ns->my_pe->currentTask)) {
 
-        b->c3 = 1;
-
-        // Save the current task and job infromation for reversing
-        m->saved_task = m->msgId.id;
-        m->msgId.id = ns->my_pe->jobNum;
-
         // Inform scheduler that the execution of this job has ended
         tw_event *e_sched = codes_event_new(sched_lpid(), g_tw_lookahead + g_tw_lookahead, lp);
         proc_msg *m_sched =  (proc_msg*)tw_event_data(e_sched);
+        m_sched->job = ns->my_pe->jobNum;
         m_sched->proc_event_type = JOB_END;
         m_sched->src = lp->gid;
-        m_sched->msgId.id = ns->my_pe->jobNum;
         m_sched->msgId.pe = ns->my_pe->myNum;
         tw_event_send(e_sched);
 
-        // Send an event to self for cleaning up on commit
+        // Send an event to self for cleaning up
         tw_event *e_self = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
         proc_msg *m_self =  (proc_msg*)tw_event_data(e_self);
+        m_self->job = ns->my_pe->jobNum;
         m_self->proc_event_type = JOB_END;
-        m_self->msgId.id = ns->my_pe->jobNum;
         m_self->msgId.pe = ns->my_pe->myNum;
         tw_event_send(e_self);
-
-#if DEBUG_PRINT
-        printf("PE%d: Job %d finish\n", ns->my_pe->myNum, ns->my_pe->jobNum);
-        fflush(stdout);
-#endif
-        // Store this PE for cleanup during commit
-        ns->other_pes[ns->my_pe->jobNum] = ns->my_pe;
-        ns->my_pe = NULL;
     }
 }
 
@@ -1445,15 +1485,6 @@ static void handle_exec_rev_event(
 {
     if(b->c2) return;
 
-    if(b->c3) {
-        ns->my_pe = ns->other_pes[m->msgId.id];
-        ns->other_pes.erase(m->msgId.id);
-        m->msgId.id = m->saved_task;
-#if DEBUG_PRINT
-        printf("PE%d: Job %d finish Rev\n", ns->my_pe->myNum, ns->my_pe->jobNum);
-        fflush(stdout);
-#endif
-    }
     int task_id = m->msgId.id;
     int iter = m->iteration;
 
@@ -1592,6 +1623,7 @@ static void delegate_send_msg(proc_state *ns,
   int taskid,
   tw_stime delay) {
   proc_msg m_local;
+  m_local.job = ns->my_pe->jobNum;
   if(t->isNonBlocking) {
     m_local.proc_event_type = SEND_COMP;
     m_local.msgId.id = t->req_id;
@@ -2106,6 +2138,7 @@ static int send_msg(
         int64_t size2) {
         proc_msg m_remote;
 
+        m_remote.job = ns->my_pe->jobNum;
         m_remote.proc_event_type = evt_type;
         m_remote.src = lp->gid;
         if(fillSz) {
@@ -2147,6 +2180,7 @@ static void enqueue_msg(
         tw_lp * lp) {
         proc_msg m_remote;
 
+        m_remote.job = ns->my_pe->jobNum;
         m_remote.proc_event_type = evt_type;
         m_remote.src = lp->gid;
         m_remote.msgId.size = size;
@@ -2232,6 +2266,7 @@ static void enqueue_coll_msg(
       //printf("%d Added %d %d %d\n",  ns->my_pe->myNum, dest, msgId->comm, seq);
     } else {
       proc_msg m_remote, m_local;
+      m_remote.job = ns->my_pe->jobNum;
       m_remote.proc_event_type = lookUpTable[index].remote_event;
       m_remote.src = lp->gid;
       m_remote.msgId.size = size;
@@ -2243,6 +2278,7 @@ static void enqueue_coll_msg(
 #endif
       m_remote.iteration = iter;
 
+      m_local.job = ns->my_pe->jobNum;
       m_local.proc_event_type = lookUpTable[index].local_event;
       m_local.executed.taskid = ns->my_pe->currentCollTask;
 
@@ -2312,6 +2348,7 @@ static void handle_coll_recv_post_event(
     m->coll_info = index;
     //printf("%d Sending coll %d %d\n", ns->my_pe->myNum, index, m->msgId.pe);
     proc_msg m_remote, m_local;
+    m_remote.job = ns->my_pe->jobNum;
     m_remote.proc_event_type = lookUpTable[index].remote_event;
     m_remote.src = lp->gid;
     m_remote.msgId.size = t->myEntry.msgId.size;
@@ -2321,6 +2358,7 @@ static void handle_coll_recv_post_event(
     m_remote.msgId.seq = ns->my_pe->currentCollSeq;
     m_remote.iteration = ns->my_pe->currIter;
 
+    m_local.job = ns->my_pe->jobNum;
     m_local.proc_event_type = lookUpTable[index].local_event;
     m_local.executed.taskid = ns->my_pe->currentCollTask;
     int64_t size = t->myEntry.msgId.size;
@@ -2920,6 +2958,7 @@ static void handle_a2a_send_comp_event(
     //send to self
     tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
+    m_new->job = ns->my_pe->jobNum;
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
     m_new->msgId.seq = ns->my_pe->currentCollSeq;
@@ -3165,6 +3204,7 @@ static void handle_allgather_send_comp_event(
     //send to self
     tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
+    m_new->job = ns->my_pe->jobNum;
     m_new->msgId.pe = 0;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
     m_new->msgId.seq = ns->my_pe->currentCollSeq;
@@ -3420,6 +3460,7 @@ static void handle_bruck_send_comp_event(
     //send to self
     tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
+    m_new->job = ns->my_pe->jobNum;
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
     m_new->msgId.seq = ns->my_pe->currentCollSeq;
@@ -3671,6 +3712,7 @@ static void handle_a2a_blocked_send_comp_event(
     b->c14 = 1;
     tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
+    m_new->job = ns->my_pe->jobNum;
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
     m_new->msgId.seq = ns->my_pe->currentCollSeq;
@@ -3833,6 +3875,7 @@ static int send_coll_comp(
     }
     e = codes_event_new(lp->gid, sendOffset + soft_delay_mpi, lp);
     msg = (proc_msg*)tw_event_data(e);
+    msg->job = ns->my_pe->jobNum;
     msg->msgId.coll_type = collType;
     msg->proc_event_type = COLL_COMPLETE;
     msg->executed.taskid = taskid;
@@ -3906,6 +3949,7 @@ static int exec_comp(
     }
     e = codes_event_new(lp->gid, sendOffset, lp);
     m = (proc_msg*)tw_event_data(e);
+    m->job = ns->my_pe->jobNum;
     m->msgId.size = 0;
     m->msgId.pe = ns->my_pe->myNum;
     m->msgId.id = task_id;

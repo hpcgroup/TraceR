@@ -73,6 +73,7 @@ struct proc_msg
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
     unsigned int coll_info;
+    int job;
 };
 
 struct Coll_lookup {
