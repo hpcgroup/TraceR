@@ -610,14 +610,13 @@ static void sched_event(
 
     int job_num = m->job;
     ss->completed_ranks[job_num]++;
-    m->incremented_flag = false;
     if(ss->completed_ranks[job_num] == jobs[job_num].numRanks) {
         ss->completed_ranks.erase(job_num);
         for(int p = 0; p < jobs[job_num].numRanks; p++) {
             ss->busy_lps.erase(pe_to_lpid(p, job_num));
         }
         ss->end_times[job_num] = tw_now(lp);
-        m->incremented_flag = true;
+        b->c0 = 1;
 
 #if DEBUG_PRINT
         printf("SCHED: Job %d finished executing\n", job_num);
@@ -663,7 +662,7 @@ static void sched_rev_event(
             ss->busy_lps.insert(pe_to_lpid(p, job_num));
         }
         ss->end_times[job_num] = 0.0;
-        m->incremented_flag = false;
+        b->c0 = 0;
     }
     ss->completed_ranks[job_num]--;
 }
@@ -679,7 +678,9 @@ static void sched_commit(
     }
 
     int job_num = m->job;
-    if(m->incremented_flag) {
+    if(b->c0) {
+        // *tw_output* can be used for printing this message but it doesn't flush the stream
+        // Stuck with this workaround for now
         printf("Job[%d]: FINALIZE in %f seconds.\n", job_num, ns_to_s(ss->end_times[job_num] - ss->start_times[job_num]));
         fflush(stdout);
     }
@@ -737,11 +738,13 @@ static void proc_event(
               lp->gid, m->job, m->src, m->proc_event_type, m->msgId.pe, m->msgId.id);
       fflush(stdout);
 #endif
+      b->c30 = 1;
       return;
     }
   } else if(ns->my_pe->jobNum != m->job) {
     // Again, these messages must have a reverse message enroute
     // Can be ignored
+    b->c30 = 1;
     return;
   }
   switch (m->proc_event_type)
@@ -823,22 +826,7 @@ static void proc_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
-  if(ns->my_pe == NULL) {
-    // Only JOB_END messages should be processed at this point
-    // All other messages must have a corresponding forward message enroute
-    // Therefore, they can be ignored
-    if((m->proc_event_type != JOB_END)) {
-#if DEBUG_PRINT
-      printf("In proc_rev_event at time %f\n", tw_now(lp));
-      printf("lp->gid=%d: m->job=%d, m->src=%d, m->proc_event_type=%d, m->msgId.pe=%d, m->msgId.id=%d\n",
-              lp->gid, m->job, m->src, m->proc_event_type, m->msgId.pe, m->msgId.id);
-      fflush(stdout);
-#endif
-      return;
-    }
-  } else if(ns->my_pe->jobNum != m->job) {
-    // Again, these messages must have a forward message enroute
-    // Can be ignored
+  if(b->c30) {
     return;
   }
   switch (m->proc_event_type)
