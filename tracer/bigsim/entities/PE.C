@@ -84,12 +84,6 @@ void PE::reset(const JobInf* jobs) {
     allMarked[i] = false;
   }
 
-  for(int i = 0; i < numIters; i++) {
-    for(int t = 0; t < tasksCount; t++) {
-      taskStatus[i][t] = false;
-      taskExecuted[i][t] = false;
-    }
-  }
 }
 
 void PE::mark_all_done(int iter, int tInd) {
