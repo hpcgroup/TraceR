@@ -374,6 +374,14 @@ int main(int argc, char **argv)
           printf("Will replace all messages of size greater than %d by %d for job %d\n", 
               size_replace_limit[jobid], size_replace_by[jobid], jobid);
       }
+      if(next == 'S' || next == 's') {
+        int size_value, size_by, jobid;
+        fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by);
+        addMsgSizeSub(jobid, size_value, size_by, num_jobs);
+        if(!rank)
+          printf("Will replace all messages of size %d by %d for job %d\n",
+              size_value, size_by, jobid);
+      }
       if(next == 'T' || next == 't') {
         fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
         if(!rank)
