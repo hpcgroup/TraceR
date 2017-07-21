@@ -208,6 +208,17 @@ int main(int argc, char **argv)
                 "modelnet_dragonfly_router", NULL, 1);
     }
 
+    if(net_id == DRAGONFLY_CUSTOM) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_dragonfly_custom", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_dragonfly_custom_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly_custom", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly_custom_router", NULL, 1);
+    }
+
     if(net_id == FATTREE) {
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
                 "modelnet_fattree", NULL, 1);
@@ -228,6 +239,17 @@ int main(int argc, char **argv)
                 "modelnet_slimfly", NULL, 1);
         num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
                 "slimfly_router", NULL, 1);
+    }
+
+    if(net_id == EXPRESS_MESH) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_express_mesh", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_express_mesh_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_express_mesh", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_express_mesh_router", NULL, 1);
     }
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
