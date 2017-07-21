@@ -554,7 +554,7 @@ static void schedule_jobs(
             }
         }
 #if DEBUG_PRINT
-        printf("SCHED: Starting job %d\n", j);
+        printf("SCHED: Job %d start\n", j);
         fflush(stdout);
 #endif
         for(int p = 0; p < jobs[j].numRanks; p++) {
@@ -619,7 +619,7 @@ static void sched_event(
         b->c0 = 1;
 
 #if DEBUG_PRINT
-        printf("SCHED: Job %d finished executing\n", job_num);
+        printf("SCHED: Job %d end\n", job_num);
         fflush(stdout);
 #endif
         m->saved_task = ss->last_scheduled_job;
@@ -640,12 +640,12 @@ static void sched_rev_event(
     int job_num = m->job;
     if(ss->completed_ranks.find(job_num) == ss->completed_ranks.end()) {
 #if DEBUG_PRINT
-        printf("SCHED: Reversing job %d finish\n", job_num);
+        printf("SCHED: Job %d end Rev\n", job_num);
         fflush(stdout);
 #endif
         for(int j = ss->last_scheduled_job; j > m->saved_task; j--) {
 #if DEBUG_PRINT
-            printf("SCHED: Reversing job %d start\n", j);
+            printf("SCHED: Job %d start Rev\n", j);
             fflush(stdout);
 #endif
             for(int p = 0; p < jobs[j].numRanks; p++) {
@@ -913,9 +913,9 @@ static void proc_commit(
 
     int job_num = m->job;
     PE* pe = ns->other_pes[job_num];
+
 #if DEBUG_PRINT
-    printf("PE%d: Committing job %d in commit handler for event %d of task %d/%d\n",
-           pe->myNum, pe->jobNum, m->proc_event_type, m->saved_task, pe->tasksCount);
+    printf("PE%d: Job %d commit\n", pe->myNum, pe->jobNum);
     fflush(stdout);
 #endif
 
