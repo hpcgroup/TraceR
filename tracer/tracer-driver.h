@@ -39,6 +39,7 @@ struct proc_state
 enum proc_event
 {
     JOB_START=1,
+    JOB_NEXT,
     JOB_END,
     KICKOFF,    /* initial event */
     LOCAL,      /* local event */
@@ -100,6 +101,28 @@ static void sched_commit(
     tw_lp * lp);
 static void sched_finalize(
     sched_state * ss,
+    tw_lp * lp);
+
+static void handle_sched_job_end_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_sched_job_next_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+
+static void handle_sched_job_end_rev_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void handle_sched_job_next_rev_event(
+    sched_state * ss,
+    tw_bf * b,
+    proc_msg * m,
     tw_lp * lp);
 
 static void proc_init(
