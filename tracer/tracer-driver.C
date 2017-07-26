@@ -555,7 +555,6 @@ static void sched_init(
 
     ss->completed_ranks = std::map<int, unsigned int>();
     ss->busy_lps = std::set<tw_lpid>();
-    ss->last_scheduled_job = -1;
     ss->start_times = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     ss->end_times = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     for(int j = 0; j < num_jobs; j++) {
@@ -566,6 +565,7 @@ static void sched_init(
     tw_event *e = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
     proc_msg *m =  (proc_msg*)tw_event_data(e);
     m->proc_event_type = JOB_NEXT;
+    m->job = -1;
     tw_event_send(e);
 }
 
@@ -613,39 +613,70 @@ static void sched_rev_event(
     }
 }
 
+static int get_next_job(
+    sched_state * ss,
+    proc_msg * m
+)
+{
+    // Go in FIFO order and schedule the first possible job
+    for(int j = m->job + 1; j < num_jobs; j++) {
+        // Job has already been scheduled OR
+        // Number of available servers is more than the number of required ranks
+        if((ss->start_times[j] != 0.0) ||
+           (jobs[j].numRanks > (num_servers - ss->busy_lps.size()))) {
+            continue;
+        }
+        bool schedule = true;
+        for(int p = 0; p < jobs[j].numRanks; p++) {
+            if(ss->busy_lps.find(pe_to_lpid(p, j)) != ss->busy_lps.end()) {
+                schedule = false;
+                break;
+            }
+        }
+        if(schedule) {
+            return j;
+        }
+    }
+    return -1;
+}
+
 static void handle_sched_job_next_event(
     sched_state * ss,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp)
 {
-    m->saved_task = ss->last_scheduled_job;
-    for(int j = ss->last_scheduled_job + 1; j < num_jobs; j++) {
-        for(int p = 0; p < jobs[j].numRanks; p++) {
-            if(ss->busy_lps.find(pe_to_lpid(p, j)) != ss->busy_lps.end()) {
-                return;
-            }
-        }
-#if DEBUG_PRINT
-        printf("SCHED: Job %d start\n", j);
-        fflush(stdout);
-#endif
-        for(int p = 0; p < jobs[j].numRanks; p++) {
-            /* skew each job start event slightly to help avoid event ties later on */
-            tw_stime start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
-            tw_event *e_proc = codes_event_new(pe_to_lpid(p, j), start_time, lp);
-            proc_msg *m_proc =  (proc_msg*)tw_event_data(e_proc);
-            m_proc->job = j;
-            m_proc->msgId.pe = p;
-            m_proc->proc_event_type = JOB_START;
-            tw_event_send(e_proc);
-
-            ss->busy_lps.insert(pe_to_lpid(p, j));
-        }
-        ss->last_scheduled_job = j;
-        ss->start_times[j] = tw_now(lp);
-        ss->completed_ranks[j] = 0;
+    int job_num = get_next_job(ss, m);
+    if(job_num == -1) {
+        b->c1 = 1;
+        return;
     }
+#if DEBUG_PRINT
+    printf("SCHED: Job %d start\n", job_num);
+    fflush(stdout);
+#endif
+    for(int p = 0; p < jobs[job_num].numRanks; p++) {
+        /* skew each job start event slightly to help avoid event ties later on */
+        tw_stime start_time = g_tw_lookahead + tw_rand_unif(lp->rng);
+        tw_event *e_proc = codes_event_new(pe_to_lpid(p, job_num), start_time, lp);
+        proc_msg *m_proc = (proc_msg*)tw_event_data(e_proc);
+        m_proc->job = job_num;
+        m_proc->msgId.pe = p;
+        m_proc->proc_event_type = JOB_START;
+        tw_event_send(e_proc);
+
+        ss->busy_lps.insert(pe_to_lpid(p, job_num));
+    }
+    ss->start_times[job_num] = tw_now(lp);
+    ss->completed_ranks[job_num] = 0;
+    m->saved_task = job_num;
+
+    // Try to schedule another job
+    tw_event *e_self = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
+    proc_msg *m_self = (proc_msg*)tw_event_data(e_self);
+    m_self->proc_event_type = JOB_NEXT;
+    m_self->job = job_num;
+    tw_event_send(e_self);
 }
 
 static void handle_sched_job_next_rev_event(
@@ -654,18 +685,19 @@ static void handle_sched_job_next_rev_event(
     proc_msg * m,
     tw_lp * lp)
 {
-    for(int j = ss->last_scheduled_job; j > m->saved_task; j--) {
-#if DEBUG_PRINT
-        printf("SCHED: Job %d start Rev\n", j);
-        fflush(stdout);
-#endif
-        for(int p = 0; p < jobs[j].numRanks; p++) {
-            tw_rand_reverse_unif(lp->rng);
-            ss->busy_lps.erase(pe_to_lpid(p, j));
-        }
-        ss->start_times[j] = 0.0;
+    if(b->c1) {
+        return;
     }
-    ss->last_scheduled_job = m->saved_task;
+    int job_num = m->saved_task;
+#if DEBUG_PRINT
+    printf("SCHED: Job %d start Rev\n", job_num);
+    fflush(stdout);
+#endif
+    for(int p = 0; p < jobs[job_num].numRanks; p++) {
+        tw_rand_reverse_unif(lp->rng);
+        ss->busy_lps.erase(pe_to_lpid(p, job_num));
+    }
+    ss->start_times[job_num] = 0.0;
 }
 
 static void handle_sched_job_end_event(
@@ -676,12 +708,13 @@ static void handle_sched_job_end_event(
 {
     int job_num = m->job;
     ss->completed_ranks[job_num]++;
+    m->incremented_flag = false;
     if(ss->completed_ranks[job_num] == jobs[job_num].numRanks) {
 #if DEBUG_PRINT
         printf("SCHED: Job %d end\n", job_num);
         fflush(stdout);
 #endif
-        b->c1 = 1;
+        b->c2 = 1;
         ss->completed_ranks.erase(job_num);
         for(int p = 0; p < jobs[job_num].numRanks; p++) {
             ss->busy_lps.erase(pe_to_lpid(p, job_num));
@@ -689,10 +722,11 @@ static void handle_sched_job_end_event(
         ss->end_times[job_num] = tw_now(lp);
         m->incremented_flag = true;
 
-        tw_event *e = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
-        m =  (proc_msg*)tw_event_data(e);
-        m->proc_event_type = JOB_NEXT;
-        tw_event_send(e);
+        tw_event *e_self = codes_event_new(lp->gid, g_tw_lookahead + g_tw_lookahead, lp);
+        proc_msg *m_self =  (proc_msg*)tw_event_data(e_self);
+        m_self->proc_event_type = JOB_NEXT;
+        m_self->job = -1;
+        tw_event_send(e_self);
     }
 }
 
@@ -703,7 +737,7 @@ static void handle_sched_job_end_rev_event(
     tw_lp * lp)
 {
     int job_num = m->job;
-    if(b->c1) {
+    if(b->c2) {
 #if DEBUG_PRINT
         printf("SCHED: Job %d end Rev\n", job_num);
         fflush(stdout);
@@ -724,7 +758,7 @@ static void sched_commit(
     proc_msg * m,
     tw_lp * lp)
 {
-    if(m->proc_event_type == JOB_END && m->incremented_flag) {
+    if((m->proc_event_type == JOB_END) && m->incremented_flag) {
         int job_num = m->job;
         // *tw_output* can be used for printing this message but it doesn't flush the stream
         // Stuck with this workaround for now

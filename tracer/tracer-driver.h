@@ -20,7 +20,6 @@ struct sched_state
 {
     std::map<int, unsigned int> completed_ranks;
     std::set<tw_lpid> busy_lps;
-    int last_scheduled_job;
     tw_stime *start_times;
     tw_stime *end_times;
 };
