@@ -839,9 +839,6 @@ static void proc_event(
     case JOB_END:
       handle_job_end_event(ns, b, m, lp);
       break;
-    case KICKOFF:
-      handle_kickoff_event(ns, b, m, lp);
-      break;
     case LOCAL:
       handle_local_event(ns, b, m, lp); 
       break;
@@ -920,9 +917,6 @@ static void proc_rev_event(
       break;
     case JOB_END:
       handle_job_end_rev_event(ns, b, m, lp);
-      break;
-    case KICKOFF:
-      handle_kickoff_rev_event(ns, b, m, lp);
       break;
     case LOCAL:
       handle_local_rev_event(ns, b, m, lp);    
@@ -1077,7 +1071,6 @@ static void handle_job_start_event(
     }
 
     tw_event *e;
-    tw_stime kickoff_time;
     //Each server read it's trace
     int my_job = m->job;
     int my_pe_num = m->msgId.pe;
@@ -1112,14 +1105,20 @@ static void handle_job_start_event(
 #endif
     }
 
-    /* skew each kickoff event slightly to help avoid event ties later on */
-    kickoff_time = g_tw_lookahead + tw_rand_unif(lp->rng);
-
-    e = codes_event_new(lp->gid, kickoff_time, lp);
-    m =  (proc_msg*)tw_event_data(e);
-    m->job = my_job;
-    m->proc_event_type = KICKOFF;
-    tw_event_send(e);
+    clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
+    if(my_pe_num == 0 && (my_job == 0 || my_job == num_jobs - 1)) {
+        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
+        "TASK: %d, RUN TIME TILL NOW=%f s, CURRENT SIM TIME %f\n", my_pe_num,
+        (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
+        (double)time_till_now, tw_now(lp));
+    }
+    //Safety check if the pe_to_lpid converter is correct
+    assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
+    assert(PE_is_busy(ns->my_pe) == false);
+    TaskPair pair;
+    pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
+    ns->my_pe->currentTask = -1;
+    exec_task(ns, pair, lp, m, b);
 }
 
 static void handle_job_start_rev_event(
@@ -1135,7 +1134,11 @@ static void handle_job_start_rev_event(
     printf("PE%d: Job %d start Rev\n", m->msgId.pe, m->job);
     fflush(stdout);
 #endif
-    tw_rand_reverse_unif(lp->rng);
+    PE_set_busy(ns->my_pe, false);
+    TaskPair pair;
+    pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
+    exec_task_rev(ns, pair, lp, m, b);
+
     assert(ns->other_pes.find(m->job) == ns->other_pes.end());
     ns->my_pe->reset(jobs);
     ns->other_pes[m->job] = ns->my_pe;
@@ -1170,50 +1173,6 @@ static void handle_job_end_rev_event(
     printf("PE%d: Job %d end Rev\n", ns->my_pe->myNum, ns->my_pe->jobNum);
     fflush(stdout);
 #endif
-}
-
-/* handle initial event */
-static void handle_kickoff_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp* lp)
-{
-    int my_pe_num = ns->my_pe->myNum;
-    int my_job = ns->my_pe->jobNum;
-    clock_t time_till_now = (double)(clock()-ns->sim_start)/CLOCKS_PER_SEC;
-    if(my_pe_num == 0 && (my_job == 0 || my_job == num_jobs - 1)) {
-        printf("PE%d - LP_GID:%d : START SIMULATION, TASKS COUNT: %d, FIRST "
-        "TASK: %d, RUN TIME TILL NOW=%f s, CURRENT SIM TIME %f\n", my_pe_num, 
-        (int)lp->gid, PE_get_tasksCount(ns->my_pe), PE_getFirstTask(ns->my_pe),
-        (double)time_till_now, tw_now(lp));
-    }
-  
-    //Safety check if the pe_to_lpid converter is correct
-    assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
-    assert(PE_is_busy(ns->my_pe) == false);
-    TaskPair pair;
-    pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
-    ns->my_pe->currentTask = -1;
-    exec_task(ns, pair, lp, m, b);
-}
-
-/* reverse handler for kickoff */
-static void handle_kickoff_rev_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp)
-{
-#if DEBUG_PRINT
-    tw_stime now = tw_now(lp);
-    printf("PE%d: handle_kickoff_rev_event. TIME now:%f.\n", ns->my_pe->myNum, now);
-#endif
-    PE_set_busy(ns->my_pe, false);
-    TaskPair pair;
-    pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
-    exec_task_rev(ns, pair, lp, m, b);
-    return;
 }
 
 static void handle_local_event(

@@ -40,7 +40,6 @@ enum proc_event
     JOB_START=1,
     JOB_NEXT,
     JOB_END,
-    KICKOFF,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast --> to be deprecated */
@@ -157,11 +156,6 @@ static void handle_job_end_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-static void handle_kickoff_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
 static void handle_local_event(
     proc_state * ns,
     tw_bf * b,
@@ -220,11 +214,6 @@ static void handle_job_start_rev_event(
     proc_msg * m,
     tw_lp * lp);
 static void handle_job_end_rev_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
