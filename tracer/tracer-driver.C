@@ -775,6 +775,9 @@ static void sched_finalize(
         return;
     }
 
+    // All the LPs should be free at this point
+    assert(ss->busy_lps.empty());
+
     ss->completed_ranks.clear();
 
     for(int j = 0; j < num_jobs; j++) {
@@ -1067,6 +1070,12 @@ static void handle_job_start_event(
     proc_msg * m,
     tw_lp* lp)
 {
+    // Ignore the message; reverse must be on the way
+    if(ns->my_pe != NULL) {
+        b->c0 = 1;
+        return;
+    }
+
     tw_event *e;
     tw_stime kickoff_time;
     //Each server read it's trace
@@ -1074,6 +1083,7 @@ static void handle_job_start_event(
     int my_pe_num = m->msgId.pe;
 
     if(my_pe_num == -1) {
+        b->c0 = 1;
         return;
     }
 
@@ -1118,7 +1128,7 @@ static void handle_job_start_rev_event(
     proc_msg * m,
     tw_lp* lp)
 {
-    if(m->msgId.pe == -1) {
+    if(b->c0) {
         return;
     }
 #if DEBUG_PRINT
