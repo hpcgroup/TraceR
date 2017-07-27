@@ -622,7 +622,7 @@ static int get_next_job(
     for(int j = m->job + 1; j < num_jobs; j++) {
         // Job has already been scheduled OR
         // Number of available servers is more than the number of required ranks
-        if((ss->start_times[j] != 0.0) ||
+        if((ss->start_times[j] - g_tw_lookahead >= 0.0) ||
            (jobs[j].numRanks > (num_servers - ss->busy_lps.size()))) {
             continue;
         }
@@ -783,6 +783,9 @@ static void sched_finalize(
     for(int j = 0; j < num_jobs; j++) {
         printf("Job %d Start Time %f seconds and End Time %f seconds\n", j, ns_to_s(ss->start_times[j]), ns_to_s(ss->end_times[j]));
     }
+    printf("Scheduler End Time %f seconds\n", ns_to_s(tw_now(lp)));
+    fflush(stdout);
+
     free(ss->start_times);
     free(ss->end_times);
 }
