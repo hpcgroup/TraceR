@@ -82,9 +82,10 @@ mpirun -np 8 ../traceR --sync=3 --nkp=16 --extramem=100000 --max-opt-lookahead=1
 
 Parameters:   
 --sync: ROSS's PDES type. 1 - sequential, 2 - conservation, 3 - optimistic  
---extramem: number of messages in ROSS's extra message buffer - each message is ~500 bytes - 10 million should work for most cases  
+--extramem: number of messages in ROSS's extra message buffer - each message is ~500 bytes - 100K should work for most cases  
 --max-opt-lookahead: leash on optimisitc execution in nanoseconds (1 micro second is a good value)  
 --timer-frequency: frequency with which PE0 should print current virtual time  
+--nkp : number of groups used for clustering LPs; recommended value for lower rollbacks: (total LPs)/(#MPI ranks) 
 
 Please refer to README.OTF for instructions on generating OTF2-MPI trace files.
 BigSim-AMPI trace file generation instructions are available at
