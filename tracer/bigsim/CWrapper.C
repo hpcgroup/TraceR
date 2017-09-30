@@ -36,7 +36,7 @@ int MsgEntry_getNode(MsgEntry* m){return m->node;}
 int MsgEntry_getThread(MsgEntry* m){return m->thread;}
 
 //PE
-PE* newPE(){ return new PE(); }
+PE* newPE(int jNum, int mNum){ return new PE(jNum, mNum); }
 int PE_get_iter(PE* p) { return p->currIter; }
 void PE_inc_iter(PE* p) { p->currIter++; }
 void PE_dec_iter(PE* p) { p->currIter--; }
@@ -52,8 +52,8 @@ double PE_getTaskExecTime(PE* p, int tInd){return p->taskExecTime(tInd);}
 void PE_addTaskExecTime(PE* p, int tInd, double time){ p->addTaskExecTime(tInd, time);}
 #if TRACER_BIGSIM_TRACES
 int PE_getTaskMsgEntryCount(PE* p, int tInd){return p->myTasks[tInd].msgEntCount;}
-MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd){
-  return &(p->myTasks[tInd].myEntries);
+MsgEntry* PE_getTaskMsgEntries(PE* p, int tInd){
+  return &(p->myTasks[tInd].myEntries[0]);
 }
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd){
   return &(p->myTasks[tInd].myEntries[mInd]);
@@ -72,7 +72,7 @@ void PE_mark_all_done(PE *p, int iter, int task_id) {
 
 bool PE_get_taskDone(PE* p, int iter, int tInd){ return p->taskStatus[iter][tInd]; }
 #if TRACER_BIGSIM_TRACES
-int* PE_getTaskFwdDep(PE* p, int tInd){ return p->myTasks[tInd].forwardDep; }
+int* PE_getTaskFwdDep(PE* p, int tInd){ return &p->myTasks[tInd].forwardDep[0]; }
 int PE_getTaskFwdDepSize(PE* p, int tInd){ return p->myTasks[tInd].forwDepSize; }
 void PE_undone_fwd_deps(PE* p, int iter, int tInd){
   int fwd_dep_size = PE_getTaskFwdDepSize(p, tInd);
@@ -135,9 +135,9 @@ void PE_invertMsgPe(PE* p, int iter, int tInd){
   p->invertMsgPe(iter, tInd);
 }
 int PE_get_tasksCount(PE* p){return p->tasksCount;}
-int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
 void PE_printStat(PE* p){p->check();}
 int PE_get_numWorkThreads(PE* p){return p->numWth;}
+void deletePE(PE* p){delete p;}
 
 #if TRACER_BIGSIM_TRACES
 //TraceReader
@@ -145,11 +145,9 @@ TraceReader* newTraceReader(char* s){return new TraceReader(s);}
 void TraceReader_loadTraceSummary(TraceReader* t){t->loadTraceSummary();}
 void TraceReader_loadOffsets(TraceReader* t){t->loadOffsets();}
 int* TraceReader_getOffsets(TraceReader* t){return t->allNodeOffsets;}
-void TraceReader_setOffsets(TraceReader* t, int** offsets){t->allNodeOffsets = *offsets;}
-void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int*
-    empes, int* nwth, PE* pe, int penum, int jobnum, double* startTime){
-  t->readTrace(tot, numnodes, empes, nwth, pe, penum, jobnum, startTime);
-}
+void TraceReader_setOffsets(TraceReader* t, int* offsets){t->allNodeOffsets = offsets;}
+void TraceReader_readTrace(TraceReader* t, PE* pe){t->readTrace(pe);}
 int TraceReader_totalWorkerProcs(TraceReader* t){return t->totalWorkerProcs;}
+void deleteTraceReader(TraceReader* t){delete t;}
 #endif
 

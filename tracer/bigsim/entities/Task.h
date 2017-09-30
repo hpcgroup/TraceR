@@ -24,8 +24,8 @@
 #include <ross.h>
 #endif
 
-class MsgEntry;
 #include <cstring>
+#include <vector>
 #define TIME_MULT 1000000000
 
 #if TRACER_BIGSIM_TRACES
@@ -51,15 +51,15 @@ class Task {
     ~Task();
 #if TRACER_BIGSIM_TRACES
     void printEvt(tw_lp * lp, double startTime, int PEno, int jobNo);
+    std::vector<MsgEntry> myEntries; // outgoing messages of task
     int msgEntCount; // number of msg entries
-    MsgEntry* myEntries; // outgoing messages of task
-    int* forwardDep; //backward dependent tasks
+    std::vector<int> forwardDep; //backward dependent tasks
     int forwDepSize;	// size of forwardDep array
 
-    int* backwardDep;	//forward dependent tasks
+    std::vector<int> backwardDep;	//forward dependent tasks
     int backwDepSize;	// size of backwDep array
+    std::vector<BgPrint> myBgPrints;
     int bgPrintCount;
-    BgPrint* myBgPrints;
 #elif TRACER_OTF_TRACES
     int64_t event_id;
     int64_t req_id;

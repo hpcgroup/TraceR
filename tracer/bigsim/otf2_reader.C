@@ -695,6 +695,7 @@ void readLocationTasks(int jobID, OTF2_Reader *reader, AllData *allData,
   }
 #endif
   OTF2_Reader_CloseEvtReader( reader, evt_reader );
+  allData->ld = NULL;
 }
 
 void closeReader(OTF2_Reader *reader) {

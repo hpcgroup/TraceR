@@ -63,23 +63,28 @@ typedef std::map< CollMsgKey, std::list<int> > CollKeyType;
 
 class PE {
   public:
-    PE();
+    PE(int jNum, int mNum);
     ~PE();
     std::list<TaskPair> msgBuffer;
-    Task* myTasks;	// all tasks of this PE
-    bool **taskStatus, **taskExecuted;
-    bool **msgStatus;
-    bool *allMarked;
+    std::vector<Task> myTasks;	// all tasks of this PE
+    std::vector<std::vector<bool> > taskStatus;
+    std::vector<std::vector<bool> > taskExecuted;
+    std::vector<std::vector<bool> > msgStatus;
+    std::vector<bool> allMarked;
     double currTime;
     bool busy;
-    int beforeTask, totalTasksCount;
-    int myNum, myEmPE, jobNum;
+    const int myNum;
+    const int jobNum;
+    int myEmPE;
     int tasksCount;	//total number of tasks
+    int numIters;	//total number of iterations
     int currentTask; // index of first not-executed task (helps searching messages)
     int firstTask;
     int currIter;
     int loop_start_task;
 
+    void initialize(const JobInf* jobs);
+    void reset(const JobInf* jobs);
     bool noUnsatDep(int iter, int tInd);	// there is no unsatisfied dependency for task
     void mark_all_done(int iter, int tInd);
     double taskExecTime(int tInd);
@@ -90,13 +95,14 @@ class PE {
     void invertMsgPe(int iter, int tInd);
     double getTaskExecTime(int tInd);
     void addTaskExecTime(int tInd, double time);
-    std::map<int, int>* msgDestLogs;
+    std::vector<std::map<int, int> > msgDestLogs;
     int findTaskFromMsg(MsgID* msg);
     int numWth, numEmPes;
 
     KeyType pendingMsgs;
     KeyType pendingRMsgs;
-    int64_t *sendSeq, *recvSeq;
+    std::vector<int64_t> sendSeq;
+    std::vector<int64_t> recvSeq;
     std::map<int, int> pendingReqs;
     std::map<int, int64_t> pendingRReqs;
 
