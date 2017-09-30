@@ -370,12 +370,6 @@ int main(int argc, char **argv)
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
     }
-    if (total_ranks > num_servers) {
-      if (!rank)
-        printf("Job requires %d servers, but the topology only contains %d. Aborting\n", total_ranks, num_servers);
-      MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
 
     if(!rank) {
       printf("Done reading meta-information about jobs\n");
