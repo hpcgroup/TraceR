@@ -33,6 +33,7 @@ extern JobInf *jobs;
 #include <string>
 
 std::map<std::string, double> *eventSubs = NULL;
+std::map<int64_t, int64_t> *msgSizeSub = NULL;
 
 void addEventSub(int jobid, char *key, double val, int numjobs) {
   if(eventSubs == NULL) {
@@ -40,6 +41,13 @@ void addEventSub(int jobid, char *key, double val, int numjobs) {
   }
   std::string skey(key);
   eventSubs[jobid][key] = (double)TIME_MULT * val;
+}
+
+void addMsgSizeSub(int jobid, int64_t key, int64_t val, int numjobs) {
+  if(msgSizeSub == NULL) {
+    msgSizeSub = new std::map<int64_t, int64_t>[numjobs];
+  }
+  msgSizeSub[jobid][key] = val;
 }
 
 #if TRACER_BIGSIM_TRACES
@@ -397,11 +405,19 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
     }
   
     if(t->event_id == TRACER_SEND_EVT || t->event_id == TRACER_RECV_POST_EVT
-       || t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT) 
+       || t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT
+       || t->event_id == TRACER_COLL_EVT)
     { 
       if(size_replace_limit[pe->jobNum] != -1 && 
           t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
         t->myEntry.msgId.size = size_replace_by[pe->jobNum];
+      }
+      if(msgSizeSub != NULL) {
+        std::map<int64_t, int64_t>::iterator loc =
+          msgSizeSub[pe->jobNum].find(t->myEntry.msgId.size);
+        if(loc != msgSizeSub[pe->jobNum].end()) {
+          t->myEntry.msgId.size = loc->second;
+        }
       }
     }
   }

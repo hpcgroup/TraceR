@@ -32,20 +32,6 @@ struct proc_state
     int my_pe_num, my_job;
 };
 
-struct proc_msg
-{
-    enum proc_event proc_event_type;
-    tw_lpid src;          /* source of this request or ack */
-    int iteration;
-    TaskPair executed;
-    int fwd_dep_count;
-    int saved_task;
-    MsgID msgId;
-    bool incremented_flag; /* helper for reverse computation */
-    int model_net_calls;
-    unsigned int coll_info;
-};
-
 /* types of events that will constitute triton requests */
 enum proc_event
 {
@@ -71,6 +57,20 @@ enum proc_event
     COLL_SCATTER_SEND_DONE,
     RECV_COLL_POST,
     COLL_COMPLETE
+};
+
+struct proc_msg
+{
+    enum proc_event proc_event_type;
+    tw_lpid src;          /* source of this request or ack */
+    int iteration;
+    TaskPair executed;
+    int fwd_dep_count;
+    int saved_task;
+    MsgID msgId;
+    bool incremented_flag; /* helper for reverse computation */
+    int model_net_calls;
+    unsigned int coll_info;
 };
 
 struct Coll_lookup {

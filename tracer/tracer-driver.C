@@ -213,6 +213,17 @@ int main(int argc, char **argv)
                 "modelnet_dragonfly_router", NULL, 1);
     }
 
+    if(net_id == DRAGONFLY_CUSTOM) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_dragonfly_custom", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_dragonfly_custom_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly_custom", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_dragonfly_custom_router", NULL, 1);
+    }
+
     if(net_id == FATTREE) {
         num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
                 "modelnet_fattree", NULL, 1);
@@ -233,6 +244,17 @@ int main(int argc, char **argv)
                 "modelnet_slimfly", NULL, 1);
         num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
                 "slimfly_router", NULL, 1);
+    }
+
+    if(net_id == EXPRESS_MESH) {
+        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_express_mesh", NULL, 1);
+        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
+                "modelnet_express_mesh_router", NULL, 1);
+        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_express_mesh", NULL, 1);
+        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
+                "modelnet_express_mesh_router", NULL, 1);
     }
 
     num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
@@ -355,6 +377,12 @@ int main(int argc, char **argv)
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
     }
+    if (total_ranks > num_servers) {
+      if (!rank)
+        printf("Job requires %d servers, but the topology only contains %d. Aborting\n", total_ranks, num_servers);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
 
     if(!rank) {
       printf("Done reading meta-information about jobs\n");
@@ -378,6 +406,14 @@ int main(int argc, char **argv)
         if(!rank)
           printf("Will replace all messages of size greater than %d by %d for job %d\n", 
               size_replace_limit[jobid], size_replace_by[jobid], jobid);
+      }
+      if(next == 'S' || next == 's') {
+        int size_value, size_by, jobid;
+        fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by);
+        addMsgSizeSub(jobid, size_value, size_by, num_jobs);
+        if(!rank)
+          printf("Will replace all messages of size %d by %d for job %d\n",
+              size_value, size_by, jobid);
       }
       if(next == 'T' || next == 't') {
         fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
@@ -1323,7 +1359,7 @@ static tw_stime exec_task(
     m->model_net_calls = 0;
     if(ns->my_pe->taskExecuted[task_id.iter][task_id.taskid]) {
       b->c10 = 1;
-      return;
+      return 0;
     }
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
@@ -1653,7 +1689,7 @@ static tw_stime exec_task(
            taskEntry->node, taskEntry->msgId.id, taskEntry->msgId.comm, 
            taskEntry->msgId.seq, t->isNonBlocking, t->req_id, b->c26, b->c27, task_id.taskid);
 #endif
-          if(!t->isNonBlocking) return;
+          if(!t->isNonBlocking) return 0;
           sendFinishTime += sendOffset+copyTime+nic_delay;
         }
       }
@@ -1684,7 +1720,7 @@ static tw_stime exec_task(
           ns->my_pe->pendingReqs[t->req_id] = task_id.taskid;
         }
         b->c29 = 1;
-        return;
+        return 0;
       } 
     }
 #endif
