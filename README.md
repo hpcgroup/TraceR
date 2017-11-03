@@ -1,4 +1,4 @@
-TraceR v2
+TraceR v2.1
 ===========
 
 TraceR is a trace replay tool built upon the ROSS-based CODES simulation
@@ -97,9 +97,11 @@ Any published work that utilizes this software should include the following
 reference:
 
 ```
-Nikhil Jain, Abhinav Bhatele, Sam White, Todd Gamblin, and Laxmikant Kale.
-Evaluating HPC Networks via Simulation of Parallel Workloads. SC 2016.
-
+Nikhil Jain, Abhinav Bhatele, Samuel T. White, Todd Gamblin, and Laxmikant
+V. Kale. Evaluating HPC networks via simulation of parallel workloads. In
+Proceedings of the ACM/IEEE International Conference for High Performance
+Computing, Networking, Storage and Analysis, SC '16. IEEE Computer Society,
+November 2016. LLNL-CONF-690662.
 ```
 
 ### Release
@@ -113,8 +115,8 @@ Written by:
     Bilge Acun <acun2@illinois.edu>
     Abhinav Bhatele <bhatele@llnl.gov>
 ```
-LLNL-CODE-681378. All rights reserved.
+LLNL-CODE-740483. All rights reserved.
 
 This file is part of TraceR. For details, see:
-https://github.com/LLNL/tracer.
-Please also read the LICENSE file for our notice and the LGPL.
+https://github.com/LLNL/TraceR.
+Please also read the LICENSE file for the MIT License notice.
