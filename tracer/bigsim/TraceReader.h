@@ -23,6 +23,9 @@
 #endif
 #include "entities/PE.h"
 #include "entities/Task.h"
+class PE;
+class Node;
+class Task;
 
 class TraceReader {
 public:
@@ -31,8 +34,9 @@ public:
 #if TRACER_BIGSIM_TRACES
     void loadOffsets();
     void loadTraceSummary();
-    void readTrace(PE* pe);
-    void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, int taskJob, int, bool, double);
+    void readTrace(int* tot, int* numnodes, int* empes, int* nwth, PE* pe,
+        int penum, int jobnum, double* startTime);
+    void setTaskFromLog(Task *t, BgTimeLog* bglog, int taskPE, int emPE, int jobPEindex, PE* pe, int, bool, double);
 #endif
 
     int numEmPes;	// number of emulation PEs, there is a trace file for each of them
@@ -41,6 +45,10 @@ public:
     int numWth;	//Working PEs per node
     int* allNodeOffsets;
     char tracePath[256];
+
+    int fileLoc; // each worker needs separate file offset
+    int firstLog; // first log of window to read for each worker
+    int totalTlineLength; // apparently totalTlineLength should be kept for each PE!
 };
 
 #endif /* TRACEFILEREADER_H_ */

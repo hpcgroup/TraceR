@@ -10,36 +10,32 @@
 #include "bigsim/otf2_reader.h"
 #endif
 
-#include <map>
-#include <set>
-
 #define BCAST_DEGREE  2
 #define REDUCE_DEGREE  2
 
-struct sched_state
-{
-    std::map<int, unsigned int> completed_ranks;
-    std::set<tw_lpid> busy_lps;
-    tw_stime *start_times;
-    tw_stime *end_times;
-};
+typedef struct CoreInf {
+    int mapsTo, jobID;
+} CoreInf;
 
 struct proc_state
 {
     int msg_sent_count;   /* requests sent */
     int msg_recvd_count;  /* requests recvd */
     int local_recvd_count; /* number of local messages received */
+    tw_stime start_ts;    /* time that we started sending requests */
+    tw_stime end_ts;      /* time that we ended sending requests */
     PE* my_pe;          /* bigsim trace timeline, stores the task depency graph*/
-    std::map<int, PE*> other_pes;
+#if TRACER_BIGSIM_TRACES
+    TraceReader* trace_reader; /* for reading the bigsim traces */
+#endif
     clock_t sim_start;
+    int my_pe_num, my_job;
 };
 
 /* types of events that will constitute triton requests */
 enum proc_event
 {
-    JOB_START=1,
-    JOB_NEXT,
-    JOB_END,
+    KICKOFF=1,    /* initial event */
     LOCAL,      /* local event */
     RECV_MSG,   /* bigsim, when received a message */
     BCAST,      /* broadcast --> to be deprecated */
@@ -75,56 +71,11 @@ struct proc_msg
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
     unsigned int coll_info;
-    int job;
 };
 
 struct Coll_lookup {
   proc_event remote_event, local_event;
 };
-
-static void sched_init(
-    sched_state * ss,
-    tw_lp * lp);
-static void sched_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void sched_rev_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void sched_commit(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void sched_finalize(
-    sched_state * ss,
-    tw_lp * lp);
-
-static void handle_sched_job_end_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void handle_sched_job_next_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-
-static void handle_sched_job_end_rev_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void handle_sched_job_next_rev_event(
-    sched_state * ss,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
 
 static void proc_init(
     proc_state * ns,
@@ -139,22 +90,12 @@ static void proc_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-static void proc_commit(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
 static void proc_finalize(
     proc_state * ns,
     tw_lp * lp);
 
 //event handler declarations
-static void handle_job_start_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void handle_job_end_event(
+static void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -216,12 +157,7 @@ static void handle_recv_post_event(
    tw_lp * lp);
 
 //reverse event handler declarations
-static void handle_job_start_rev_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-static void handle_job_end_rev_event(
+static void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,

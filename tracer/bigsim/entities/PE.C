@@ -18,72 +18,22 @@
 #include "PE.h"
 #include <math.h>
 #define MAX_LOGS 5000000
+extern JobInf *jobs;
 
-PE::PE(int jNum, int mNum)
-  : myTasks(),
-    taskStatus(),
-    taskExecuted(),
-    msgStatus(),
-    allMarked(),
-    busy(false),
-    myNum(mNum),
-    jobNum(jNum),
-    currentTask(0),
-    currIter(0),
-    loop_start_task(-1),
-    msgDestLogs(),
-    numEmPes(0),
-    sendSeq(),
-    recvSeq(),
-    currentCollComm(-1),
-    currentCollSeq(-1),
-    currentCollTask(-1),
-    currentCollMsgSize(-1),
-    currentCollRank(-1),
-    currentCollPartner(-1),
-    currentCollSize(-1),
-    currentCollSendCount(-1),
-    currentCollRecvCount(-1)
-{
+PE::PE() {
+  busy = false;
+  currentTask = 0;
+  beforeTask = 0;
+  currIter = 0;
+  loop_start_task = -1; 
 }
 
 PE::~PE() {
-}
-
-void PE::initialize(const JobInf* jobs) {
-  tasksCount = myTasks.size();
-  numIters = jobs[jobNum].numIters;
-
-  taskStatus.resize(numIters);
-  taskExecuted.resize(numIters);
-  msgStatus.resize(numIters);
-  allMarked.resize(numIters, false);
-  for(int i = 0; i < numIters; i++) {
-    taskStatus[i].resize(tasksCount, false);
-    taskExecuted[i].resize(tasksCount, false);
-    msgStatus[i].resize(tasksCount, false);
-  }
-
-  msgDestLogs.resize(numEmPes),
-
-  sendSeq.resize(jobs[jobNum].numRanks, 0);
-  recvSeq.resize(jobs[jobNum].numRanks, 0);
-
-}
-
-void PE::reset(const JobInf* jobs) {
-  busy = false;
-  currentTask = 0;
-  currIter = 0;
-  loop_start_task = -1;
-  currentCollComm = currentCollSeq = currentCollTask = -1;
-  currentCollRank = currentCollPartner = currentCollSize = -1;
-  currentCollMsgSize = currentCollSendCount = currentCollRecvCount = -1;
-
-  for(int i = 0; i < numIters; i++) {
-    allMarked[i] = false;
-  }
-
+    msgBuffer.clear();
+#if TRACER_BIGSIM_TRACES
+    delete [] myTasks;
+    delete [] msgDestLogs;
+#endif
 }
 
 void PE::mark_all_done(int iter, int tInd) {
@@ -124,7 +74,7 @@ double PE::taskExecTime(int tInd)
 void PE::printStat()
 {
   int countTask=0;
-  for(int j = 0; j < numIters; j++) {
+  for(int j = 0; j < jobs[jobNum].numIters; j++) {
     for(int i=0; i<tasksCount; i++)
     {
       if(!taskStatus[j][i])

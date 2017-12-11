@@ -38,7 +38,7 @@ int MsgEntry_getThread(MsgEntry* m);
 
 //PE
 typedef struct PE PE;
-PE* newPE(int jNum, int mNum);
+PE* newPE();
 void PE_set_busy(PE* p, bool b);
 bool PE_is_busy(PE* p);
 bool PE_noUnsatDep(PE* p, int, int tInd);
@@ -50,7 +50,7 @@ double PE_getTaskExecTime(PE* p, int tInd);
 void PE_addTaskExecTime(PE* p, int tInd, double time);
 #if TRACER_BIGSIM_TRACES
 int PE_getTaskMsgEntryCount(PE* p, int tInd);
-MsgEntry* PE_getTaskMsgEntries(PE* p, int tInd);
+MsgEntry** PE_getTaskMsgEntries(PE* p, int tInd);
 MsgEntry* PE_getTaskMsgEntry(PE* p, int tInd, int mInd);
 void PE_execPrintEvt(tw_lp * lp, PE* p, int tInd, double stime);
 #endif
@@ -84,7 +84,6 @@ int PE_get_tasksCount(PE* p);
 int PE_get_totalTasksCount(PE* p);
 void PE_printStat(PE* p);
 int PE_get_numWorkThreads(PE* p);
-void deletePE(PE* p);
 
 #if TRACER_BIGSIM_TRACES
 //TraceReader
@@ -93,14 +92,14 @@ TraceReader* newTraceReader(char*);
 void TraceReader_loadTraceSummary(TraceReader* t);
 void TraceReader_loadOffsets(TraceReader* t);
 int* TraceReader_getOffsets(TraceReader* t);
-void TraceReader_setOffsets(TraceReader* t, int* offsets);
-void TraceReader_readTrace(TraceReader* t, PE* pe);
+void TraceReader_setOffsets(TraceReader* t, int** offsets);
+void TraceReader_readTrace(TraceReader* t, int* tot, int* numnodes, int* empes,
+    int* nwth, PE* pe, int penum, int jobnum, double* startTime);
 int TraceReader_totalWorkerProcs(TraceReader* t);
-void deleteTraceReader(TraceReader* t);
 #endif
 void addEventSub(int job, char *key, double val, int numjobs);
 void addMsgSizeSub(int job, int64_t key, int64_t val, int numjobs);
 
 bool isPEonThisRank(int jobID, int i);
-void TraceReader_readOTF2Trace(PE* pe);
+void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startTime);
 #endif
