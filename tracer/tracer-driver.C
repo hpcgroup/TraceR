@@ -1,4 +1,4 @@
-/** \file tracer-driver.c
+/** \file tracer-driver.C
  * Copyright (c) 2015, Lawrence Livermore National Security, LLC.
  * Produced at the Lawrence Livermore National Laboratory.
  *
@@ -7,11 +7,11 @@
  *     Bilge Acun <acun2@illinois.edu>
  *     Abhinav Bhatele <bhatele@llnl.gov>
  *
- * LLNL-CODE-681378. All rights reserved.
+ * LLNL-CODE-740483. All rights reserved.
  *
  * This file is part of TraceR. For details, see:
- * https://github.com/LLNL/tracer
- * Please also read the LICENSE file for our notice and the LGPL.
+ * https://github.com/LLNL/TraceR
+ * Please also read the LICENSE file for the MIT License notice.
  */
 
 /**
@@ -371,6 +371,12 @@ int main(int argc, char **argv)
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
         }
     }
+    if (total_ranks > num_servers) {
+      if (!rank)
+        printf("Job requires %d servers, but the topology only contains %d. Aborting\n", total_ranks, num_servers);
+      MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
 
     if(!rank) {
       printf("Done reading meta-information about jobs\n");
