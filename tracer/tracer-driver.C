@@ -3556,6 +3556,11 @@ static void perform_scatter_small_rev(
   send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_SCATTER_SMALL, lp, isEvent, m);
 }
 
+/* Implementation of scatter using binomial tree:
+ * Recurvsive trees rooted at logical rank 0 which sends to 2^n, 2^n-1, 2^n-2...
+ * Each of those receipients than send to nodes in their subtrees
+ *
+*/
 static void perform_scatter(
     proc_state * ns,
     int taskid,
@@ -3566,6 +3571,7 @@ static void perform_scatter(
 {
   Task *t;
   int recvCount;
+  m->model_net_calls = 0;
   if(!isEvent) {
     PE_set_busy(ns->my_pe, true);
     t = &ns->my_pe->myTasks[taskid];
@@ -3584,22 +3590,49 @@ static void perform_scatter(
     }
     maxSize = g.members.size();
 
+    //my logical rank in the tree
     ns->my_pe->currentCollRank = (index - t->myEntry.node + maxSize) % maxSize;
+    //this gets sent with the msg to identify the source
     t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     ns->my_pe->currentCollSize = maxSize;
-    if (ns->my_pe->currentCollRank == 0) {
-      ns->my_pe->currentCollMsgSize = t->myEntry.msgId.size * maxSize;
-    }
 
     int partner;
+    //distance on left of partner from which I receive the first message: 0 is the
+    //root and sends to 2^n, 2^n-1, and so on
     for(partner = 0x1; partner < maxSize; partner <<= 1) {
       if (ns->my_pe->currentCollRank & partner) {
         break;
       }
     }
+    //distance of the partner on the right to which I send next
     ns->my_pe->currentCollPartner = partner >> 1;
+    //logical rank in the tree from which i expect to receive
     partner = (ns->my_pe->currentCollRank - partner + maxSize) % maxSize;
 
+    int size_mult = 2 * ns->my_pe->currentCollPartner;
+    if(size_mult == 0) {
+      size_mult = 1;
+    }
+    if(ns->my_pe->currentCollRank + size_mult > maxSize) {
+      size_mult = maxSize - ns->my_pe->currentCollRank;
+    }
+    ns->my_pe->currentCollMsgSize = t->myEntry.msgId.size * size_mult;
+    
+    tw_stime delay = codes_local_latency(lp);
+    if(ns->my_pe->currentCollRank != 0 && ns->my_pe->currentCollMsgSize > eager_limit) {
+      m->model_net_calls++;
+      //POST messages are matched on global rank
+      t->myEntry.msgId.pe = ns->my_pe_num;
+      int src = (t->myEntry.node + partner) % ns->my_pe->currentCollSize;
+      src = g.members[src];
+      send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId,
+        ns->my_pe->currentCollSeq, pe_to_lpid(src, ns->my_job),
+        delay, RECV_COLL_POST, lp, true, ns->my_pe->currentCollMsgSize);
+      //Reset the task PE to the rank in current comm
+      t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
+    }
+
+    //check if message received already
     std::map<int64_t, std::map<int64_t, std::map<int, int> > >::iterator it =
       ns->my_pe->pendingCollMsgs.find(ns->my_pe->currentCollComm);
     if(it == ns->my_pe->pendingCollMsgs.end()) {
@@ -3622,10 +3655,12 @@ static void perform_scatter(
   } else {
     int comm = m->msgId.comm;
     int64_t collSeq = m->msgId.seq;
+    //if not a self message
     if((m->msgId.pe != ns->my_pe->currentCollRank) ||
        (comm != ns->my_pe->currentCollComm) ||
        (collSeq != ns->my_pe->currentCollSeq)) {
       ns->my_pe->pendingCollMsgs[comm][collSeq][m->msgId.pe]++;
+      //if not reached the MPI task yet, return
       if((comm != ns->my_pe->currentCollComm) ||
          (collSeq != ns->my_pe->currentCollSeq) ||
          (ns->my_pe->currentCollTask == -1)) {
@@ -3641,11 +3676,13 @@ static void perform_scatter(
     recvCount = 1;
   }
 
+  //if not root, and haven't received a message, return
   if((recvCount == 0) && (ns->my_pe->currentCollRank != 0)) {
     b->c14 = 1;
     return;
   }
 
+  //if non-self message, then pendingCollMsgs need to be updated
   if(isEvent && (m->msgId.pe != ns->my_pe->currentCollRank)) {
     ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe]--;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq][m->msgId.pe] == 0) {
@@ -3653,32 +3690,32 @@ static void perform_scatter(
     }
   }
 
-  m->model_net_calls = 0;
   tw_stime delay = codes_local_latency(lp);
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
 
-  if((ns->my_pe->currentCollPartner > 0) &&
-     (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner < ns-> my_pe->currentCollSize)) {
+  //scan till find a destination that exist
+  m->coll_info_2 = ns->my_pe->currentCollPartner;
+  while((ns->my_pe->currentCollPartner > 0) &&
+     (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner >= ns-> my_pe->currentCollSize)) {
+    ns->my_pe->currentCollPartner >>= 1;
+  }
+
+  if(ns->my_pe->currentCollPartner > 0) {
     b->c15 = 1;
+    //destination is shifted by the root's rank to look up the comm map
     int dest = (t->myEntry.node + ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner) % ns->my_pe->currentCollSize;
     dest = g.members[dest];
     m->coll_info = dest;
+    //temporary storage
     m->msgId.size = ns->my_pe->currentCollMsgSize;
+    //this is the amount of data we need to send next
     ns->my_pe->currentCollMsgSize -= (t->myEntry.msgId.size * ns->my_pe->currentCollPartner);
     tw_stime copyTime = copy_per_byte * ns->my_pe->currentCollMsgSize;
     enqueue_coll_msg(TRACER_SCATTER, ns, ns->my_pe->currentCollMsgSize,
         ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq,
         dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
-    if(ns->my_pe->currentCollMsgSize > eager_limit) {
-      m->model_net_calls++;
-      t->myEntry.msgId.pe = ns->my_pe_num;
-      int src = (t->myEntry.node + ns->my_pe->currentCollRank) % ns->my_pe->currentCollSize;
-      src = g.members[src];
-      send_msg(ns, 16, ns->my_pe->currIter, &t->myEntry.msgId,
-        ns->my_pe->currentCollSeq, pe_to_lpid(src, ns->my_job),
-        delay, RECV_COLL_POST, lp, true, ns->my_pe->currentCollMsgSize);
-    }
     delay += copyTime;
+    //left over data after the previous send
     ns->my_pe->currentCollMsgSize = m->msgId.size - ns->my_pe->currentCollMsgSize;
   } else {
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -3698,6 +3735,11 @@ static void perform_scatter_rev(
 {
   Task *t;
   int64_t seq = ns->my_pe->currentCollSeq;
+  for(int i = 0; i < m->model_net_calls; i++) {
+    //TODO use the right size to rc
+    model_net_event_rc(net_id, lp, 0);
+  }
+
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = -1;
@@ -3709,6 +3751,7 @@ static void perform_scatter_rev(
     ns->my_pe->currentCollSize = -1;
     ns->my_pe->currentCollMsgSize = -1;
     ns->my_pe->currentCollPartner = -1;
+    codes_local_latency_reverse(lp);
   } else {
     if(b->c12) {
       ns->my_pe->pendingCollMsgs[m->msgId.comm][m->msgId.seq][m->msgId.pe]--;
@@ -3728,11 +3771,7 @@ static void perform_scatter_rev(
   }
 
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
-
+  ns->my_pe->currentCollPartner = m->coll_info_2;
   if(b->c15) {
     ns->my_pe->currentCollMsgSize = m->msgId.size;
     enqueue_coll_msg_rev(TRACER_SCATTER, ns, &t->myEntry.msgId, seq, m->coll_info, lp, m, b);
@@ -3753,6 +3792,7 @@ static void handle_scatter_send_comp_event(
     b->c18 = 1;
     return;
   }
+  //move to the next destination by reducing the distance
   ns->my_pe->currentCollPartner >>= 1;
   //send to self
   tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
