@@ -86,7 +86,7 @@ struct proc_msg
     MsgID msgId;
     bool incremented_flag; /* helper for reverse computation */
     int model_net_calls;
-    unsigned int coll_info;
+    unsigned int coll_info, coll_info_2;
 };
 
 struct Coll_lookup {
