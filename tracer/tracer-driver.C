@@ -802,7 +802,7 @@ static void handle_recv_event(
 #endif
     MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
-    assert((it == ns->my_pe->pendingMsgs.end()) || (it->second.size() != 0));
+    assert((it == ns->my_pe->pendingMsgs.end()) || (!it->second.empty()));
     if(it == ns->my_pe->pendingMsgs.end() || it->second.front() == -1) {
       task_id = -1;
       ns->my_pe->pendingMsgs[key].push_back(task_id);
@@ -812,7 +812,7 @@ static void handle_recv_event(
       b->c3 = 1;
       task_id = it->second.front();
       it->second.pop_front();
-      if(it->second.size() == 0) {
+      if(it->second.empty()) {
         ns->my_pe->pendingMsgs.erase(it);
       }
 #if DEBUG_PRINT
