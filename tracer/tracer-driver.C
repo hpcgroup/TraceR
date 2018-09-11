@@ -49,6 +49,7 @@ unsigned int print_frequency = 5000;
 #define TRACER_A2A_ALG_CUTOFF 512
 #define TRACER_ALLGATHER_ALG_CUTOFF 163840
 #define TRACER_BLOCK_SIZE 32
+#define MPI_INTERNAL_DELAY 10
 
 char tracer_input[256];
 proc_state *ns_5 = NULL;
@@ -1400,7 +1401,7 @@ static tw_stime exec_task(
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
     tw_stime soft_latency = codes_local_latency(lp);
-    tw_stime delay = soft_latency; //intra node latency
+    tw_stime delay = MPI_INTERNAL_DELAY + soft_latency; //intra node latency
     double sendFinishTime = 0;
 
     for(int i=0; i<msgEntCount; i++){
@@ -2169,7 +2170,7 @@ static void perform_bcast(
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
       &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
       delay, COLL_BCAST, lp);
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
     m->model_net_calls++;
   }
   send_coll_comp(ns, delay, TRACER_COLLECTIVE_BCAST, lp, isEvent, m);
@@ -2309,7 +2310,7 @@ static void perform_reduction(
     int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0), COLL_REDUCTION, lp);
+        delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0) + MPI_INTERNAL_DELAY, COLL_REDUCTION, lp);
     m->model_net_calls++;
   }
   delay += copyTime;
@@ -2458,7 +2459,7 @@ static void perform_a2a(
         delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2689,7 +2690,7 @@ static void perform_allgather(
     //}
     enqueue_coll_msg(TRACER_ALLGATHER, ns, t->myEntry.msgId.size, 
         ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
-        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+        dest, delay + nic_delay, copyTime, lp, m, b);
     if(t->myEntry.msgId.size > eager_limit) {
       m->model_net_calls++;
       int saved_pe = t->myEntry.msgId.pe;
@@ -2707,7 +2708,7 @@ static void perform_allgather(
     //  it->first.rank, it->first.comm, it->first.seq);
     //  fflush(stdout);
     //}
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2939,7 +2940,7 @@ static void perform_bruck(
     tw_stime copyTime = copy_per_byte * ns->my_pe->currentCollMsgSize;
     enqueue_coll_msg(TRACER_BRUCK, ns, ns->my_pe->currentCollMsgSize,
         ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
-        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+        dest, delay + nic_delay, copyTime, lp, m, b);
     if(ns->my_pe->currentCollMsgSize > eager_limit) {
       m->model_net_calls++;
       t->myEntry.msgId.pe = ns->my_pe_num;
@@ -2948,7 +2949,7 @@ static void perform_bruck(
         delay, RECV_COLL_POST, lp, true,  ns->my_pe->currentCollMsgSize);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -3188,7 +3189,7 @@ static void perform_a2a_blocked(
       enqueue_coll_msg(TRACER_BLOCKED, ns, t->myEntry.msgId.size, 
           ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
           dest, delay + nic_delay, copyTime, lp, m, b, true);
-      delay += copyTime;
+      delay += copyTime + MPI_INTERNAL_DELAY;
     }
   } else {
     b->c15 = 1;
@@ -3524,7 +3525,7 @@ static int bcast_msg(
     for(int i = 0; i < numValidChildren; i++) {
       send_msg(ns, size, iter, msgId,  0 /*not used */, 
         pe_to_lpid(myChildren[i], ns->my_job), sendOffset + delay, BCAST, lp);
-      delay += copyTime;
+      delay += copyTime + MPI_INTERNAL_DELAY;
       m->model_net_calls++;
     }
     return numValidChildren;
