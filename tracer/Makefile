@@ -19,18 +19,14 @@ include Makefile.common
 TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o bigsim/otf2_reader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o 
 
-TRACER_LDADD += ${CODES_LIBS} ${CHARM_LIBS} ${OTF_LIBS}
-
-TRACER_CFLAGS = ${CODES_CFLAGS} ${SELECT_TRACE}
-
 all: traceR
 .PHONY: components
 
 traceR: tracer-driver.o components
-	$(CXX) ${LDFLAGS} $< -o $@ ${TRACER_LDADD}
+	${CXX} ${LDFLAGS} $< -o $@ ${TRACER_LDADD} ${LIBS}
 
 tracer-driver.o: tracer-driver.C tracer-driver.h
-	$(CXX) $(CFLAGS) ${BASE_INCS} $(TRACER_CFLAGS) -c $< -o $@
+	${CXX} ${CXXFLAGS} -c $< -o $@
 
 components:
 	cd bigsim; make;

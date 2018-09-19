@@ -33,9 +33,9 @@ CPP_DEPS += entities/MsgEntry.d entities/PE.d entities/Task.d
 events/%.o: events/%.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -43,9 +43,9 @@ endif
 entities/%.o: entities/%.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
@@ -53,16 +53,16 @@ endif
 %.o: %.C
 	@echo 'Building file: $<'
 ifeq ($(ARCH),bgq)
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 else
-	$(SEQ_CXX) ${BASE_INCS} $(NETWORKOPTS) $(OPTS) $(WARNING) -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
 endif
 	@echo 'Finished building: $<'
 	@echo ' '
 
 fastSim: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
-	#$(LXX) -L$(CHARMPATH)/lib -o $@ $(NETWORKOPTS) $(OBJS) $(USER_OBJS) $(LIBS)
+	#$(LXX) -L$(CHARMPATH)/lib -o $@ $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building: $<'
 	@echo ' '
 

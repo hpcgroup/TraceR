@@ -14,63 +14,53 @@
 # Please also read the LICENSE file for the MIT License notice.
 ##############################################################################
 
-ifeq ($(ARCH),bgq)
-CC = mpixlc_r
+ifeq (${ARCH},bgq)
 CXX = mpixlcxx_r
-else ifeq ($(ARCH),cray)
-CC = cc -std=gnu99
+ARCH_FLAGS = -I/bgsys/drivers/ppcfloor
+else ifeq (${ARCH},cray)
 CXX = CC
+ARCH_FLAGS = -Wall
 else
-CC = mpicc -std=gnu99
 CXX = mpicxx
+ARCH_FLAGS = -Wall
 endif
 
 SEQ_CXX = ${CXX}
 
-#needed if using bigsim logs
-#CHARMPATH = /p/lscratchf/jain6/network-sim/charm/verbs-linux-x86_64-bigemulator-icc
-CHARMPATH = /p/lscratchf/jain6/network-sim/charm/mpi-linux-x86_64-bigemulator
+# ROSS install directory
+ROSS_DIR = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/ross-7.0.0
 
-#ross install directory
-ROSS = /p/lscratchf/jain6/migrate-tracer/ROSS-rebase/install
-#base directory of this code
-BASE_DIR = /p/lscratchf/jain6/migrate-tracer
-CODES = ${BASE_DIR}/codes-rebase
-CODES_LIBS = -L${CODES}/install-mod/lib -Wl,-rpath=${CODES}/install-mod/lib
-CODES_LIBS += -L${ROSS}/lib -Wl,-rpath=${ROSS}/lib
+# CODES install directory
+CODES_DIR  = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/codes-1.0.0
+CODES_LIBS = -L${CODES_DIR}/lib -Wl,-rpath=${CODES_DIR}/lib
+CODES_LIBS += -L${ROSS_DIR}/lib -Wl,-rpath=${ROSS_DIR}/lib
 CODES_LIBS += -lcodes -lROSS -lm
 
-ifeq ($(ARCH),bgq)
-ARCH_FLAGS = -I/bgsys/drivers/ppcfloor
-else
-ARCH_FLAGS = -Wall 
-endif
+CODES_CXXFLAGS = -I${CODES_DIR}/include -I${ROSS_DIR}/include
 
-CODES_CFLAGS = -I${CODES}/install-mod/include -I${ROSS}/include
-#Enable one of the following:
-#SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
+
+# Use BigSim traces
+# SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1
+# CHARMPATH = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/charmpp-6.8.2
+
+# Use OTF2 traces
 SELECT_TRACE = -DTRACER_OTF_TRACES=1
 
-#CFLAGS = -O2 -g -Wall -DNO_COMM_BUILD=1
-#CXXFLAGS = -O2 -g -Wall -DNO_COMM_BUILD=1
-CFLAGS = -O2 -g -Wall 
-CXXFLAGS = -O2 -g -Wall 
-LDFLAGS = -g
-OPTS = ${CXXFLAGS} ${ARCH_FLAGS} ${CODES_CFLAGS} ${SELECT_TRACE}
-BASE_INCS= -Ibigsim -I.
+LDFLAGS  = -g
+CXXFLAGS = -O2 -g ${ARCH_FLAGS} # -DNO_COMM_BUILD=1
+CXXFLAGS += -Ibigsim -I.
+CXXFLAGS += ${CODES_CXXFLAGS} ${SELECT_TRACE}
 
-ifeq ($(SELECT_TRACE),-DTRACER_BIGSIM_TRACES=1)
-CHARM_LIBS = -L$(CHARMPATH)/lib
+ifeq (${SELECT_TRACE},-DTRACER_BIGSIM_TRACES=1)
+CHARM_LIBS = -L${CHARMPATH}/lib
 CHARM_LIBS += -lconv-bigsim-logs -lblue-standalone -lconv-util
-OPTS += -I$(CHARMPATH)/include
+CXXFLAGS   += -I${CHARMPATH}/include
 endif
 
-ifeq ($(SELECT_TRACE),-DTRACER_OTF_TRACES=1)
-CFLAGS += `otf2-config --cflags`
-CXXFLAGS += `otf2-config --cflags`
-LDFLAGS += `otf2-config --ldflags`
+ifeq (${SELECT_TRACE},-DTRACER_OTF_TRACES=1)
 OTF_LIBS = `otf2-config --libs`
-OPTS += `otf2-config --cflags`
-SEQ_CXX = ${CXX}
+CXXFLAGS += `otf2-config --cflags`
+LDFLAGS  += `otf2-config --ldflags`
 endif
 
+LIBS = ${CODES_LIBS} ${CHARM_LIBS} ${OTF_LIBS}
