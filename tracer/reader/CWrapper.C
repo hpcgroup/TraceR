@@ -14,8 +14,8 @@
 // Please also read the LICENSE file for the MIT License notice.
 //////////////////////////////////////////////////////////////////////////////
 
-#include "entities/MsgEntry.h"
-#include "entities/PE.h"
+#include "elements/MsgEntry.h"
+#include "elements/PE.h"
 #include "CWrapper.h"
 #include "TraceReader.h"
 #include "assert.h"

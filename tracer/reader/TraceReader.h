@@ -21,8 +21,8 @@
 #include "blue.h"
 #include "blue_impl.h"
 #endif
-#include "entities/PE.h"
-#include "entities/Task.h"
+#include "elements/PE.h"
+#include "elements/Task.h"
 class PE;
 class Node;
 class Task;

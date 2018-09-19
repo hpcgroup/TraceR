@@ -14,28 +14,28 @@
 # Please also read the LICENSE file for the MIT License notice.
 ##############################################################################
 
-include Makefile.common
+include ../Makefile.common
 
-TRACER_LDADD = reader/CWrapper.o reader/TraceReader.o reader/otf2_reader.o \
-elements/PE.o elements/Task.o elements/MsgEntry.o
+RM := rm -rf
 
-all: traceR
-.PHONY: components
+CPP_SRCS = MsgEntry.C PE.C Task.C
+OBJS = MsgEntry.o PE.o Task.o
+CPP_DEPS = MsgEntry.d PE.d Task.d
 
-SRCS = tracer-driver.C p2p-events.C coll-events.C
-OBJS = ${SRCS:.C=.o}
+CXXFLAGS += -I../
 
-traceR: ${OBJS} components
-	${CXX} ${LDFLAGS} ${OBJS} -o $@ ${TRACER_LDADD} ${LIBS}
+elements: ${OBJS}
 
 %.o: %.C
-	${CXX} ${CXXFLAGS} -c $< -o $@
-
-components:
-	cd reader; make;
-	cd elements; make;
+	@echo 'Building file: $<'
+ifeq ($(ARCH),bgq)
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -M -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+else
+	${SEQ_CXX} ${CXXFLAGS} -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$(@:%.o=%.d)" -o"$@" "$<"
+endif
+	@echo 'Finished building: $<'
+	@echo ' '
 
 clean:
-	rm -rf *.o traceR
-	cd reader; make clean;
-	cd elements; make clean;
+	-$(RM) $(OBJS) $(C++_DEPS) $(CC_DEPS) $(CPP_DEPS) $(EXECUTABLES) $(CXX_DEPS) $(C_UPPER_DEPS)
+	-@echo ' '
