@@ -26,7 +26,7 @@
 #include <vector>
 #include <map>
 #include <string>
-#include "entities/Task.h"
+#include "elements/Task.h"
 
 #if MPI_VERSION < 3
 #define OTF2_MPI_UINT64_T MPI_UNSIGNED_LONG
