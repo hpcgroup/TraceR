@@ -39,15 +39,7 @@ extern "C" {
 #include "tracer-driver.h"
 
 static int net_id = 0;
-static int num_routers = 0;
 static int num_servers = 0;
-static int num_nics = 0;
-
-static int num_routers_per_rep = 0;
-static int num_servers_per_rep = 0;
-static int num_nics_per_rep = 0;
-static int lps_per_rep = 0;
-static int total_lps = 0;
 
 typedef struct proc_msg proc_msg;
 typedef struct proc_state proc_state;
@@ -58,6 +50,9 @@ unsigned int print_frequency = 5000;
 #define TRACER_ALLGATHER_ALG_CUTOFF 163840
 #define TRACER_BLOCK_SIZE 32
 #define TRACER_SCATTER_ALG_CUTOFF 0
+#define MPI_INTERNAL_DELAY 10
+
+
 
 char tracer_input[256];
 proc_state *ns_5 = NULL;
@@ -194,74 +189,6 @@ int main(int argc, char **argv)
     
     num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
             NULL, 1);
-
-    if(net_id == TORUS) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0, "modelnet_torus",
-                NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_torus", NULL, 1);
-    }
-
-    if(net_id == DRAGONFLY) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_dragonfly", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0, 
-                "modelnet_dragonfly_router", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_dragonfly", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_dragonfly_router", NULL, 1);
-    }
-
-    if(net_id == DRAGONFLY_CUSTOM) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_dragonfly_custom", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_dragonfly_custom_router", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_dragonfly_custom", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_dragonfly_custom_router", NULL, 1);
-    }
-
-    if(net_id == FATTREE) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_fattree", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "fattree_switch", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_fattree", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "fattree_switch", NULL, 1);
-    }
-    
-    if(net_id == SLIMFLY) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_slimfly", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "slimfly_router", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_slimfly", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "slimfly_router", NULL, 1);
-    }
-
-    if(net_id == EXPRESS_MESH) {
-        num_nics = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_express_mesh", NULL, 1);
-        num_routers = codes_mapping_get_lp_count("MODELNET_GRP", 0,
-                "modelnet_express_mesh_router", NULL, 1);
-        num_nics_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_express_mesh", NULL, 1);
-        num_routers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-                "modelnet_express_mesh_router", NULL, 1);
-    }
-
-    num_servers_per_rep = codes_mapping_get_lp_count("MODELNET_GRP", 1,
-        "server", NULL, 1);
-
-    total_lps = num_servers + num_nics + num_routers;
-    lps_per_rep = num_servers_per_rep + num_nics_per_rep + num_routers_per_rep;
 
     configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
         &soft_delay_mpi);
@@ -581,7 +508,7 @@ static void proc_init(
       ns->my_pe->sendSeq[i] = ns->my_pe->recvSeq[i] = 0;
     }
 
-    e = codes_event_new(lp->gid, kickoff_time, lp);
+    e = tw_event_new(lp->gid, kickoff_time, lp);
     m =  (proc_msg*)tw_event_data(e);
     m->proc_event_type = KICKOFF;
     tw_event_send(e);
@@ -901,7 +828,7 @@ static void handle_recv_event(
 #endif
     MsgKey key(m->msgId.pe, m->msgId.id, m->msgId.comm, m->msgId.seq);
     KeyType::iterator it = ns->my_pe->pendingMsgs.find(key);
-    assert((it == ns->my_pe->pendingMsgs.end()) || (it->second.size() != 0));
+    assert((it == ns->my_pe->pendingMsgs.end()) || (!it->second.empty()));
     if(it == ns->my_pe->pendingMsgs.end() || it->second.front() == -1) {
       task_id = -1;
       ns->my_pe->pendingMsgs[key].push_back(task_id);
@@ -911,7 +838,7 @@ static void handle_recv_event(
       b->c3 = 1;
       task_id = it->second.front();
       it->second.pop_front();
-      if(it->second.size() == 0) {
+      if(it->second.empty()) {
         ns->my_pe->pendingMsgs.erase(it);
       }
 #if DEBUG_PRINT
@@ -1088,7 +1015,7 @@ static void handle_bcast_event(
 
   if(!num_sends) num_sends++;
 
-  tw_event*  e = codes_event_new(lp->gid, num_sends * soft_latency + codes_local_latency(lp), lp);
+  tw_event*  e = tw_event_new(lp->gid, num_sends * soft_latency + codes_local_latency(lp), lp);
   proc_msg * msg = (proc_msg*)tw_event_data(e);
   memcpy(&msg->msgId, &m->msgId, sizeof(m->msgId));
   msg->iteration = m->iteration;
@@ -1499,7 +1426,7 @@ static tw_stime exec_task(
     int nWth = PE_get_numWorkThreads(ns->my_pe);  
     int myNode = myPE/nWth;
     tw_stime soft_latency = codes_local_latency(lp);
-    tw_stime delay = soft_latency; //intra node latency
+    tw_stime delay = MPI_INTERNAL_DELAY + soft_latency; //intra node latency
     double sendFinishTime = 0;
 
     for(int i=0; i<msgEntCount; i++){
@@ -2288,7 +2215,7 @@ static void perform_bcast(
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
       &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
       delay, COLL_BCAST, lp);
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
     m->model_net_calls++;
   }
   send_coll_comp(ns, delay, TRACER_COLLECTIVE_BCAST, lp, isEvent, m);
@@ -2428,7 +2355,7 @@ static void perform_reduction(
     int dest = g.members[myParent];
     send_msg(ns, t->myEntry.msgId.size, ns->my_pe->currIter,
         &t->myEntry.msgId,  ns->my_pe->currentCollSeq, pe_to_lpid(dest, ns->my_job),
-        delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0), COLL_REDUCTION, lp);
+        delay+ nic_delay*((t->myEntry.msgId.size>16)?1:0) + MPI_INTERNAL_DELAY, COLL_REDUCTION, lp);
     m->model_net_calls++;
   }
   delay += copyTime;
@@ -2577,7 +2504,7 @@ static void perform_a2a(
         delay, RECV_COLL_POST, lp);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2680,7 +2607,7 @@ static void handle_a2a_send_comp_event(
       ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
     }
     //send to self
-    tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+    tw_event *e = tw_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
@@ -2808,7 +2735,7 @@ static void perform_allgather(
     //}
     enqueue_coll_msg(TRACER_ALLGATHER, ns, t->myEntry.msgId.size, 
         ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
-        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+        dest, delay + nic_delay, copyTime, lp, m, b);
     if(t->myEntry.msgId.size > eager_limit) {
       m->model_net_calls++;
       int saved_pe = t->myEntry.msgId.pe;
@@ -2826,7 +2753,7 @@ static void perform_allgather(
     //  it->first.rank, it->first.comm, it->first.seq);
     //  fflush(stdout);
     //}
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -2925,7 +2852,7 @@ static void handle_allgather_send_comp_event(
       ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
     }
     //send to self
-    tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+    tw_event *e = tw_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
     m_new->msgId.pe = 0;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
@@ -3058,7 +2985,7 @@ static void perform_bruck(
     tw_stime copyTime = copy_per_byte * ns->my_pe->currentCollMsgSize;
     enqueue_coll_msg(TRACER_BRUCK, ns, ns->my_pe->currentCollMsgSize,
         ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
-        dest, delay + nic_delay + soft_delay_mpi, copyTime, lp, m, b);
+        dest, delay + nic_delay, copyTime, lp, m, b);
     if(ns->my_pe->currentCollMsgSize > eager_limit) {
       m->model_net_calls++;
       t->myEntry.msgId.pe = ns->my_pe_num;
@@ -3067,7 +2994,7 @@ static void perform_bruck(
         delay, RECV_COLL_POST, lp, true,  ns->my_pe->currentCollMsgSize);
       t->myEntry.msgId.pe = ns->my_pe->currentCollRank;
     }
-    delay += copyTime;
+    delay += copyTime + MPI_INTERNAL_DELAY;
   } else {
     b->c15 = 1;
     if(ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].size() == 0) {
@@ -3180,7 +3107,7 @@ static void handle_bruck_send_comp_event(
       ns->my_pe->pendingCollMsgs[ns->my_pe->currentCollComm][ns->my_pe->currentCollSeq].erase(partner);
     }
     //send to self
-    tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+    tw_event *e = tw_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
@@ -3307,7 +3234,7 @@ static void perform_a2a_blocked(
       enqueue_coll_msg(TRACER_BLOCKED, ns, t->myEntry.msgId.size, 
           ns->my_pe->currIter, &t->myEntry.msgId,  ns->my_pe->currentCollSeq, 
           dest, delay + nic_delay, copyTime, lp, m, b, true);
-      delay += copyTime;
+      delay += copyTime + MPI_INTERNAL_DELAY;
     }
   } else {
     b->c15 = 1;
@@ -3431,7 +3358,7 @@ static void handle_a2a_blocked_send_comp_event(
   if(ns->my_pe->currentCollRecvCount == ns->my_pe->currentCollPartner) {
     //send to self
     b->c14 = 1;
-    tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+    tw_event *e = tw_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
     proc_msg *m_new = (proc_msg*)tw_event_data(e);
     m_new->msgId.pe = ns->my_pe->currentCollRank;
     m_new->msgId.comm = ns->my_pe->currentCollComm;
@@ -4012,7 +3939,7 @@ static int send_coll_comp(
     if(sendOffset < g_tw_lookahead) {
       sendOffset += g_tw_lookahead;
     }
-    e = codes_event_new(lp->gid, sendOffset + soft_delay_mpi, lp);
+    e = tw_event_new(lp->gid, sendOffset + soft_delay_mpi, lp);
     msg = (proc_msg*)tw_event_data(e);
     msg->msgId.coll_type = collType;
     msg->proc_event_type = COLL_COMPLETE;
@@ -4063,7 +3990,7 @@ static int bcast_msg(
     for(int i = 0; i < numValidChildren; i++) {
       send_msg(ns, size, iter, msgId,  0 /*not used */, 
         pe_to_lpid(myChildren[i], ns->my_job), sendOffset + delay, BCAST, lp);
-      delay += copyTime;
+      delay += copyTime + MPI_INTERNAL_DELAY;
       m->model_net_calls++;
     }
     return numValidChildren;
@@ -4078,14 +4005,14 @@ static int exec_comp(
     int recv,
     tw_lp * lp)
 {
-    //If it's a self event use codes_event_new instead of model_net_event 
+    //If it's a self event use tw_event_new instead of model_net_event 
     tw_event *e;
     proc_msg *m;
 
     if(sendOffset < g_tw_lookahead) {
       sendOffset += g_tw_lookahead;
     }
-    e = codes_event_new(lp->gid, sendOffset, lp);
+    e = tw_event_new(lp->gid, sendOffset, lp);
     m = (proc_msg*)tw_event_data(e);
     m->msgId.size = 0;
     m->msgId.pe = ns->my_pe_num;
@@ -4117,20 +4044,17 @@ static int exec_comp(
 //Assuming the servers come first in lp registration in terms of global id
 static inline int pe_to_lpid(int pe, int job){
     int server_num = jobs[job].rankMap[pe];
-    return (server_num / num_servers_per_rep) * lps_per_rep +
-            (server_num % num_servers_per_rep);
+    return codes_mapping_get_lpid_from_relative(server_num, NULL, "server", NULL, 0);
 }
 
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come first in lp registration in terms of global id
 static inline int lpid_to_pe(int lp_gid){
-    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
-                      (lp_gid % lps_per_rep);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
     return global_rank[server_num].mapsTo;
 }
 static inline int lpid_to_job(int lp_gid){
-    int server_num =  ((int)(lp_gid / lps_per_rep))*(num_servers_per_rep) +
-                      (lp_gid % lps_per_rep);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
     return global_rank[server_num].jobID;;
 }
 static inline int pe_to_job(int pe){
