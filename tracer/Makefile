@@ -20,7 +20,7 @@ TRACER_LDADD = bigsim/CWrapper.o bigsim/TraceReader.o bigsim/otf2_reader.o \
 bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o 
 
 all: traceR
-.PHONY: components
+.PHONY: components install
 
 traceR: tracer-driver.o components
 	${CXX} ${LDFLAGS} $< -o $@ ${TRACER_LDADD} ${LIBS}
@@ -30,6 +30,10 @@ tracer-driver.o: tracer-driver.C tracer-driver.h
 
 components:
 	cd bigsim; make;
+
+install: traceR
+	mkdir -p $(PREFIX)/bin
+	cp traceR $(PREFIX)/bin
 
 clean:
 	rm -rf *.o traceR
