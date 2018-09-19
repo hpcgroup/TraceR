@@ -22,10 +22,13 @@ bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o
 all: traceR
 .PHONY: components
 
-traceR: tracer-driver.o components
-	${CXX} ${LDFLAGS} $< -o $@ ${TRACER_LDADD} ${LIBS}
+SRCS = tracer-driver.C p2p-events.C coll-events.C
+OBJS = ${SRCS:.C=.o}
 
-tracer-driver.o: tracer-driver.C tracer-driver.h
+traceR: ${OBJS} components
+	${CXX} ${LDFLAGS} ${OBJS} -o $@ ${TRACER_LDADD} ${LIBS}
+
+%.o: %.C
 	${CXX} ${CXXFLAGS} -c $< -o $@
 
 components:
