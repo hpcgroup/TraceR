@@ -42,8 +42,8 @@ commonly used collectives using algorithms used in MPICH is supported in this
 trace format: Barrier, Bcast, (All)Reduce, Alltoall(v), and Allgather. In
 contrast, for BigSim traces, the simulation depends on AMPI's implementation.
 
-* Set the appropriate paths: ROSS, BASE_DIR/CODES in tracer/Makefile.common.
-Also set compilers and flags - CC, CXX, SEQ_CXX, CFLAGS, CXXFLAGS, LDFLAGS. 
+* Set the appropriate paths: ROSS_DIR, CODES_DIR in tracer/Makefile.common.
+Also set the compiler - CXX and SEQ_CXX.
 
 If using BigSim format, uncomment SELECT_TRACE = -DTRACER_BIGSIM_TRACES=1,
 otherwise SELECT_TRACE = -DTRACER_OTF_TRACES=1 should be left uncommented (one of
