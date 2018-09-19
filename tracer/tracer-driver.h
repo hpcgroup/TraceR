@@ -17,13 +17,13 @@
 #ifndef _TRACER_DRIVER_H_
 #define _TRACER_DRIVER_H_
 
-#include "bigsim/datatypes.h"
-#include "bigsim/CWrapper.h"
-#include "bigsim/entities/MsgEntry.h"
-#include "bigsim/entities/PE.h"
+#include "reader/datatypes.h"
+#include "reader/CWrapper.h"
+#include "elements/MsgEntry.h"
+#include "elements/PE.h"
 
 #if TRACER_OTF_TRACES
-#include "bigsim/otf2_reader.h"
+#include "reader/otf2_reader.h"
 #endif
 
 #define BCAST_DEGREE  2

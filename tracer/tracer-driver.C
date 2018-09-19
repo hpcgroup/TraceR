@@ -38,12 +38,9 @@ extern "C" {
 
 #include "tracer-driver.h"
 
-typedef struct proc_msg proc_msg;
-typedef struct proc_state proc_state;
+char tracer_input[256]; /* filename for tracer input file */
 
-char tracer_input[256];
-
-CoreInf *global_rank;
+CoreInf *global_rank;   /* core to job ID and process ID */
 JobInf *jobs;
 int default_mapping;
 int total_ranks;
