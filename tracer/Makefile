@@ -22,6 +22,8 @@ bigsim/entities/PE.o bigsim/entities/Task.o bigsim/entities/MsgEntry.o
 all: traceR
 .PHONY: components install
 
+PREFIX = ..
+
 traceR: tracer-driver.o components
 	${CXX} ${LDFLAGS} $< -o $@ ${TRACER_LDADD} ${LIBS}
 
