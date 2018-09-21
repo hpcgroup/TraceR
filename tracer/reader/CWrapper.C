@@ -36,7 +36,6 @@ int MsgEntry_getNode(MsgEntry* m){return m->node;}
 int MsgEntry_getThread(MsgEntry* m){return m->thread;}
 
 //PE
-PE* newPE(){ return new PE(); }
 int PE_get_iter(PE* p) { return p->currIter; }
 void PE_inc_iter(PE* p) { p->currIter++; }
 void PE_dec_iter(PE* p) { p->currIter--; }
