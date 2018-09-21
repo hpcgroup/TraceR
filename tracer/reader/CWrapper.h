@@ -38,7 +38,6 @@ int MsgEntry_getThread(MsgEntry* m);
 
 //PE
 typedef struct PE PE;
-PE* newPE();
 void PE_set_busy(PE* p, bool b);
 bool PE_is_busy(PE* p);
 bool PE_noUnsatDep(PE* p, int, int tInd);
