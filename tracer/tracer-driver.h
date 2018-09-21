@@ -127,171 +127,171 @@ struct Coll_lookup {
 };
 
 /* core info to/from ROSS LP */
-extern int pe_to_lpid(int pe, int job);
-extern int pe_to_job(int pe);
-extern int lpid_to_pe(int lp_gid);
-extern int lpid_to_job(int lp_gid);
+int pe_to_lpid(int pe, int job);
+int pe_to_job(int pe);
+int lpid_to_pe(int lp_gid);
+int lpid_to_job(int lp_gid);
 
 /* change of units for time */
-extern tw_stime ns_to_s(tw_stime ns);
-extern tw_stime s_to_ns(tw_stime ns);
+tw_stime ns_to_s(tw_stime ns);
+tw_stime s_to_ns(tw_stime ns);
 
-extern void proc_init(
+void proc_init(
     proc_state * ns,
     tw_lp * lp);
-extern void proc_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-extern void proc_rev_event(
+void proc_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void proc_finalize(
+void proc_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+void proc_finalize(
     proc_state * ns,
     tw_lp * lp);
 
 //event handler declarations
-extern void handle_kickoff_event(
+void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_local_event(
+void handle_local_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_recv_event(
+void handle_recv_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_bcast_event( /* to be deprecated */
+void handle_bcast_event( /* to be deprecated */
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_exec_event(
+void handle_exec_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_send_comp_event(
+void handle_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_a2a_send_comp_event(
+void handle_a2a_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_allgather_send_comp_event(
+void handle_allgather_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_bruck_send_comp_event(
+void handle_bruck_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_a2a_blocked_send_comp_event(
+void handle_a2a_blocked_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_scatter_send_comp_event(
+void handle_scatter_send_comp_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_recv_post_event(
+void handle_recv_post_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
 
 //reverse event handler declarations
-extern void handle_kickoff_rev_event(
+void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_local_rev_event(
+void handle_local_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-extern void handle_recv_rev_event(
+void handle_recv_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_bcast_rev_event(
+void handle_bcast_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_exec_rev_event(
+void handle_exec_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_send_comp_rev_event(
+void handle_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_a2a_send_comp_rev_event(
+void handle_a2a_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_allgather_send_comp_rev_event(
+void handle_allgather_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_bruck_send_comp_rev_event(
+void handle_bruck_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_a2a_blocked_send_comp_rev_event(
+void handle_a2a_blocked_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_scatter_send_comp_rev_event(
+void handle_scatter_send_comp_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-extern void handle_recv_post_rev_event(
+void handle_recv_post_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
 
-extern tw_stime exec_task(
+tw_stime exec_task(
     proc_state * ns,
     TaskPair task_id,
     tw_lp * lp,
     proc_msg *m,
     tw_bf *b);
 
-extern void exec_task_rev(
+void exec_task_rev(
     proc_state * ns,
     TaskPair task_id,
     tw_lp * lp,
     proc_msg *m,
     tw_bf *b);
 
-extern int send_msg(
+int send_msg(
     proc_state * ns,
     int size,
     int iter,
@@ -304,7 +304,7 @@ extern int send_msg(
     bool fillSz = false,
     int64_t size2 = 0);
 
-extern void enqueue_msg(
+void enqueue_msg(
     proc_state * ns,
     int size,
     int iter,
@@ -316,7 +316,7 @@ extern void enqueue_msg(
     proc_msg *m_local,
     tw_lp * lp);
 
-extern void delegate_send_msg(
+void delegate_send_msg(
     proc_state *ns,
     tw_lp * lp,
     proc_msg * m,
@@ -325,7 +325,7 @@ extern void delegate_send_msg(
     int taskid,
     tw_stime delay);
 
-extern int bcast_msg(
+int bcast_msg(
     proc_state * ns,
     int size,
     int iter,
@@ -335,7 +335,7 @@ extern int bcast_msg(
     tw_lp * lp,
     proc_msg *m);
 
-extern int exec_comp(
+int exec_comp(
     proc_state * ns,
     int iter,
     int task_id,
@@ -344,14 +344,14 @@ extern int exec_comp(
     int recv,
     tw_lp * lp);
 
-extern void perform_collective(
+void perform_collective(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
     proc_msg *m,
     tw_bf * b);
 
-extern void perform_bcast(
+void perform_bcast(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -359,7 +359,7 @@ extern void perform_bcast(
     tw_bf * b,
     int isEvent);
 
-extern void perform_reduction(
+void perform_reduction(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -367,7 +367,7 @@ extern void perform_reduction(
     tw_bf * b,
     int isEvent);
 
-extern void perform_a2a(
+void perform_a2a(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -375,7 +375,7 @@ extern void perform_a2a(
     tw_bf * b,
     int isEvent);
 
-extern void perform_allreduce(
+void perform_allreduce(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -383,7 +383,7 @@ extern void perform_allreduce(
     tw_bf * b,
     int isEvent);
 
-extern void perform_allgather(
+void perform_allgather(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -391,7 +391,7 @@ extern void perform_allgather(
     tw_bf * b,
     int isEvent);
 
-extern void perform_bruck(
+void perform_bruck(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -399,7 +399,7 @@ extern void perform_bruck(
     tw_bf * b,
     int isEvent);
 
-extern void perform_a2a_blocked(
+void perform_a2a_blocked(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -407,7 +407,7 @@ extern void perform_a2a_blocked(
     tw_bf * b,
     int isEvent);
 
-extern void perform_scatter_small(
+void perform_scatter_small(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -415,7 +415,7 @@ extern void perform_scatter_small(
     tw_bf * b,
     int isEvent);
 
-extern void perform_scatter(
+void perform_scatter(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -423,19 +423,19 @@ extern void perform_scatter(
     tw_bf * b,
     int isEvent);
 
-extern void handle_coll_recv_post_event(
+void handle_coll_recv_post_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
 
-extern void handle_coll_complete_event(
+void handle_coll_complete_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
 
-extern int send_coll_comp(
+int send_coll_comp(
     proc_state * ns,
     tw_stime sendOffset,
     int collType,
@@ -443,14 +443,14 @@ extern int send_coll_comp(
     int isEvent,
     proc_msg * m);
 
-extern void perform_collective_rev(
+void perform_collective_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
     proc_msg *m,
     tw_bf * b);
 
-extern void perform_bcast_rev(
+void perform_bcast_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -458,7 +458,7 @@ extern void perform_bcast_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_reduction_rev(
+void perform_reduction_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -466,7 +466,7 @@ extern void perform_reduction_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_a2a_rev(
+void perform_a2a_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -474,7 +474,7 @@ extern void perform_a2a_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_allreduce_rev(
+void perform_allreduce_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -482,7 +482,7 @@ extern void perform_allreduce_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_allgather_rev(
+void perform_allgather_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -490,7 +490,7 @@ extern void perform_allgather_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_bruck_rev(
+void perform_bruck_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -498,7 +498,7 @@ extern void perform_bruck_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_a2a_blocked_rev(
+void perform_a2a_blocked_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -506,7 +506,7 @@ extern void perform_a2a_blocked_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_scatter_small_rev(
+void perform_scatter_small_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -514,7 +514,7 @@ extern void perform_scatter_small_rev(
     tw_bf * b,
     int isEvent);
 
-extern void perform_scatter_rev(
+void perform_scatter_rev(
     proc_state * ns,
     int task_id,
     tw_lp * lp,
@@ -522,19 +522,19 @@ extern void perform_scatter_rev(
     tw_bf * b,
     int isEvent);
 
-extern void handle_coll_recv_post_rev_event(
+void handle_coll_recv_post_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
 
-extern void handle_coll_complete_rev_event(
+void handle_coll_complete_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
 
-extern int send_coll_comp_rev(
+int send_coll_comp_rev(
     proc_state * ns,
     tw_stime sendOffset,
     int collType,
