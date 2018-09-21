@@ -76,7 +76,7 @@ tw_lptype proc_lp = {
      sizeof(proc_state),
 };
 
-extern const tw_lptype* proc_get_lp_type();
+const tw_lptype* proc_get_lp_type();
 static void proc_add_lp_type();
 
 static char lp_io_dir[256] = {'\0'};
