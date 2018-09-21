@@ -45,7 +45,6 @@ JobInf *jobs;
 int default_mapping;
 int total_ranks;
 tw_stime *jobTimes;
-tw_stime *finalizeTimes;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 100;
 tw_stime nic_delay = 400;
@@ -101,12 +100,14 @@ int main(int argc, char **argv)
     int nprocs;
     int num_nets;
     int *net_ids;
-    //printf("\n Config count %d ",(int) config.lpgroups_count);
-    g_tw_ts_end = s_to_ns(60*60); /* one hour, in nsecs */
+
+    /* upper bound on virtual end time when ROSS will stop the simulation, one
+     * hour */
+    g_tw_ts_end = s_to_ns(60*60);
     lp_io_handle handle;
 
-    tw_opt_add(app_opt);
-    g_tw_lookahead = 0.1;
+    tw_opt_add(app_opt);    /* adding TraceR options to ROSS */
+    g_tw_lookahead = 0.1;   /* default lookahead */
     tw_init(&argc, &argv);
 
     signal(SIGTERM, term_handler);
@@ -117,9 +118,7 @@ int main(int argc, char **argv)
     if(argc < 2 && rank == 0)
     {
       printf("\nUSAGE: \n");
-      printf("\tSequential: modelnet-test-bigsim --sync=1 -- mapping_file_name.conf (optional --nkp)\n");
-      printf("\tParallel Conservative: mpirun <args> modelnet-test-bigsim --sync=2 -- mapping_file_name.conf (optional --nkp)\n");
-      printf("\tParallel Optimistic: mpirun <args> modelnet-test-bigsim --sync=3 -- mapping_file_name.conf (optional --nkp)\n\n");
+      printf("\tmpirun -n <arg> ./TraceR --sync=3 --nkp=16 --extramem=100000 --max-opt-lookahead=1000000 --timer-frequency=1000 -- <net.conf> <tracer.conf>\n\n");
       assert(0);
     }
 
@@ -132,53 +131,55 @@ int main(int argc, char **argv)
 
     configuration_load(argv[1], MPI_COMM_WORLD, &config);
 
+    /* register CODES' LPs */
     model_net_register();
 
     net_ids=model_net_configure(&num_nets);
     net_id = net_ids[0];
     free(net_ids);
 
+    /* register the server LP */
     proc_add_lp_type();
-    
+
+    /* specify LP mapping to ROSS */
     codes_mapping_setup();
     
     num_servers = codes_mapping_get_lp_count("MODELNET_GRP", 0, "server", 
-            NULL, 1);
+            NULL, 1); /* total number of cores in the system */
 
     configuration_get_value_double(&config, "PARAMS", "soft_delay", NULL,
-        &soft_delay_mpi);
+        &soft_delay_mpi); /* overhead of calling an MPI routine (ns) */
     if(!rank) 
       printf("Found soft_delay as %f\n", soft_delay_mpi);
     
     configuration_get_value_double(&config, "PARAMS", "nic_delay", NULL,
-        &nic_delay);
+        &nic_delay);    /* overhead of making a NIC invocation (ns) */
     if(!rank) 
       printf("Found nic_delay as %f\n", nic_delay);
     
     configuration_get_value_double(&config, "PARAMS", "rdma_delay", NULL,
-        &rdma_delay);
+        &rdma_delay);   /* overhead of making an RDMA call (ns) */
     if(!rank) 
       printf("Found rdma_delay as %f\n", rdma_delay);
     
     configuration_get_value_double(&config, "PARAMS", "copy_per_byte", NULL,
-        &copy_per_byte);
-
+        &copy_per_byte);    /* per byte copying cost in memory (ns) */
     if(!rank) 
       printf("Copy cost per byte is %f ns\n", copy_per_byte);
 
     configuration_get_value_int(&config, "PARAMS", "dump_topo", NULL,
-        &dump_topo_only);
-
+        &dump_topo_only);   /* fake run to dump topology */
     if(!rank && dump_topo_only) 
       printf("Run to dump topology only\n");
 
     configuration_get_value_double(&config, "PARAMS", "eager_limit", NULL,
-        &eager_limit);
-
+        &eager_limit);      /* message size threshold for switch from eager to
+                               rendezvous */
     if(!rank) 
       printf("Eager limit is %f bytes\n", eager_limit);
 
     int ret;
+    /* set up the output directory */
     if(lp_io_dir[0]) {
       ret = lp_io_prepare(lp_io_dir, 0, &handle, MPI_COMM_WORLD);
     } else {
@@ -195,6 +196,7 @@ int main(int argc, char **argv)
       MPI_Abort(MPI_COMM_WORLD, 1);
     }
     char globalIn[256];
+    /* global mapping file */
     fscanf(jobIn, "%s", globalIn);
 
     global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
@@ -204,6 +206,7 @@ int main(int argc, char **argv)
         global_rank[i].jobID = -1;
     }
 
+    /* read in the mapping file and populating global_rank */
     if(dump_topo_only || strcmp("NA", globalIn) == 0) {
       if(!rank) printf("Using default linear mapping of jobs\n");
       default_mapping = 1;
@@ -232,12 +235,12 @@ int main(int argc, char **argv)
       MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
-    fscanf(jobIn, "%d", &num_jobs);
+    fscanf(jobIn, "%d", &num_jobs);    /* number of jobs */
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
-    finalizeTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
 
+    /* read per job information */
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
         char tempTrace[200];
@@ -247,13 +250,12 @@ int main(int argc, char **argv)
         fscanf(jobIn, "%s", jobs[i].traceDir);
 #endif
         fscanf(jobIn, "%s", jobs[i].map_file);
-        fscanf(jobIn, "%d", &jobs[i].numRanks);
-        fscanf(jobIn, "%d", &jobs[i].numIters);
+        fscanf(jobIn, "%d", &jobs[i].numRanks); /* number of processes */
+        fscanf(jobIn, "%d", &jobs[i].numIters); /* number of repetitions */
         total_ranks += jobs[i].numRanks;
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
-        finalizeTimes[i] = 0;
         if(!rank) {
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
@@ -280,6 +282,7 @@ int main(int argc, char **argv)
     char next = ' ';
     fscanf(jobIn, "%c", &next);
     while(next != ' ') {
+      /* replace all messages of size greater than x */
       if(next == 'M' || next == 'm') {
         int size_limit, size_by, jobid;
         fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by);
@@ -289,6 +292,7 @@ int main(int argc, char **argv)
           printf("Will replace all messages of size greater than %d by %d for job %d\n", 
               size_replace_limit[jobid], size_replace_by[jobid], jobid);
       }
+      /* replace all messages of size = x */
       if(next == 'S' || next == 's') {
         int size_value, size_by, jobid;
         fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by);
@@ -297,12 +301,14 @@ int main(int argc, char **argv)
           printf("Will replace all messages of size %d by %d for job %d\n",
               size_value, size_by, jobid);
       }
+      /* replace all compute tasks with exec time greater x */
       if(next == 'T' || next == 't') {
         fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
         if(!rank)
           printf("Will replace all methods with exec time greater than %lf by %lf\n", 
               time_replace_limit, time_replace_by);
       }
+      /* replace time of specific named region/event */
       if(next == 'E' || next == 'e') {
         double etime;
         int jobid;
@@ -380,7 +386,8 @@ int main(int argc, char **argv)
     }
 #endif
 
-
+    /* Pass control to ROSS to initiate simulation, ROSS calls proc_init
+     * eventually */
     tw_run();
 
     if(lp_io_flush(handle, MPI_COMM_WORLD) < 0)
@@ -398,13 +405,6 @@ int main(int argc, char **argv)
         }
     }
     
-    MPI_Reduce(finalizeTimes, jobTimesMax, num_jobs, MPI_DOUBLE, MPI_MAX, 0,
-    MPI_COMM_WORLD);
-    if(rank == 0) {
-        for(int i = 0; i < num_jobs; i++) {
-            printf("Job %d Finalize Time %f s\n", i, ns_to_s(jobTimesMax[i]));
-        }
-    }
     model_net_report_stats(net_id);
     tw_end();
     return 0;
@@ -420,6 +420,8 @@ static void proc_add_lp_type()
     lp_type_register("server", proc_get_lp_type());
 }
 
+/* function used by ROSS to initialize server LPs/PEs/cores -- this is the
+ * first function invoked in tw_run() */
 static void proc_init(
     proc_state * ns,
     tw_lp * lp) {
@@ -431,7 +433,6 @@ static void proc_init(
 
     if(dump_topo_only) return;
 
-    //Each server read it's trace
     ns->sim_start = clock();
     ns->my_pe_num = lpid_to_pe(lp->gid);
     ns->my_job = lpid_to_job(lp->gid);
@@ -440,8 +441,10 @@ static void proc_init(
         return;
     }
 
-    ns->my_pe = newPE();
+    /* allocate memory for storing information related to a core */
+    ns->my_pe = new PE();
     tw_stime startTime=0;
+    // Each server reads it's full trace
 #if TRACER_BIGSIM_TRACES
     ns->trace_reader = newTraceReader(jobs[ns->my_job].traceDir);
     int tot=0, totn=0, emPes=0, nwth=0;
@@ -457,6 +460,7 @@ static void proc_init(
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
     ns->end_ts = 0;
+    /* maintain message sequencing for MPI */
     ns->my_pe->sendSeq = new int64_t[jobs[ns->my_job].numRanks];
     ns->my_pe->recvSeq = new int64_t[jobs[ns->my_job].numRanks];
     for(int i = 0; i < jobs[ns->my_job].numRanks; i++) {
@@ -466,11 +470,14 @@ static void proc_init(
     e = tw_event_new(lp->gid, kickoff_time, lp);
     m =  (proc_msg*)tw_event_data(e);
     m->proc_event_type = KICKOFF;
+    /* enqueue KICKOFF event with ROSS */
     tw_event_send(e);
 
     return;
 }
 
+/* handle different kinds of event for this core: events are only triggered
+ * after all cores have been initialized (proc_init) */
 static void proc_event(
     proc_state * ns,
     tw_bf * b,
@@ -554,6 +561,7 @@ static void proc_event(
   }
 }
 
+/* reverse handlers for different kinds of event for this core */
 static void proc_rev_event(
     proc_state * ns,
     tw_bf * b,
@@ -635,6 +643,8 @@ static void proc_rev_event(
   return;
 }
 
+/* ROSS calls this once all events have been processed for all cores and
+ * quiescence has been detected */
 static void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
@@ -684,9 +694,6 @@ static void proc_finalize(
 
     if(jobTime > jobTimes[ns->my_job]) {
         jobTimes[ns->my_job] = jobTime;
-    }
-    if(finalTime > finalizeTimes[ns->my_job]) {
-        finalizeTimes[ns->my_job] = finalTime;
     }
 
     return;
