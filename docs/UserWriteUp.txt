@@ -80,7 +80,7 @@ Create a new folder and move all bgTrace to that folder.
 6) Simulation. To run simulation, 2 files are needed: a tracer config file, 
 and a codes config file. Optionally, mapping files can also be provided.
 
-Tracer config file: sample found at tracer/jacobi2d/tracer_config (BigSim) or tracer/stencil4d-otf/tracer_config (OTF) Format (expected content on each line of the file):
+Tracer config file: sample found at examples/jacobi2d-bigsim/tracer_config (BigSim) or examples/stencil4d-otf/tracer_config (OTF) Format (expected content on each line of the file):
 <global_map file>
 <num jobs>
 <Trace path for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
@@ -90,10 +90,10 @@ Tracer config file: sample found at tracer/jacobi2d/tracer_config (BigSim) or tr
 If <global_map file> is not needed, use NA for it and <map file for job*>.
 For generating simple global and job map file, use the code in utils.
 
-CODES config files: samples in tracer/conf 
+CODES config files: samples in examples/conf 
 
 Additional documentation on format of the CODES config file can be found in the
-CODES distribution at: CODES/src/networks/model-net/doc
+CODES wiki at https://xgitlab.cels.anl.gov/codes/codes/wikis/home
 
 Brief summary follows:
 

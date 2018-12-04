@@ -19,9 +19,7 @@ Latest verified commit: 53b7fcabcb9b8c015b1f17e3ce1a94298b06920d
 Website: https://xgitlab.cels.anl.gov/codes/codes
 git clone https://xgitlab.cels.anl.gov/codes/codes.git
 ```
-Latest verfied commit (from master): 8f56c9608eb07922971242d76bae88ad0c7aa789
-
-Pending pull request (with new features): https://xgitlab.cels.anl.gov/codes/codes/merge_requests/21
+Latest verfied commit (from master): f28191b7c11bb0a64b6e803587a00de17fee4784
 
 * Trace format choice (pick one of the following): 
 
@@ -35,7 +33,7 @@ Use "charm++" as target for compiling TraceR.
 Use "bgampi" as target for buidling AMPI used for collecting traces.
 In both of cases above, pass "bigemulator" as a build option.
 
-2) OTF2: download and build scoreP for OTF2 support.
+2) OTF2: download and build scoreP for OTF2 support. (preferred)
 
 Refer to README.OTF2 file in this directory. Simulation of the following most
 commonly used collectives using algorithms used in MPICH is supported in this
@@ -73,11 +71,11 @@ For generating  global and job map file, please refer to README inside
 utils for the format and sample map generation code.
 
 More information on workflow of TraceR and network config files can be found at
-docs/UserWriteUp.txt and in CODES:codes/src/networks/model-net/doc
+docs/UserWriteUp.txt and https://xgitlab.cels.anl.gov/codes/codes/wikis/home.
 
-Example files for BigSim are in tracer/jacobi2d, while for OTF2 are in tracer/stencil4d-otf. Sample run command:
+Example files for BigSim are in examples/jacobi2d-bigsim, while for OTF2 are in examples/stencil4d-otf. Sample run command:
 ```
-mpirun -np 8 ../traceR --sync=3 --nkp=16 --extramem=100000 --max-opt-lookahead=1000000 --timer-frequency=1000 -- ../conf/tracer-torus.conf tracer_config
+mpirun -np 8 ../../tracer/traceR --sync=3 --nkp=16 --extramem=100000 --max-opt-lookahead=1000000 --timer-frequency=1000 -- ../conf/fattree.conf ./tracer_config
 ```
 
 Parameters:   
