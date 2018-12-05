@@ -1,4 +1,4 @@
-TraceR v2.1
+TraceR v2.2
 ===========
 
 TraceR is a trace replay tool built upon the ROSS-based CODES simulation
