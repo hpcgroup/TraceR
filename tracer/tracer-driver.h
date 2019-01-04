@@ -136,30 +136,30 @@ int lpid_to_job(int lp_gid);
 tw_stime ns_to_s(tw_stime ns);
 tw_stime s_to_ns(tw_stime ns);
 
-void proc_init(
+static void proc_init(
     proc_state * ns,
     tw_lp * lp);
-void proc_event(
-    proc_state * ns,
-    tw_bf * b,
-    proc_msg * m,
-    tw_lp * lp);
-void proc_rev_event(
+static void proc_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-void proc_finalize(
+static void proc_rev_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
+static void proc_finalize(
     proc_state * ns,
     tw_lp * lp);
 
 //event handler declarations
-void handle_kickoff_event(
+static void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-void handle_local_event(
+static void handle_local_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -174,7 +174,7 @@ void handle_bcast_event( /* to be deprecated */
     tw_bf * b,
     proc_msg * m,
    tw_lp * lp);
-void handle_exec_event(
+static void handle_exec_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -216,12 +216,12 @@ void handle_recv_post_event(
    tw_lp * lp);
 
 //reverse event handler declarations
-void handle_kickoff_rev_event(
+static void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-void handle_local_rev_event(
+static void handle_local_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -236,7 +236,7 @@ void handle_bcast_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
-void handle_exec_rev_event(
+static void handle_exec_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
