@@ -24,7 +24,7 @@ all: traceR
 
 PREFIX = ..
 
-SRCS = tracer-driver.C p2p-events.C coll-events.C
+SRCS = p2p-events.C coll-events.C tracer-driver.C
 OBJS = ${SRCS:.C=.o}
 
 traceR: ${OBJS} components
