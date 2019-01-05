@@ -422,7 +422,7 @@ static void proc_add_lp_type()
 
 /* function used by ROSS to initialize server LPs/PEs/cores -- this is the
  * first function invoked in tw_run() */
-static void proc_init(
+void proc_init(
     proc_state * ns,
     tw_lp * lp) {
     tw_event *e;
@@ -478,7 +478,7 @@ static void proc_init(
 
 /* handle different kinds of event for this core: events are only triggered
  * after all cores have been initialized (proc_init) */
-static void proc_event(
+void proc_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -562,7 +562,7 @@ static void proc_event(
 }
 
 /* reverse handlers for different kinds of event for this core */
-static void proc_rev_event(
+void proc_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -645,7 +645,7 @@ static void proc_rev_event(
 
 /* ROSS calls this once all events have been processed for all cores and
  * quiescence has been detected */
-static void proc_finalize(
+void proc_finalize(
     proc_state * ns,
     tw_lp * lp)
 {
@@ -712,7 +712,7 @@ tw_stime s_to_ns(tw_stime s)
 }
 
 /* handle initial event */
-static void handle_kickoff_event(
+void handle_kickoff_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -740,7 +740,7 @@ static void handle_kickoff_event(
 }
 
 /* reverse handler for kickoff */
-static void handle_kickoff_rev_event(
+void handle_kickoff_rev_event(
     proc_state * ns,
     tw_bf * b,
     proc_msg * m,
@@ -757,14 +757,14 @@ static void handle_kickoff_rev_event(
     return;
 }
 
-static void handle_local_event(
+void handle_local_event(
 		proc_state * ns,
 		tw_bf * b,
 		proc_msg * m,
 		tw_lp * lp)
 { }
 
-static void handle_local_rev_event(
+void handle_local_rev_event(
 	       proc_state * ns,
 	       tw_bf * b,
 	       proc_msg * m,
@@ -772,7 +772,7 @@ static void handle_local_rev_event(
 { }
 
 
-static void handle_exec_event(
+void handle_exec_event(
 		proc_state * ns,
 		tw_bf * b,
 		proc_msg * m,
@@ -849,7 +849,7 @@ static void handle_exec_event(
     }
 }
 
-static void handle_exec_rev_event(
+void handle_exec_rev_event(
 		proc_state * ns,
 		tw_bf * b,
 		proc_msg * m,
