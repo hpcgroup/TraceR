@@ -18,6 +18,7 @@ Computing applications on interconnection networks.
    install
    userguide
    tutorial
+   api/doxygen
 
 
 Indices and tables
