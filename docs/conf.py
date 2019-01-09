@@ -49,13 +49,13 @@ extensions = [
 ]
 
 # Configure Breathe and Exhale tools for Doxygen integration in Sphinx
-breathe_projects = { project : './doxygen/xml' }
+breathe_projects = { project : './_build/doxygen/xml' }
 breathe_default_project = project
 import textwrap
 exhale_args = {
-        'containmentFolder' : './api',
+        'containmentFolder' : './autogen',
         'rootFileName' : 'doxygen.rst',
-        'rootFileTitle' : 'Internal API',
+        'rootFileTitle' : 'Source Code Documentation',
         'doxygenStripFromPath' : '..',
         'createTreeView' : True,
         'exhaleExecutesDoxygen' : True,
