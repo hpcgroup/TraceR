@@ -32,8 +32,8 @@ ROSS_DIR = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/ross-7.0.0
 
 # CODES install directory
 CODES_DIR  = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/codes-1.0.0
-CODES_LIBS = -L${CODES_DIR}/lib -Wl,-rpath=${CODES_DIR}/lib
-CODES_LIBS += -L${ROSS_DIR}/lib -Wl,-rpath=${ROSS_DIR}/lib
+CODES_LIBS = -L${CODES_DIR}/lib -Wl,-rpath,${CODES_DIR}/lib
+CODES_LIBS += -L${ROSS_DIR}/lib -Wl,-rpath,${ROSS_DIR}/lib
 CODES_LIBS += -lcodes -lROSS -lm
 
 CODES_CXXFLAGS = -I${CODES_DIR}/include -I${ROSS_DIR}/include
