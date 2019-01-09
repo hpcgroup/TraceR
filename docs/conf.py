@@ -44,7 +44,26 @@ extensions = [
     'sphinx.ext.imgmath',
     'sphinx.ext.viewcode',
     'sphinx.ext.githubpages',
+    'breathe',
+    'exhale',
 ]
+
+# Configure Breathe and Exhale tools for Doxygen integration in Sphinx
+breathe_projects = { project : './_build/doxygen/xml' }
+breathe_default_project = project
+import textwrap
+exhale_args = {
+        'containmentFolder' : './autogen',
+        'rootFileName' : 'doxygen.rst',
+        'rootFileTitle' : 'Source Code Documentation',
+        'doxygenStripFromPath' : '..',
+        'createTreeView' : True,
+        'exhaleExecutesDoxygen' : True,
+        'exhaleDoxygenStdin' : textwrap.dedent(''' 
+            INPUT = ../tracer
+            EXCLUDE_PATTERNS = *.d
+        ''')
+}
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

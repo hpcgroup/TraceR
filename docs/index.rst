@@ -18,6 +18,7 @@ Computing applications on interconnection networks.
    install
    userguide
    tutorial
+   autogen/doxygen
 
 
 Indices and tables
