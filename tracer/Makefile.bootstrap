@@ -1,0 +1,33 @@
+#
+# This bootstrap Makefile clones and builds ROSS 
+# and CODES libraries, then builds TraceR
+#
+# Input: ARCH, CC, CXX variables
+# Defaults to x86_64 and typical compilers for MPI 
+# builds. Change to match your target platform
+# 
+
+ARCH = x86_64
+CC = mpicc
+CXX = mpicxx
+
+all:
+	mkdir -p .repos .local
+	git clone -b master --single-branch https://github.com/carothersc/ROSS .repos/ROSS || git -C .repos/ROSS clean -fx && git -C .repos/ROSS pull
+	cd .repos/ROSS && \
+		git checkout 17e9d7b455be32fc2b085f38d9a5b3cc30c37101 && \
+		ARCH=$(ARCH) CC=$(CC) CXX=$(CXX) cmake -DCMAKE_INSTALL_PREFIX=../../.local && \
+		make install
+	git clone -b master --single-branch https://xgitlab.cels.anl.gov/codes/codes.git .repos/codes || git -C .repos/codes clean -fx && git -C .repos/codes pull
+	cd .repos/codes && \
+		git checkout f28191b7c11bb0a64b6e803587a00de17fee4784 && \
+		./prepare.sh && \
+		./configure --prefix="$(PWD)"/.local CC=$(CC) CXX=$(CXX) PKG_CONFIG_PATH="$(PWD)"/.local/lib/pkgconfig && \
+		make install
+	make ROSS_DIR="$(PWD)"/.local CODES_DIR="$(PWD)"/.local -f Makefile all
+	@echo "\nAll done. Enjoy!\n"
+
+.PHONY: clean
+clean:
+	rm -rf .repos .local
+	make -f Makefile clean
