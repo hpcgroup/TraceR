@@ -1,6 +1,8 @@
 TraceR v2.2
 ===========
 
+[![Read the Docs](http://readthedocs.org/projects/tracer-codes/badge/?version=latest)](http://tracer-codes.readthedocs.io)
+
 TraceR is a trace replay tool built upon the ROSS-based CODES simulation
 framework. TraceR can be used for predicting network performance and
 understanding network behavior by simulating messaging in High Performance
@@ -118,3 +120,5 @@ LLNL-CODE-740483. All rights reserved.
 This file is part of TraceR. For details, see:
 https://github.com/LLNL/TraceR.
 Please also read the LICENSE file for the MIT License notice.
+
+SPDX-License-Identifier: MIT
