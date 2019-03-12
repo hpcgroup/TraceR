@@ -847,6 +847,10 @@ void handle_exec_event(
     if(buffd_task.taskid != -1){
         exec_task(ns, buffd_task, lp, m, b); //we don't care about the return value?
     }
+    // no more tasks, so record job end time
+    else {
+        ns->end_ts = tw_now(lp);
+    }
 }
 
 void handle_exec_rev_event(
