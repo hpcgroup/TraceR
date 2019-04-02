@@ -340,6 +340,9 @@ tw_stime exec_task(
       b->c10 = 1;
       return 0;
     }
+#if SST_VALIDATION
+    char args[256] = "";
+#endif
     //Check if the backward dependencies are satisfied
     //If not, do nothing yet
     //If yes, execute the task
@@ -677,6 +680,19 @@ tw_stime exec_task(
     //print event
     if(t->event_id >= 0) {
       char str[1000];
+#if SST_VALIDATION
+      sprintf(str, "SST %s:%d %d T=%14.8f s:MPI Rank %3u: %s(%s) %s\n",
+              __FILE__,
+              __LINE__,
+              t->event_id,
+              tw_now(lp) / (double) TIME_MULT,
+              ns->my_pe_num,
+              jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
+              args,
+              ( t->beginEvent ? "start" : ( t->endEvent ? "finished" : "" ) )
+             );
+      tw_output( lp, str );
+#else
       if(t->beginEvent) {
         strcpy(str, "[ %d %d : Begin %s %f ]\n");
       } else {
@@ -685,6 +701,7 @@ tw_stime exec_task(
       tw_output(lp, str, ns->my_job, ns->my_pe_num, 
           jobs[ns->my_job].allData->strings[jobs[ns->my_job].allData->regions[t->event_id].name].c_str(),
           tw_now(lp)/((double)TIME_MULT));
+#endif
     }
 
     if(t->loopStartEvent) {

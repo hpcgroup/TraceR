@@ -133,11 +133,15 @@ callbackDefRegion(void * userData,
   new_r.name = name;
   new_r.role = regionRole;
   new_r.paradigm = paradigm;
+#if SST_VALIDATION
+  new_r.isTracerPrintEvt = true;
+#else
   if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_WallTime", 15) == 0) {
     new_r.isTracerPrintEvt = true;
   } else {
     new_r.isTracerPrintEvt = false;
   }
+#endif
   if(strncmp(((AllData*)userData)->strings[name].c_str(), "TRACER_Loop", 11) == 0) {
     new_r.isLoopEvt = true;
   } else {
@@ -231,6 +235,7 @@ callbackEvtEnd( OTF2_LocationRef    location,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = region;
+    new_task.endEvent = true;
   }
   if(globalData->regions[region].isLoopEvt) {
     ld->tasks.push_back(Task());
