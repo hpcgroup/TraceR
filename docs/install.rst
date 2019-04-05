@@ -13,8 +13,7 @@ Build
 
 There are several ways to build TraceR.
 
-1. Use `spack <https://github.com/spack/spack>`_ to build TraceR and its
-dependencies::
+1. Use `spack <https://github.com/spack/spack>`_ to build TraceR and its dependencies::
 
     spack install tracer
 
