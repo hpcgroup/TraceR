@@ -37,11 +37,13 @@ extern "C" {
 }
 
 #include "tracer-driver.h"
+#include "qos-manager.h"
 
 char tracer_input[256]; /* filename for tracer input file */
 
 CoreInf *global_rank;   /* core to job ID and process ID */
 JobInf *jobs;
+QoSManager qosManager(0);
 int default_mapping;
 int total_ranks;
 tw_stime *jobTimes;
@@ -179,6 +181,14 @@ int main(int argc, char **argv)
       printf("Eager limit is %f bytes\n", eager_limit);
 
     int ret;
+    int default_sl;
+    ret = configuration_get_value_int(&config, "PARAMS", "default_sl", NULL,
+        &default_sl);
+    if (ret == 0) {
+      qosManager.setDefaultServiceLevel(default_sl);
+      printf("Default service level is %d\n", default_sl);
+    }
+
     /* set up the output directory */
     if(lp_io_dir[0]) {
       ret = lp_io_prepare(lp_io_dir, 0, &handle, MPI_COMM_WORLD);
@@ -241,24 +251,43 @@ int main(int argc, char **argv)
     total_ranks = 0;
 
     /* read per job information */
+    #define LINE_SIZE 1024
+    char line[LINE_SIZE];
+    fgets(line, LINE_SIZE, jobIn); // Eat everything to the next newline
     for(int i = 0; i < num_jobs; i++) {
+        fgets(line, LINE_SIZE, jobIn);
+        FILE * lineStream = fmemopen(line, strlen(line), "r");
 #if TRACER_BIGSIM_TRACES
         char tempTrace[200];
-        fscanf(jobIn, "%s", tempTrace);
+        fscanf(lineStream, "%s", tempTrace);
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
 #else
-        fscanf(jobIn, "%s", jobs[i].traceDir);
+        fscanf(lineStream, "%s", jobs[i].traceDir);
 #endif
-        fscanf(jobIn, "%s", jobs[i].map_file);
-        fscanf(jobIn, "%d", &jobs[i].numRanks); /* number of processes */
-        fscanf(jobIn, "%d", &jobs[i].numIters); /* number of repetitions */
+        fscanf(lineStream, "%s", jobs[i].map_file);
+        fscanf(lineStream, "%d", &jobs[i].numRanks); /* number of processes */
+        fscanf(lineStream, "%d", &jobs[i].numIters); /* number of repetitions */
+
+        // See if there is a QoS file
+        char qosFile[LINE_SIZE] = "";
+        if (fscanf(lineStream, "%s", qosFile) == 1) {
+          if(!qosManager.readQoSFileForJob(i, qosFile)) {
+            // The QoS Manager already printed an error message, so just quit
+            MPI_Abort(MPI_COMM_WORLD, 1);
+          }
+        }
+
         total_ranks += jobs[i].numRanks;
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
         jobTimes[i] = 0;
         if(!rank) {
-          printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
+          printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
+          if(qosFile[0] != '\0') {
+            printf(", QoS file %s", qosFile);
+          }
+          printf("\n");
         }
     }
 
@@ -322,6 +351,7 @@ int main(int argc, char **argv)
       next = ' ';
       fscanf(jobIn, "%c", &next);
     }
+    fclose(jobIn);
 
     int ranks_till_now = 0;
     for(int i = 0; i < num_jobs && !dump_topo_only; i++) {

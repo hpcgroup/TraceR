@@ -8,6 +8,7 @@
 
 extern "C" {
 #include "codes/model-net.h"
+#include "codes/model-net-sched.h"
 #include "codes/lp-io.h"
 #include "codes/codes.h"
 #include "codes/codes_mapping.h"
@@ -16,6 +17,9 @@ extern "C" {
 }
 
 #include "tracer-driver.h"
+#include "qos-manager.h"
+
+extern QoSManager qosManager;
 
 // the indexing should match between the #define and the lookUpTable
 #define TRACER_A2A 0
@@ -155,6 +159,8 @@ void enqueue_coll_msg(
       m_local.proc_event_type = lookUpTable[index].local_event;
       m_local.executed.taskid = ns->my_pe->currentCollTask;
 
+      int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), dest);
+      model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
       model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
           sendOffset + copyTime*(isEager?1:0), sizeof(proc_msg), 
           (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);
@@ -241,6 +247,8 @@ void handle_coll_recv_post_event(
       size = m->msgId.size;
       m_remote.msgId.size = size;
     }
+    int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), m->msgId.pe);
+    model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
     model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_job), 
         size, nic_delay, sizeof(proc_msg), 
         (const void*)&m_remote, sizeof(proc_msg), &m_local, lp);

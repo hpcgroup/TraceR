@@ -8,6 +8,7 @@
 
 extern "C" {
 #include "codes/model-net.h"
+#include "codes/model-net-sched.h"
 #include "codes/lp-io.h"
 #include "codes/codes.h"
 #include "codes/codes_mapping.h"
@@ -16,6 +17,9 @@ extern "C" {
 }
 
 #include "tracer-driver.h"
+#include "qos-manager.h"
+
+extern QoSManager qosManager;
 
 void handle_recv_event(
     proc_state * ns,
@@ -841,6 +845,8 @@ int send_msg(
 #endif
         m_remote.iteration = iter;
 
+        int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), lpid_to_pe(dest_id));
+        model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
         /*   model_net_event params:
              int net_id, char* category, tw_lpid final_dest_lp,
              uint64_t message_size, tw_stime offset, int remote_event_size,
@@ -877,6 +883,8 @@ void enqueue_msg(
 #endif
         m_remote.iteration = iter;
 
+        int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), lpid_to_pe(dest_id));
+        model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
         model_net_event(net_id, "p2p", dest_id, size, sendOffset,
           sizeof(proc_msg), (const void*)&m_remote, sizeof(proc_msg), m_local, 
           lp);
