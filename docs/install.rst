@@ -40,8 +40,7 @@ Trace Formats
 TraceR supports two different trace formats as input. For each format, you need to build additional software as explained below.
 
 1. Score-P's OTF2 format (default): To use OTF2 traces, you need to download and build the `OTF2 <http://www.vi-hps.org/projects/score-p>`_ library.
-2. AMPI-based BigSim format: To use BigSim traces as input to TraceR, you need
-to download and build `Charm++ <https://github.com/UIUC-PPL/charm>`_.
+2. AMPI-based BigSim format: To use BigSim traces as input to TraceR, you need to download and build `Charm++ <https://github.com/UIUC-PPL/charm>`_.
 
 The instructions to build Charm++ are in the `Charm++ manual
 <http://charm.cs.illinois.edu/manuals/html/charm++/A.html>`_. You should use
