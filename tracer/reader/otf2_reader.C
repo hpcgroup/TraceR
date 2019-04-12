@@ -488,6 +488,7 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
 
   // Return without processing for MPI_COMM_SELF groups
   if( OTF2_GROUP_TYPE_COMM_SELF == group.type ) {
+      ld->lastLogTime = time;
       return OTF2_CALLBACK_SUCCESS;
   }
 
