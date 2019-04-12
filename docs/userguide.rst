@@ -128,12 +128,13 @@ for more detail). Use any one of the following commands:
 
     ./build bgampi mpi-linux-x86_64 bigemulator --with-production --enable-tracing
 
-Note that this build is used to compile MPI applications so that traces can be
-generated. Hence, the communication layer used by BigSim/Charm++ is not
-important. During simulation, the communication will be replayed using the
-network simulator from CODES. However, the computation time captured here can be
-important if it is not being explicitly replaced at simulation time using
-configuration options. So using appropriate compiler flags is important.
+.. note::
+   This build is used to compile MPI applications so that traces can be
+   generated. Hence, the communication layer used by BigSim/Charm++ is not
+   important. During simulation, the communication will be replayed using the
+   network simulator from CODES. However, the computation time captured here can be
+   important if it is not being explicitly replaced at simulation time using
+   configuration options. So using appropriate compiler flags is important.
 
 Quick start
 """""""""""
