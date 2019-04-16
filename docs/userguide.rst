@@ -13,6 +13,7 @@ optimistic mode::
     mpirun -np <p> ../traceR --sync=3  -- <network_config> <tracer_config>
 
 Some useful options to use with TraceR:
+
 --sync                 ROSS's PDES type. 1 - sequential, 2 - conservative, 3 - optimistic
 --nkp                  number of groups used for clustering LPs; recommended value for lower rollbacks: (total #LPs)/(#MPI processes)
 --extramem             number of messages in ROSS's extra message buffer (each message is ~500 bytes, 100K should work for most cases)
@@ -118,6 +119,8 @@ Network specific parameters::
 
 Creating the job placement file
 -------------------------------
+
+See the README in utils for instructions on using the tools to generate the global and job mapping files.
 
 Generating Traces
 -----------------
