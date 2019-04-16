@@ -19,8 +19,8 @@ Some useful options to use with TraceR:
 --max-opt-lookahead    leash on optimistic execution in nanoseconds (1 microsecond is a good value)
 --timer-frequency      frequency with which PE0 should print current virtual time
 
-Creating a TraceR config file
------------------------------
+Creating a TraceR configuration file
+------------------------------------
 
 This is the format for the TraceR config file::
 
@@ -28,11 +28,16 @@ This is the format for the TraceR config file::
     <num jobs>
     <Trace path for job0> <map file for job0> <number of ranks in job0> <iterations (use 1 if running in normal mode)>
     <Trace path for job1> <map file for job1> <number of ranks in job1> <iterations (use 1 if running in normal mode)>
+    ...
+    <Trace path for jobN> <map file for jobN> <number of ranks in jobN> <iterations (use 1 if running in normal mode)>
+
 
 If you do not intend to create global or per-job map files, you can use ``NA``
 instead of them.
 
-See below to generate global or per-job map files.
+Sample TraceR config files can be found in examples/jacobi2d-bigsim/tracer_config (BigSim) or examples/stencil4d-otf/tracer_config (OTF)
+
+See `Creating the job placement file`_ below for how to generate global or per-job map files.
 
 Creating the network (CODES) configuration file
 -----------------------------------------------
@@ -41,7 +46,7 @@ Sample network configuration files can be found in examples/conf
 Additional documentation on the format of the CODES config file can be found in the
 CODES wiki at https://xgitlab.cels.anl.gov/codes/codes/wikis/home
 
-A brief summary follows:
+A brief summary of the format follows.
 
 LPGROUPS, MODELNET_GRP, PARAMS are keywords and should be used as is.
 
@@ -51,7 +56,7 @@ MODELNET_GRP::
 
     server = number of MPI processes/cores per router
 
-    modelnet_\* = number of NICs. For torus, this value has to be 1; for dragonfly,
+    modelnet_* = number of NICs. For torus, this value has to be 1; for dragonfly,
     it should be router radix divided by 4; for the fat-tree, it should be router
     radix divided by 2. For the dragonfly network, modelnet_dragonfly_router should
     also be specified (as 1). For express mesh, modelnet_express_mesh_router should
@@ -74,8 +79,8 @@ Other common parameters::
     modelnet_order = torus/dragonfly/fattree/slimfly/express_mesh
 
     modelnet_scheduler =
-        fcfs : packetize messages one by one.
-        round-robin : packetize message in a round robin manner.
+        fcfs: packetize messages one by one.
+        round-robin: packetize message in a round robin manner.
 
     message_size = PDES parameter (keep constant at 512)
 
@@ -90,10 +95,10 @@ Other common parameters::
     buffer_size/vc_size = size of channels used to store transient packets at routers (in
     bytes). Typical value is 64*packet_size.
 
-    routing = how are packets being routed. Options depend on the network:
-        torus = static/adaptive
-        dragonfly = minimal/nonminimal/adaptive
-        fat-tree = adaptive/static
+    routing = how are packets being routed. Options depend on the network.
+        torus: static/adaptive
+        dragonfly: minimal/nonminimal/adaptive
+        fat-tree: adaptive/static
 
 Network specific parameters::
 
