@@ -1,0 +1,13 @@
+dist: xenial
+addons:
+  apt:
+    packages:
+
+install:
+  - flex --version
+  - bison --version
+  - autoconf --version
+  - automake --version
+  - libtool --version
+  - m4 --version
+  - pkgconfig --version
