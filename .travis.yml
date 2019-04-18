@@ -1,14 +1,46 @@
 dist: xenial
+language: cpp
+
 addons:
   apt:
     packages:
       - libtool-bin
+      - libmpich-dev
 
 install:
-  - flex --version
-  - bison --version
-  - autoconf --version
-  - automake --version
-  - libtool --version
-  - m4 --version
-  - pkgconfig --version
+  # Install ROSS
+  - |
+    git clone http://github.com/carothersc/ROSS.git ${TRAVIS_BUILD_DIR}/ci-build-deps/ROSS
+    pushd ${TRAVIS_BUILD_DIR}/ci-build-deps/ROSS
+    mkdir build
+    cd build
+    ARCH=x86_64 CC=mpicc CXX=mpicxx cmake -DCMAKE_INSTALL_PREFIX=${TRAVIS_BUILD_DIR}/ci-deps/ROSS ../
+    make -j3
+    make install
+    popd
+  # Install CODES
+  - |
+    git clone https://xgitlab.cels.anl.gov/codes/codes.git ${TRAVIS_BUILD_DIR}/ci-build-deps/CODES
+    pushd ${TRAVIS_BUILD_DIR}/ci-build-deps/CODES
+    ./prepare.sh
+    mkdir build
+    cd build
+    ../configure --prefix=${TRAVIS_BUILD_DIR}/ci-deps/CODES CC=mpicc CXX=mpicxx PKG_CONFIG_PATH=${TRAVIS_BUILD_DIR}/ci-deps/ROSS/lib/pkgconfig
+    # add --with-dumpi=/path/to/dumpi/install here to enable tracing with dumpi; only needs libundumpi, so can use --disable-libdumpi and --enable-libundumpi when installing DUMPI
+    make -j3
+    make install
+    popd
+  # Install OTF2
+  - |
+    mkdir ${TRAVIS_BUILD_DIR}/ci-build-deps/
+    pushd ${TRAVIS_BUILD_DIR}/ci-build-deps/
+    wget https://www.vi-hps.org/cms/upload/packages/otf2/otf2-2.1.1.tar.gz
+    tar -xf otf2-2.1.1.tar.gz
+    cd otf2-2.1.1
+    mkdir build
+    cd build
+    ../configure --prefix=${TRAVIS_BUILD_DIR}/ci-deps/OTF2 CC=mpicc CXX=mpicxx --enable-shared
+    make -j3
+    make install
+    popd
+    export PATH=$PATH:${TRAVIS_BUILD_DIR}/ci-deps/OTF2/bin
