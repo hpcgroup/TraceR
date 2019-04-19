@@ -47,4 +47,4 @@ install:
     
 script:
   - cd tracer
-  - make --prefix=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR='${TRAVIS_BUILD_DIR}/ci-deps/ROSS' CODES_DIR='${TRAVIS_BUILD_DIR}/ci-deps/CODES' SELECT_TRACE='-DTRACER_OTF_TRACES=1'
+  - make all PREFIX=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR='${TRAVIS_BUILD_DIR}/ci-deps/ROSS' CODES_DIR='${TRAVIS_BUILD_DIR}/ci-deps/CODES' SELECT_TRACE='-DTRACER_OTF_TRACES=1'
