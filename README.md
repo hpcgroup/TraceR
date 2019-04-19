@@ -2,6 +2,7 @@ TraceR v2.2
 ===========
 
 [![Read the Docs](http://readthedocs.org/projects/tracer-codes/badge/?version=master)](http://tracer-codes.readthedocs.io)
+[![Build Status](https://travis-ci.com/LLNL/TraceR.svg?branch=master)](https://travis-ci.com/LLNL/TraceR)
 
 TraceR is a trace replay tool built upon the ROSS-based CODES simulation
 framework. TraceR can be used for predicting network performance and
