@@ -484,12 +484,19 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
   addEmptyUserEvt(userData);
 #else
   AllData *globalData = (AllData *)userData;
+  Group& group = globalData->groups[globalData->communicators[communicator]];
+
+  // Return without processing for MPI_COMM_SELF groups
+  if( OTF2_GROUP_TYPE_COMM_SELF == group.type ) {
+      ld->lastLogTime = time;
+      return OTF2_CALLBACK_SUCCESS;
+  }
+
   if(collectiveOp == OTF2_COLLECTIVE_OP_BCAST) {
     ld->tasks.push_back(Task());
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.pe = group.members[root];
     new_task.myEntry.msgId.size = sizeReceived;
     new_task.myEntry.msgId.comm = communicator;
@@ -502,7 +509,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.pe = group.members[root];
     new_task.myEntry.msgId.size = sizeSent;
     new_task.myEntry.msgId.comm = communicator;
@@ -515,7 +521,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.size = sizeSent/group.members.size();
     new_task.myEntry.msgId.comm = communicator;
     new_task.myEntry.msgId.coll_type = OTF2_COLLECTIVE_OP_ALLTOALL;
@@ -526,7 +531,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.size = sizeSent/group.members.size();
     new_task.myEntry.msgId.comm = communicator;
     new_task.myEntry.msgId.coll_type = OTF2_COLLECTIVE_OP_ALLTOALLV;
@@ -537,7 +541,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.pe = group.members[0];
     new_task.myEntry.msgId.size = sizeSent/group.members.size();
     new_task.myEntry.msgId.comm = communicator;
@@ -550,7 +553,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.pe = group.members[0];
     new_task.myEntry.msgId.size = 0;
     new_task.myEntry.msgId.comm = communicator;
@@ -564,7 +566,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.size = sizeReceived/group.members.size();
     new_task.myEntry.msgId.comm = communicator;
     new_task.myEntry.msgId.coll_type = OTF2_COLLECTIVE_OP_ALLGATHER;
@@ -575,7 +576,6 @@ callbackCollectiveEnd(OTF2_LocationRef locationID,
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = TRACER_COLL_EVT;
-    Group& group = globalData->groups[globalData->communicators[communicator]];
     new_task.myEntry.msgId.pe = group.members[root];
     new_task.myEntry.msgId.size = sizeReceived;
     new_task.myEntry.msgId.comm = communicator;
