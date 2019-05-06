@@ -70,7 +70,7 @@ tw_lptype proc_lp = {
      (pre_run_f) NULL,
      (event_f) proc_event,
      (revent_f) proc_rev_event,
-     (commit_f) NULL,
+     (commit_f) proc_commit_event,
      (final_f)  proc_finalize, 
      (map_f) codes_mapping,
      sizeof(proc_state),
@@ -643,6 +643,26 @@ void proc_rev_event(
   return;
 }
 
+/* commit event handler: this is called when an event is committed; won't ever
+ * be rolled back */
+void proc_commit_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp) {
+  switch (m->proc_event_type)
+  {
+    case EXEC_COMPLETE:
+      int iter = ns->my_pe->currIter - 1;
+      if(b->c1) {
+        delete [] ns->my_pe->taskStatus[iter];
+        delete [] ns->my_pe->taskExecuted[iter];
+        delete [] ns->my_pe->msgStatus[iter];
+      }
+      break;
+  }
+}
+
 /* ROSS calls this once all events have been processed for all cores and
  * quiescence has been detected */
 void proc_finalize(
@@ -660,7 +680,7 @@ void proc_finalize(
           ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
 
 #if TRACER_OTF_TRACES
-    PE_printStat(ns->my_pe);
+    PE_printStat(ns->my_pe, -1);
 #endif
 
     if(ns->my_pe->pendingMsgs.size() != 0 ||

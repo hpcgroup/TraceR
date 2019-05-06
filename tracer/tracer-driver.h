@@ -149,6 +149,11 @@ void proc_rev_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp);
+void proc_commit_event(
+    proc_state * ns,
+    tw_bf * b,
+    proc_msg * m,
+    tw_lp * lp);
 void proc_finalize(
     proc_state * ns,
     tw_lp * lp);
