@@ -41,12 +41,30 @@ void PE::mark_all_done(int iter, int tInd) {
   for(int i = tInd + 1; i < tasksCount; i++) {
     taskStatus[iter][i] = true;
   }
+  allMarked[iter] =  true;
+}
+
+void PE::goToNextIter(int iter) {
+  if(taskStatus[iter + 1] != NULL) return;
+  if(iter >= 0) {
+    printStat(iter);
+  }
+  iter++;
+  taskStatus[iter] = new bool[tasksCount];
+  taskExecuted[iter] = new bool[tasksCount];
+  msgStatus[iter] = new bool[tasksCount];
+  
+  for(int logInd = 0; logInd  < tasksCount; logInd++)
+  {
+    taskStatus[iter][logInd] = false;
+    taskExecuted[iter][logInd] = false;
+    msgStatus[iter][logInd] = false;
+  }
 #if TRACER_OTF_TRACES
-  for(int i = 0; i < loop_start_task; i++) {
-    taskStatus[iter+1][i] = true;
+  for(int logInd = 0; logInd < loop_start_task; logInd++) {
+    taskStatus[iter][logInd] = true;
   }
 #endif
-  allMarked[iter] =  true;
 }
 
 bool PE::noUnsatDep(int iter, int tInd)
@@ -71,31 +89,21 @@ double PE::taskExecTime(int tInd)
   return myTasks[tInd].execTime;
 }
 
-void PE::printStat()
+void PE::printStat(int iter)
 {
+  if(iter == -1) iter = jobs[jobNum].numIters - 1;
   int countTask=0;
-  for(int j = 0; j < jobs[jobNum].numIters; j++) {
-    for(int i=0; i<tasksCount; i++)
+  for(int i=0; i<tasksCount; i++)
+  {
+    if(!taskStatus[iter][i])
     {
-      if(!taskStatus[j][i])
-      {
-        countTask++;
-      }
+      countTask++;
     }
   }
   if(countTask != 0) {
-    printf("PE%d: not done count:%d out of %d \n",myNum, countTask, tasksCount);
+    printf("PE%d: not done count:%d out of %d for iter %d\n", 
+      myNum, countTask, tasksCount, iter);
   }
-}
-
-void PE::check()
-{
-  printStat();
-}
-
-void PE::printState()
-{
-  printStat();
 }
 
 void PE::invertMsgPe(int iter, int tInd)

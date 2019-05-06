@@ -80,12 +80,11 @@ class PE {
     int currIter;
     int loop_start_task;
 
+    void goToNextIter(int iter);
     bool noUnsatDep(int iter, int tInd);	// there is no unsatisfied dependency for task
     void mark_all_done(int iter, int tInd);
     double taskExecTime(int tInd);
-    void printStat();
-    void check();
-    void printState();
+    void printStat(int iter);
 
     void invertMsgPe(int iter, int tInd);
     double getTaskExecTime(int tInd);

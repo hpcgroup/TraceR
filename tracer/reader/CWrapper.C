@@ -37,7 +37,12 @@ int MsgEntry_getThread(MsgEntry* m){return m->thread;}
 
 //PE
 int PE_get_iter(PE* p) { return p->currIter; }
-void PE_inc_iter(PE* p) { p->currIter++; }
+void PE_inc_iter(PE* p) { 
+#if TRACER_OTF_TRACES
+  p->goToNextIter(p->currIter);
+#endif
+  p->currIter++;
+}
 void PE_dec_iter(PE* p) { p->currIter--; }
 void PE_set_busy(PE* p, bool b){p->busy = b;}
 bool PE_is_busy(PE* p){return p->busy;}
@@ -135,7 +140,7 @@ void PE_invertMsgPe(PE* p, int iter, int tInd){
 }
 int PE_get_tasksCount(PE* p){return p->tasksCount;}
 int PE_get_totalTasksCount(PE* p){return p->totalTasksCount;}
-void PE_printStat(PE* p){p->check();}
+void PE_printStat(PE* p, int iter){ p->printStat(iter); }
 int PE_get_numWorkThreads(PE* p){return p->numWth;}
 
 #if TRACER_BIGSIM_TRACES
