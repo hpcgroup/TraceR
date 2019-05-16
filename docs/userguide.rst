@@ -67,8 +67,8 @@ Quick start
 
 1. Add $SCOREP_INSTALL/bin to your PATH for convenience. Example::
 
-    export SCOREP_INSTALL=/g/g92/jain6/workspace/scoreP/scorep-3.0/install
-    export PATH=$SCOREP_INSTALL/bin/$PATH
+    export SCOREP_INSTALL=$HOME/workspace/scoreP/scorep-3.0/install
+    export PATH=$SCOREP_INSTALL/bin:$PATH
 
 2. Add the following compile time flags to the application::
 
