@@ -83,6 +83,11 @@ Quick start
  
  Region names beginning with TRACER_WallTime\_ are special: using TRACER_WallTime_<any_name> prints current time during simulation with tag <any_name>.
 
+An example using these features is given below:
+
+.. literalinclude:: code-examples/scorep_user_calls.calls
+   :language: c
+
 4. for the link step, prefix the linker line with the following::
 
     LD = scorep --user --nocompiler --noopenmp --nopomp --nocuda --noopenacc --noopencl --nomemory <your_linker>
