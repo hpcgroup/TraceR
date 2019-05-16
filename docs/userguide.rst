@@ -85,7 +85,7 @@ Quick start
 
 An example using these features is given below:
 
-.. literalinclude:: code-examples/scorep_user_calls.calls
+.. literalinclude:: code-examples/scorep_user_calls.c
    :language: c
 
 4. for the link step, prefix the linker line with the following::
