@@ -1,0 +1,265 @@
+diff -Naur scorep-5.0.original/src/adapters/mpi/SCOREP_Mpi.h scorep-5.0/src/adapters/mpi/SCOREP_Mpi.h
+--- scorep-5.0.original/src/adapters/mpi/SCOREP_Mpi.h	2019-03-22 10:41:49.127806703 -0700
++++ scorep-5.0/src/adapters/mpi/SCOREP_Mpi.h	2019-04-03 01:58:09.441425000 -0700
+@@ -119,6 +119,8 @@
+  * Flag which indicates whether event generation is turned on/off.
+  */
+ extern bool scorep_mpi_generate_events;
++extern bool scorep_mpi_reduce_probe_test;
++extern uint64_t scorep_mpi_last_probe_test_evt;
+ 
+ /**
+    Flag which indicates whether recording of MPI topologies is enabled.
+diff -Naur scorep-5.0.original/src/adapters/mpi/SCOREP_Mpi_P2p.c scorep-5.0/src/adapters/mpi/SCOREP_Mpi_P2p.c
+--- scorep-5.0.original/src/adapters/mpi/SCOREP_Mpi_P2p.c	2019-03-22 10:41:49.127806703 -0700
++++ scorep-5.0/src/adapters/mpi/SCOREP_Mpi_P2p.c	2019-04-24 14:22:41.803509000 -0700
+@@ -74,6 +74,8 @@
+  */
+ static int scorep_mpi_status_array_size = 0;
+ 
++extern uint64_t SCOREP_get_number_of_events();
++
+ /**
+  * Get a pointer to a status array of at least 'size' statuses
+  * @param  size minimal requested size
+@@ -1444,8 +1446,11 @@
+     const int event_gen_active           = SCOREP_MPI_IS_EVENT_GEN_ON;
+     const int event_gen_active_for_group = SCOREP_MPI_IS_EVENT_GEN_ON_FOR( SCOREP_MPI_ENABLED_P2P );
+     int       return_val;
++    uint64_t num_evts_written = SCOREP_get_number_of_events();
++    bool gen_region = !scorep_mpi_reduce_probe_test || 
++                              (num_evts_written != scorep_mpi_last_probe_test_evt);
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
+         SCOREP_MPI_EVENT_GEN_OFF();
+         if ( event_gen_active_for_group )
+@@ -1462,7 +1467,7 @@
+     return_val = PMPI_Iprobe( source, tag, comm, flag, status );
+     SCOREP_EXIT_WRAPPED_REGION();
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
+         if ( event_gen_active_for_group )
+         {
+@@ -1473,6 +1478,7 @@
+             SCOREP_ExitWrapper( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_IPROBE ] );
+         }
+         SCOREP_MPI_EVENT_GEN_ON();
++        scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
+     }
+ 
+     SCOREP_IN_MEASUREMENT_DECREMENT();
+@@ -1918,8 +1924,11 @@
+     scorep_mpi_request* orig_req;
+     MPI_Status          mystatus;
+     uint64_t            start_time_stamp;
++    uint64_t num_evts_written = SCOREP_get_number_of_events();
++    bool gen_region = !scorep_mpi_reduce_probe_test || 
++        (num_evts_written != scorep_mpi_last_probe_test_evt);
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
+         SCOREP_MPI_EVENT_GEN_OFF();
+ 
+@@ -1963,8 +1972,9 @@
+         SCOREP_MpiRequestTested( orig_req->id );
+     }
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
++        bool updateEvt = (scorep_mpi_last_probe_test_evt == SCOREP_get_number_of_events()); 
+         if ( event_gen_active_for_group )
+         {
+             SCOREP_ExitRegion( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TEST ] );
+@@ -1975,6 +1985,9 @@
+         }
+ 
+         SCOREP_MPI_EVENT_GEN_ON();
++        if(updateEvt) {
++            scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
++        }
+     }
+ 
+     SCOREP_IN_MEASUREMENT_DECREMENT();
+@@ -2006,8 +2019,11 @@
+     scorep_mpi_request* orig_req;
+     MPI_Status          mystatus;
+     uint64_t            start_time_stamp;
++    uint64_t num_evts_written = SCOREP_get_number_of_events();
++    bool gen_region = !scorep_mpi_reduce_probe_test || 
++        (num_evts_written != scorep_mpi_last_probe_test_evt);
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
+         SCOREP_MPI_EVENT_GEN_OFF();
+ 
+@@ -2019,6 +2035,7 @@
+         {
+             SCOREP_EnterWrapper( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTANY ] );
+         }
++        scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
+     }
+ 
+   #if !defined( SCOREP_MPI_NO_HOOKS )
+@@ -2072,8 +2089,9 @@
+       #endif
+         scorep_mpi_check_request( orig_req, status );
+     }
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
++        bool updateEvt = (scorep_mpi_last_probe_test_evt ==  SCOREP_get_number_of_events()); 
+         if ( event_gen_active_for_group )
+         {
+             SCOREP_ExitRegion( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTANY ] );
+@@ -2084,6 +2102,9 @@
+         }
+ 
+         SCOREP_MPI_EVENT_GEN_ON();
++        if(updateEvt) {
++            scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
++        }
+     }
+ 
+     SCOREP_IN_MEASUREMENT_DECREMENT();
+@@ -2114,8 +2135,12 @@
+     int                 i;
+     scorep_mpi_request* orig_req;
+     uint64_t            start_time_stamp;
++    uint64_t num_evts_written = SCOREP_get_number_of_events();
++    bool gen_region = !scorep_mpi_reduce_probe_test || 
++        (num_evts_written != scorep_mpi_last_probe_test_evt);
+ 
+-    if ( event_gen_active )
++
++    if ( event_gen_active && gen_region )
+     {
+         SCOREP_MPI_EVENT_GEN_OFF();
+ 
+@@ -2127,6 +2152,8 @@
+         {
+             SCOREP_EnterWrapper( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTALL ] );
+         }
++
++        scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
+     }
+ 
+   #if !defined( SCOREP_MPI_NO_HOOKS )
+@@ -2177,8 +2204,9 @@
+             }
+         }
+     }
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
++        bool updateEvt = (scorep_mpi_last_probe_test_evt == SCOREP_get_number_of_events());
+         if ( event_gen_active_for_group )
+         {
+             SCOREP_ExitRegion( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTALL ] );
+@@ -2189,6 +2217,9 @@
+         }
+ 
+         SCOREP_MPI_EVENT_GEN_ON();
++        if(updateEvt) {
++            scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
++        }
+     }
+ 
+     SCOREP_IN_MEASUREMENT_DECREMENT();
+@@ -2220,8 +2251,11 @@
+     int                 i;
+     scorep_mpi_request* orig_req;
+     uint64_t            start_time_stamp;
++    uint64_t num_evts_written = SCOREP_get_number_of_events();
++    bool gen_region = !scorep_mpi_reduce_probe_test || 
++        (num_evts_written != scorep_mpi_last_probe_test_evt);
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
+         SCOREP_MPI_EVENT_GEN_OFF();
+ 
+@@ -2233,6 +2267,7 @@
+         {
+             SCOREP_EnterWrapper( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTSOME ] );
+         }
++        scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
+     }
+ 
+   #if !defined( SCOREP_MPI_NO_HOOKS )
+@@ -2314,8 +2349,10 @@
+         }
+     }
+ 
+-    if ( event_gen_active )
++    if ( event_gen_active && gen_region )
+     {
++        bool updateEvt = (scorep_mpi_last_probe_test_evt == 
++                                                                SCOREP_get_number_of_events());
+         if ( event_gen_active_for_group )
+         {
+             SCOREP_ExitRegion( scorep_mpi_regions[ SCOREP_MPI_REGION__MPI_TESTSOME ] );
+@@ -2326,6 +2363,9 @@
+         }
+ 
+         SCOREP_MPI_EVENT_GEN_ON();
++        if(updateEvt) {
++            scorep_mpi_last_probe_test_evt = SCOREP_get_number_of_events();
++        }
+     }
+ 
+     SCOREP_IN_MEASUREMENT_DECREMENT();
+diff -Naur scorep-5.0.original/src/adapters/mpi/scorep_mpi_init.c scorep-5.0/src/adapters/mpi/scorep_mpi_init.c
+--- scorep-5.0.original/src/adapters/mpi/scorep_mpi_init.c	2019-03-22 10:41:49.131806652 -0700
++++ scorep-5.0/src/adapters/mpi/scorep_mpi_init.c	2019-04-03 01:59:13.540480000 -0700
+@@ -308,6 +308,10 @@
+ mpi_subsystem_begin( void )
+ {
+     SCOREP_MPI_EVENT_GEN_ON();
++    char *reduce_logs = getenv("SCOREP_REDUCE_PROBE_TEST");
++    if(reduce_logs != NULL) {
++        scorep_mpi_reduce_probe_test = (atoi(reduce_logs) == 1);
++    }
+     return SCOREP_SUCCESS;
+ }
+ 
+@@ -426,6 +430,8 @@
+    events are generated.
+  */
+ bool scorep_mpi_generate_events = false;
++bool scorep_mpi_reduce_probe_test = false;
++uint64_t scorep_mpi_last_probe_test_evt = -1;
+ 
+ /**
+  * @internal
+diff -Naur scorep-5.0.original/src/measurement/tracing/SCOREP_Tracing.c scorep-5.0/src/measurement/tracing/SCOREP_Tracing.c
+--- scorep-5.0.original/src/measurement/tracing/SCOREP_Tracing.c	2019-03-22 10:41:49.391803294 -0700
++++ scorep-5.0/src/measurement/tracing/SCOREP_Tracing.c	2019-04-03 02:12:25.959430000 -0700
+@@ -580,3 +580,11 @@
+     write_properties();
+     write_definitions();
+ }
++
++uint64_t SCOREP_get_number_of_events() {
++    OTF2_EvtWriter* writer =  scorep_tracing_get_trace_data( SCOREP_Location_GetCurrentCPULocation() )->otf_writer;
++    if(writer == NULL) return 0;
++    uint64_t num_evts_written;
++    OTF2_EvtWriter_GetNumberOfEvents( writer, &num_evts_written);
++    return num_evts_written;
++}
+diff -Naur scorep-5.0.original/src/measurement/tracing/SCOREP_Tracing.h scorep-5.0/src/measurement/tracing/SCOREP_Tracing.h
+--- scorep-5.0.original/src/measurement/tracing/SCOREP_Tracing.h	2019-03-22 10:41:49.391803294 -0700
++++ scorep-5.0/src/measurement/tracing/SCOREP_Tracing.h	2019-04-03 02:11:30.732441000 -0700
+@@ -86,5 +86,6 @@
+ void
+ SCOREP_Tracing_Write( void );
+ 
++uint64_t SCOREP_get_number_of_events(); 
+ 
+ #endif /* SCOREP_TRACING_H */
