@@ -51,7 +51,7 @@ If using UDP as the BigSim/Charm++'s communication layer:
 If using MPI as the BigSim/Charm++'s communication layer:
 mpirun -n<number of real processes> ./pgm <program arguments> +vp<number of processes expected on the future system> +x<x dim> +y<y dim> +z<z dim> +bglog
 
-Number of real processes is typically equalt to the number cores the emulation
+Number of real processes is typically equal to the number cores the emulation
 is being run on.
 
 machine file is the list of systems the emulation should be run on (similar to
@@ -69,7 +69,7 @@ effect on the emulation, but exist due to historical reasons.
 
 +bglog instructs bigsim to write the logs to files.
 
-When this run finished, you should use many files named bgTrace* in the
+When this run finished, you should see many files named bgTrace* in the
 directory. The total number of such files equals the number of real processes
 plus one. Their names are bgTrace, bgTrace0, bgTrace1, so on.
 
@@ -77,7 +77,7 @@ Create a new folder and move all bgTrace to that folder.
 
 5) Following instructions in README.OTF to generate OTF2 traces.
 
-6) Simulation. To run simulation, 2 files are needed: a tracer config file,
+6) Simulation. To run a simulation, 2 files are needed: a tracer config file,
 and a codes config file. Optionally, mapping files can also be provided.
 
 Tracer config file: sample found at examples/jacobi2d-bigsim/tracer_config (BigSim) or examples/stencil4d-otf/tracer_config (OTF) Format (expected content on each line of the file):
