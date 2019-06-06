@@ -13,8 +13,8 @@ Build
 
 There are several ways to build TraceR.
 
-1. Use `spack <https://github.com/spack/spack>`_ to build TraceR and its
-dependencies::
+1. Use `spack <https://github.com/spack/spack>`_ to build TraceR and its dependencies::
+
     spack install tracer
 
 2. Build TraceR and its dependencies manually:
@@ -29,6 +29,7 @@ dependencies::
   tracer/Makefile.common.
 * Set the ARCH variable in tracer/Makefile.common or alternatively set the CXX
   and ARCH_FLAGS variables. Then type::
+
     cd tracer
     make
 
@@ -37,12 +38,9 @@ Trace Formats
 
 TraceR supports two different trace formats as input. For each format, you need to build additional software as explained below.
 
-1. ScoreP's OTF2 format (default): To use OTF2 traces, you need to download and build the `OTF2 <http://www.vi-hps.org/projects/score-p>`_ library.
-
-1. AMPI-based BigSim format: To use BigSim traces as input to Tracer, you need
-to download and build `Charm++ <https://github.com/UIUC-PPL/charm>`_.
+1. Score-P's OTF2 format (default): To use OTF2 traces, you need to download and build the `OTF2 <http://www.vi-hps.org/projects/score-p>`_ library.
+2. AMPI-based BigSim format: To use BigSim traces as input to TraceR, you need to download and build `Charm++ <https://github.com/UIUC-PPL/charm>`_.
 
 The instructions to build Charm++ are in the `Charm++ manual
 <http://charm.cs.illinois.edu/manuals/html/charm++/A.html>`_. You should use
 the "charm++" target and pass "bigemulator" as a build option.
-
