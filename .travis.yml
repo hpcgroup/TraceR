@@ -10,7 +10,7 @@ addons:
 install:
   # Install ROSS
   - |
-    git clone http://github.com/carothersc/ROSS.git ${TRAVIS_BUILD_DIR}/ci-build-deps/ROSS
+    git clone https://github.com/ROSS-org/ROSS.git ${TRAVIS_BUILD_DIR}/ci-build-deps/ROSS
     pushd ${TRAVIS_BUILD_DIR}/ci-build-deps/ROSS
     mkdir build
     cd build
