@@ -143,9 +143,6 @@ Generating OTF2 traces with an MPI program using Score-P
 
 Detailed instructions are available at https://silc.zih.tu-dresden.de/scorep-current/pdf/scorep.pdf.
 
-Quick start
-"""""""""""
-
 1. Add $SCOREP_INSTALL/bin to your PATH for convenience. Example::
 
     export SCOREP_INSTALL=$HOME/workspace/scoreP/scorep-3.0/install
@@ -217,8 +214,8 @@ for more detail). Use any one of the following commands:
    important if it is not being explicitly replaced at simulation time using
    configuration options. So using appropriate compiler flags is important.
 
-Quick start
-"""""""""""
+Generating AMPI traces with an MPI program using BigSim
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 1. Compile your MPI application using BigSim/Charm++.
 
