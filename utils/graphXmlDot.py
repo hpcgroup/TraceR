@@ -50,8 +50,6 @@ def addLinksToDict(node, root):
 class graphXml():
     def __init__(self, fullFilePath, **kwargs):
         print('This is a small module to read an xml file into a graph.')
-        print('To create the dot file call the function writeDot().')
-        print('To draw the graph call function draw().')
         self.graphObj = None # Object For holding the NetworkX Graph 
         self.dictOfNodes = None
         self.listOfTerminals = None
@@ -61,8 +59,8 @@ class graphXml():
     def writeDot(self, switchRadix=48, nodeTags='FIs', switchTags='Switches', write=True, **kwargs):
         tree = ET.parse(self.fullFilePath)
         root = tree.getroot()
-        terminalIndex = 274877906944
-        switchIndex = 12884901888
+        terminalIndex = int("0x0000004000000000",0)
+        switchIndex = int("0x0000000300000000",0)
         dictOfNodes = {}
         listOfTerminals=[]
         self.graphObj = nx.MultiDiGraph() # Create a Multi DiGraph
