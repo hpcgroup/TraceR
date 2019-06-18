@@ -176,6 +176,3 @@ class graphXml():
         nx.draw(self.graphObj,pos=pos)
         plt.savefig("Graph.png", format="PNG")
                 
-c=graphXml('topology.xml')#replace topology.xml with test.xml for testing with a smaller graph
-c.writeDot()
-c.draw()
