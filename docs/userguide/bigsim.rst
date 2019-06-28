@@ -4,7 +4,7 @@ BigSim
 Installation of BigSim
 """"""""""""""""""""""
 
-Compile BigSim/Charm++ for emulation (see http://charm.cs.illinois.edu/manuals/html/bigsim/manual-1p.html
+Compile BigSim/Charm++ for emulation (see the `BigSim manual <https://charm.readthedocs.io/en/latest/bigsim/manual.html>`_
 for more detail). Use any one of the following commands:
 
 - To use UDP as BigSim/Charm++'s communication layer::

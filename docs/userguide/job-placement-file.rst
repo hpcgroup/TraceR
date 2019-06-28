@@ -12,7 +12,7 @@ to another. Due to the way default server to node mapping works within CODES, if
 more than one node is connected to a switch, servers/cores are distributed in a
 cyclic manner.
 
-Example config file::
+Consider this example config file::
 
     MODELNET_GRP
     {
@@ -92,11 +92,12 @@ many_job.C
 Commands for execution
 """"""""""""""""""""""
 ./def_lin_mapping <global_map_file> <space separated #ranks in each job>
+
 ./node_mapping <global_map_file> <total_ranks in the job> <nodes per router> <cores per node> [optional <nodes with router to skip after>]
 
 The output from these commands will be a global map file, and job{0,1..} files in binary format.
 
-Example:
+Example::
 
     ./def_lin_mapping global.bin 32 32 64
 

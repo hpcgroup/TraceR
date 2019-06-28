@@ -31,8 +31,8 @@ modelnet_*
     the number of MPI processes being simulated (specified in the tracer config
     file).
 
-Common parameters
-"""""""""""""""""
+Common parameters (PARAMS)
+""""""""""""""""""""""""""
 
 packet_size/chunk_size (both should have the same value)
     size of the packets created by NIC for transmission on the network. Smaller the
@@ -76,35 +76,35 @@ routing
 
     fat-tree: adaptive/static
 
-Network specific parameters
-"""""""""""""""""""""""""""
+Network specific parameters (PARAMS)
+""""""""""""""""""""""""""""""""""""
 
 Torus:
 
-n_dims
-    number of dimensions in the torus
+    n_dims
+        number of dimensions in the torus
 
-dim_length
-    length of each dimension
+    dim_length
+        length of each dimension
 
 Dragonfly:
     
-num_routers
-    number of routers within a group.
+    num_routers
+        number of routers within a group.
     
-global_bandwidth
-    bandwidth of the links that connect groups.
+    global_bandwidth
+        bandwidth of the links that connect groups.
 
 Fat-tree:
 
-ft_type
-    always choose 1
+    ft_type
+        always choose 1
 
-num_levels
-    number of levels in the fat-tree (2 or 3)
+    num_levels
+        number of levels in the fat-tree (2 or 3)
 
-switch_radix
-    radix of the switch being used
+    switch_radix
+        radix of the switch being used
 
-switch_count
-    number of switches at leaf level.
+    switch_count
+        number of switches at leaf level.
