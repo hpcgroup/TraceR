@@ -17,6 +17,7 @@ Computing applications on interconnection networks.
 
    install
    userguide
+   workflow
    tutorial
    autogen/doxygen
 
