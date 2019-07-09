@@ -14,9 +14,8 @@ Tutorial
 `Download Slides <http://www.hoti.org/tutorials/HOTI25_Tutorial_2c.pdf>`_.
 
 **Full citation:** Nikhil Jain and Misbah Mubarak.
-`CODES-TRACER Tutorial: Enabling HPC Design Space
-Exploration via Discrete-Event Simulation
-<http://www.hoti.org/tutorials/HOTI25_Tutorial_2c.pdf>`_.
+CODES-TRACER Tutorial: Enabling HPC Design Space
+Exploration via Discrete-Event Simulation.
 Tutorial presented at 25th Annual Symposium on High Performance
 Interconnects (HOTI). Aug 28, 2017, Santa Clara, CA, USA.
 
