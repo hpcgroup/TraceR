@@ -22,8 +22,8 @@ is used for simulating the communication on the network.
    shows how a program would be compiled to generate BigSim traces, and the
    stencil4d-otf example shows how to compile a program for generating OTF2 traces.
 
-    .. note::
-       If you're using BigSim, avoid global variables in your MPI application so that it can be run with virtualization.
+   .. note::
+      If you're using BigSim, avoid global variables in your MPI application so that it can be run with virtualization.
 
 2. Generate traces. For instructions on generating OTF2 traces, see the user guide
    section on using :ref:`userguide-score-p`, or for using BigSim traces see the section in

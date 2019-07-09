@@ -37,7 +37,7 @@ Configuring
 ^^^^^^^^^^^
 
 Consider this Simplenet configuration file that can be
-found in ``codes/tests/conf/modelnet-test.conf``::
+found in *codes/tests/conf/modelnet-test.conf*::
 
     LPGROUPS
     {
@@ -106,7 +106,7 @@ Configuring
 ^^^^^^^^^^^
 
 Consider this example configuration that can be found with the
-CODES source, ``codes/src/network-workloads/dragonfly-custom``::
+CODES source, *codes/src/network-workloads/dragonfly-custom*::
 
     LPGROUPS
     {
