@@ -24,9 +24,9 @@ Interconnects (HOTI). Aug 28, 2017, Santa Clara, CA, USA.
 
 These guides will give some of the basics needed to use TraceR.
 
-    1. :ref:`tutorial/network_models`
-    2. :ref:`tutorial/simulation_basics`
-    3. :ref:`tutorial/workflow`
+    1. :ref:`tutorial-network-models`
+    2. :ref:`tutorial-simulation-basics`
+    3. :ref:`tutorial-workflow`
 
 Full contents:
 

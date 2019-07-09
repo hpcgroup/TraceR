@@ -8,7 +8,7 @@ supported by TraceR, as presented in the HOTI 25 tutorial (slides 22-39).
 For a more detailed guide, see the CODES wiki pages on network
 models at https://github.com/codes-org/codes/wiki/codes-networks.
 Any commands/examples in this section are referring to files
-included in the CODES git repository (not TraceR).
+included in the `CODES git repository <https://github.com/codes-org/codes>`_ (not TraceR).
 
 Overview
 --------
