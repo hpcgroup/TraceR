@@ -20,7 +20,7 @@ install:
     popd
   # Install CODES
   - |
-    git clone https://xgitlab.cels.anl.gov/codes/codes.git ${TRAVIS_BUILD_DIR}/ci-build-deps/CODES
+    git clone https://github.com/codes-org/codes.git ${TRAVIS_BUILD_DIR}/ci-build-deps/CODES
     pushd ${TRAVIS_BUILD_DIR}/ci-build-deps/CODES
     ./prepare.sh
     mkdir build
