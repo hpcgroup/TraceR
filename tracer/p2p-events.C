@@ -296,9 +296,7 @@ void handle_recv_post_rev_event(
   }
   if(b->c2) {
      ns->my_pe->pendingRMsgs[key].push_front(m->executed.taskid);
-     for(int i = 0; i < m->model_net_calls; i++) {
-       model_net_event_rc(net_id, lp, 0);
-     }
+     model_net_event_rc2(lp, &(m->model_net_calls));
   }
 }
 
@@ -756,10 +754,7 @@ void exec_task_rev(
     }
   }
   
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c21 || b->c22) {
     MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
