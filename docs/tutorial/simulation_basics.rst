@@ -90,7 +90,10 @@ Effect of Replaying Traces
 
 As shown in the table below, replaying a trace can result in
 different results from the original run due to different configurations
-resulting in operations taking more or less time to run.
+resulting in operations taking more or less time to run. In the first
+line and last line, the MPI_Bcast and MPI_Waitall operations are faster
+in the replayed trace, resulting in subsequent operations happening at
+earlier times than when the trace was captured.
 
 ====================   =================   ===============   ============   ================
 Original time stamps   Original duration   New time stamps   New duration   Operation type
@@ -107,13 +110,13 @@ Original time stamps   Original duration   New time stamps   New duration   Oper
 In addition to the affect of the network configuration, different trace
 formats may result in different results.
 
-As an example, DUMPI stores all the information passed to MPI calls. The
+As an example, DUMPI traces store all the information passed to MPI calls. The
 simulation then decides which request to fulfill, allowing accurate resolution
 for the target systems. If the control flow of the program can change
 significantly due to the ordering of operations, then simulations are not
 entirely correct.
 
-On the other hand, OTF2 stores only the information that is used (e.g. which
+On the other hand, OTF2 traces store only the information that is used (e.g. which
 request was satisfied). This accurately mimics the control flow of the trace
 run, but does not accurately represent execution for the target system.
 
