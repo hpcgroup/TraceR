@@ -91,9 +91,9 @@ Effect of Replaying Traces
 As shown in the table below, replaying a trace can result in
 different results from the original run due to different configurations
 resulting in operations taking more or less time to run. In the first
-line and last line, the MPI_Bcast and MPI_Waitall operations are faster
-in the replayed trace, resulting in subsequent operations happening at
-earlier times than when the trace was captured.
+and 2nd to last table entries, the MPI_Bcast and MPI_Waitall operations
+are faster in the replayed trace, resulting in subsequent operations
+happening at earlier times than when the trace was captured.
 
 ====================   =================   ===============   ============   ================
 Original time stamps   Original duration   New time stamps   New duration   Operation type
