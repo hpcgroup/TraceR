@@ -6,6 +6,7 @@ addons:
     packages:
       - libtool-bin
       - libmpich-dev
+      - mpich
 
 install:
   # Install ROSS
