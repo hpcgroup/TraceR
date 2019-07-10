@@ -2002,7 +2002,7 @@ void handle_scatter_send_comp_event(
   //move to the next destination by reducing the distance
   ns->my_pe->currentCollPartner >>= 1;
   //send to self
-  tw_event *e = codes_event_new_bounded(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+  tw_event *e = tw_event_new_bounded(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
   proc_msg *m_new = (proc_msg*)tw_event_data(e);
   m_new->msgId.pe = ns->my_pe->currentCollRank;
   m_new->msgId.comm = ns->my_pe->currentCollComm;
