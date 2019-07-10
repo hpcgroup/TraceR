@@ -650,10 +650,10 @@ void proc_commit_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
+  int iter = m->iteration;
   switch (m->proc_event_type)
   {
     case EXEC_COMPLETE:
-      int iter = m->iteration;
       if(b->c1) {
         delete [] ns->my_pe->taskStatus[iter];
         delete [] ns->my_pe->taskExecuted[iter];
