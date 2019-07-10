@@ -2190,6 +2190,7 @@ int send_coll_comp_rev(
     proc_msg *m)
 {
   if(isEvent) ns->my_pe->currentCollTask = m->executed.taskid;
+  return 0;
 }
 #endif
 
