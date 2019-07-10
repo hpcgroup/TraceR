@@ -554,7 +554,7 @@ void proc_event(
       handle_coll_complete_event(ns, b, m, lp);
       break;
     default:
-      printf("\n Invalid message type %d event %lld ", 
+      printf("\n Invalid message type %d event %p ", 
           m->proc_event_type, m);
       assert(0);
       break;

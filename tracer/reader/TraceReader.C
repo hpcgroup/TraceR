@@ -365,7 +365,7 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
   pe->currentCollRank = pe->currentCollPartner = pe->currentCollSize = -1;
   pe->currentCollMsgSize = pe->currentCollSendCount = pe->currentCollRecvCount = -1;
  
-  double user_timing, scaling_factor;
+  double user_timing = 0, scaling_factor = 1;
   bool isScaling = false, isUserTiming = false;
 
   if(eventSubs != NULL) {

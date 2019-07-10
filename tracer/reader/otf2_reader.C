@@ -49,7 +49,7 @@ callbackDefClockProperties(void * userData,
   clockProperties.ticks_per_second = timerResolution;
   clockProperties.ticksToSecond = TIME_MULT * 1.0/timerResolution;
   if(!g_tw_mynode) 
-    printf("Clock Props: %lld %d %f\n", clockProperties.ticks_per_second,
+    printf("Clock Props: %lu %d %f\n", clockProperties.ticks_per_second,
       TIME_MULT, clockProperties.ticksToSecond);
   fflush(stdout);
   clockProperties.time_offset = globalOffset;
