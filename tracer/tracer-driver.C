@@ -660,6 +660,8 @@ void proc_commit_event(
         delete [] ns->my_pe->msgStatus[iter];
       }
       break;
+    default:
+      break;
   }
 }
 
