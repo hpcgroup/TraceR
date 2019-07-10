@@ -685,18 +685,18 @@ void proc_finalize(
 
     if(ns->my_pe->pendingMsgs.size() != 0 ||
        ns->my_pe->pendingRMsgs.size() != 0) {
-      printf("%d psize %d pRsize %d\n", ns->my_pe_num, 
+      printf("%d psize %zu pRsize %zu\n", ns->my_pe_num, 
         ns->my_pe->pendingMsgs.size(), ns->my_pe->pendingRMsgs.size());
     }
 
     if(ns->my_pe->pendingReqs.size() != 0 ||
       ns->my_pe->pendingRReqs.size() != 0) {
-      printf("%d rsize %d rRsize %d\n", ns->my_pe_num, 
+      printf("%d rsize %zu rRsize %zu\n", ns->my_pe_num, 
         ns->my_pe->pendingReqs.size(), ns->my_pe->pendingRReqs.size());
     }
 
     if(ns->my_pe->pendingRCollMsgs.size() != 0) {
-      printf("%d rcollsize %d \n", ns->my_pe_num, 
+      printf("%d rcollsize %zu \n", ns->my_pe_num, 
         ns->my_pe->pendingRCollMsgs.size());
     }
 
