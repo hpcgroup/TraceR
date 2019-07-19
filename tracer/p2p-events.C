@@ -377,7 +377,7 @@ tw_stime exec_task(
 
     //else continue
     bool needPost = false, returnAtEnd = false;
-    int64_t seq;
+    int64_t seq = 0; /* can this safely be set to ns->my_pe->recvSeq[t->myEntry.node] instead? */
     if(t->event_id == TRACER_RECV_POST_EVT) {
       seq = ns->my_pe->recvSeq[t->myEntry.node];
       ns->my_pe->pendingRReqs[t->req_id] = seq;
@@ -742,7 +742,7 @@ void exec_task_rev(
     ns->my_pe->recvSeq[t->myEntry.node]--;
   }
 
-  int64_t seq;
+  int64_t seq = 0; /* is there a better value to set if the if statement doesn't set it? */
   if(b->c7) {
     if(t->event_id == TRACER_RECV_COMP_EVT) {
       ns->my_pe->pendingRReqs[t->req_id] = t->myEntry.msgId.seq;
