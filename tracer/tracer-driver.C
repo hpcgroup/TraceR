@@ -183,7 +183,8 @@ int main(int argc, char **argv)
     if(lp_io_dir[0]) {
       ret = lp_io_prepare(lp_io_dir, 0, &handle, MPI_COMM_WORLD);
     } else {
-      ret = lp_io_prepare("tracer-out", LP_IO_UNIQ_SUFFIX, &handle, 
+      char tmpIoDir[] = "tracer-out";
+      ret = lp_io_prepare(tmpIoDir, LP_IO_UNIQ_SUFFIX, &handle, 
                           MPI_COMM_WORLD);
     }
     assert(ret == 0);
