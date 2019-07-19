@@ -197,7 +197,10 @@ int main(int argc, char **argv)
     }
     char globalIn[256];
     /* global mapping file */
-    fscanf(jobIn, "%s", globalIn);
+    if(fscanf(jobIn, "%s", globalIn) != 1)
+    {
+      globalIn = ""; /* read or matching error, set to empty string */
+    }
 
     global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
 
@@ -235,7 +238,10 @@ int main(int argc, char **argv)
       MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
-    fscanf(jobIn, "%d", &num_jobs);    /* number of jobs */
+    if(fscanf(jobIn, "%d", &num_jobs) != 1)    /* number of jobs */
+    {
+      num_jobs = 0; /* read or matching error */
+    }
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
@@ -244,14 +250,29 @@ int main(int argc, char **argv)
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
         char tempTrace[200];
-        fscanf(jobIn, "%s", tempTrace);
+        if(fscanf(jobIn, "%s", tempTrace) != 1)
+        {
+          tempTrace = ""; /* read or matching error, set to empty string */
+        }
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
 #else
-        fscanf(jobIn, "%s", jobs[i].traceDir);
+        if(fscanf(jobIn, "%s", jobs[i].traceDir) != 1)
+        {
+          jobs[i].traceDir = ""; /* read or matching error, set to empty string */
+        }
 #endif
-        fscanf(jobIn, "%s", jobs[i].map_file);
-        fscanf(jobIn, "%d", &jobs[i].numRanks); /* number of processes */
-        fscanf(jobIn, "%d", &jobs[i].numIters); /* number of repetitions */
+        if(fscanf(jobIn, "%s", jobs[i].map_file) != 1)
+        {
+          jobs[i].map_file = ""; /* read or matching error, set to empty string */
+        }
+        if(fscanf(jobIn, "%d", &jobs[i].numRanks) != 1) /* number of processes */
+        {
+          jobs[i].numRanks = 0; /* read or matching error */
+        }
+        if(fscanf(jobIn, "%d", &jobs[i].numIters) != 1) /* number of repetitions */
+        {
+          jobs[i].numIters = 0; /* read or matching error */
+        }
         total_ranks += jobs[i].numRanks;
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
@@ -280,12 +301,18 @@ int main(int argc, char **argv)
     }
 
     char next = ' ';
-    fscanf(jobIn, "%c", &next);
+    if(fscanf(jobIn, "%c", &next) != 1)
+    {
+      next = ' '; /* read or matching error, set to skip char */
+    }
     while(next != ' ') {
       /* replace all messages of size greater than x */
       if(next == 'M' || next == 'm') {
         int size_limit, size_by, jobid;
-        fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by);
+        if(fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by) != 3)
+        {
+          /* read or matching error for some of the parameters; any defaults or abort? */
+        }
         size_replace_limit[jobid] = size_limit;
         size_replace_by[jobid] = size_by;
         if(!rank)
@@ -295,7 +322,9 @@ int main(int argc, char **argv)
       /* replace all messages of size = x */
       if(next == 'S' || next == 's') {
         int size_value, size_by, jobid;
-        fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by);
+        if(fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by) != 3)
+        {
+          /* read or matching error for some of the parameters; any defaults or abort? */
         addMsgSizeSub(jobid, size_value, size_by, num_jobs);
         if(!rank)
           printf("Will replace all messages of size %d by %d for job %d\n",
@@ -303,7 +332,10 @@ int main(int argc, char **argv)
       }
       /* replace all compute tasks with exec time greater x */
       if(next == 'T' || next == 't') {
-        fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
+        if(fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by) != 2)
+        {
+          /* read or matching error for some of the parameters; any defaults or abort? */
+        }
         if(!rank)
           printf("Will replace all methods with exec time greater than %lf by %lf\n", 
               time_replace_limit, time_replace_by);
@@ -313,14 +345,20 @@ int main(int argc, char **argv)
         double etime;
         int jobid;
         char eName[256];
-        fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime);
+        if(fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime) != 3)
+        {
+          /* read or matching error for some of the parameters, any defaults or abort? */
+        }
         if(!rank)
           printf("Will make all events with name %s run for %lf s for job %d; if scale_all, events will be scaled down\n", 
             eName, etime, jobid);
         addEventSub(jobid, eName, etime, num_jobs);
       }
       next = ' ';
-      fscanf(jobIn, "%c", &next);
+      if(fscanf(jobIn, "%c", &next) != 1)
+      {
+        next = ' '; /* read or matching error, set to skip char */
+      }
     }
 
     int ranks_till_now = 0;
