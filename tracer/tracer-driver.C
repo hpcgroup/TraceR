@@ -199,7 +199,7 @@ int main(int argc, char **argv)
     /* global mapping file */
     if(fscanf(jobIn, "%s", globalIn) != 1)
     {
-      globalIn = ""; /* read or matching error, set to empty string */
+      globalIn[0] = 0; /* read or matching error, set to empty string */
     }
 
     global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
@@ -252,18 +252,18 @@ int main(int argc, char **argv)
         char tempTrace[200];
         if(fscanf(jobIn, "%s", tempTrace) != 1)
         {
-          tempTrace = ""; /* read or matching error, set to empty string */
+          tempTrace[0] = 0; /* read or matching error, set to empty string */
         }
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
 #else
         if(fscanf(jobIn, "%s", jobs[i].traceDir) != 1)
         {
-          jobs[i].traceDir = ""; /* read or matching error, set to empty string */
+          jobs[i].traceDir[0] = 0; /* read or matching error, set to empty string */
         }
 #endif
         if(fscanf(jobIn, "%s", jobs[i].map_file) != 1)
         {
-          jobs[i].map_file = ""; /* read or matching error, set to empty string */
+          jobs[i].map_file[0] = 0; /* read or matching error, set to empty string */
         }
         if(fscanf(jobIn, "%d", &jobs[i].numRanks) != 1) /* number of processes */
         {
@@ -325,6 +325,7 @@ int main(int argc, char **argv)
         if(fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by) != 3)
         {
           /* read or matching error for some of the parameters; any defaults or abort? */
+        }
         addMsgSizeSub(jobid, size_value, size_by, num_jobs);
         if(!rank)
           printf("Will replace all messages of size %d by %d for job %d\n",
