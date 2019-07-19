@@ -714,7 +714,7 @@ void proc_finalize(
     if(dump_topo_only) return;
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
-    tw_stime finalTime = tw_now(lp);
+    /* tw_stime finalTime = tw_now(lp); */
 
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
