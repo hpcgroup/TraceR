@@ -971,11 +971,11 @@ int pe_to_lpid(int pe, int job){
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come first in lp registration in terms of global id
 int lpid_to_pe(int lp_gid){
-    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, 0);
     return global_rank[server_num].mapsTo;
 }
 inline int lpid_to_job(int lp_gid){
-    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, 0);
     return global_rank[server_num].jobID;;
 }
 inline int pe_to_job(int pe){
