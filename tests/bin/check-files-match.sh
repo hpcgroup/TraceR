@@ -17,7 +17,10 @@ do
         continue
         ;;
     *)
-        if ! diff $fRun $f > /dev/null
+        echo "=========================================="
+	echo "diff: $f"
+	echo "=========================================="
+        if ! diff $fRun $f
         then
             passed=false
             echo "FAILED $f does not match"
