@@ -55,6 +55,6 @@ script:
   - popd
   - |
     pushd examples/stencil4d-otf
-    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly --sync=3 -- ../conf/dfly.conf tracer_config
-    ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-dfly
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/ --sync=3 -- ../conf/dfly.conf tracer_config
     popd
+  - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-dfly
