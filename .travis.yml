@@ -6,6 +6,7 @@ addons:
     packages:
       - libtool-bin
       - libmpich-dev
+      - mpich
 
 install:
   # Install ROSS
@@ -46,7 +47,13 @@ install:
     export PATH=$PATH:${TRAVIS_BUILD_DIR}/ci-deps/OTF2/bin
     
 script:
-  - cd tracer
+  - pushd tracer
   - make all PREFIX=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR="${TRAVIS_BUILD_DIR}/ci-deps/ROSS" CODES_DIR="${TRAVIS_BUILD_DIR}/ci-deps/CODES" SELECT_TRACE="-DTRACER_OTF_TRACES=1"
+  - make install PREFIX=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR="${TRAVIS_BUILD_DIR}/ci-deps/ROSS" CODES_DIR="${TRAVIS_BUILD_DIR}/ci-deps/CODES" SELECT_TRACE="-DTRACER_OTF_TRACES=1"
   - cd ../utils
   - make
+  - popd
+  - |
+    pushd examples/stencil4d-otf
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --sync=3 -- ../conf/dfly.conf tracer_config
+    popd
