@@ -17,7 +17,10 @@ do
         continue
         ;;
     *)
-        if ! git diff -U0 --word-diff=porcelain --no-index -- $fRun $f > /dev/null
+        echo "=========================================="
+	    echo "diff: $f"
+	    echo "=========================================="
+        if ! git diff -U0 --word-diff=porcelain --no-index -- $fRun $f
         then
             passed=false
             echo "FAILED $f does not match"
