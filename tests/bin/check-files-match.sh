@@ -20,8 +20,11 @@ do
         echo "=========================================="
 	    echo "diff: $f"
 	    echo "=========================================="
-        if ! git diff -U0 --word-diff=porcelain --no-index -- $fRun $f
+        test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- $fRun $f)
+        if ! $?
         then
+            test_diff=$(echo "$test_diff" | tail -n +5)
+
             passed=false
             echo "FAILED $f does not match"
         fi
