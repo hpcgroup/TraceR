@@ -21,7 +21,7 @@ do
 	    echo "diff: $f"
 	    echo "=========================================="
         test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- $fRun $f)
-        if ! $?
+        if [[ $? != 0 ]]
         then
             test_diff=$(echo "$test_diff" | tail -n +5)
             while IFS= read -r line;
