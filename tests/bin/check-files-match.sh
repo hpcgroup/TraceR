@@ -29,7 +29,6 @@ do
             test_diff=$(echo "$test_diff" | tail -n +5)
             while IFS= read -r line;
             do
-                echo "line=$line"
                 tmp_float_num=-1
 		is_recv_diffline=false
                 # grep returns 0 if recv_time is present prefixed with + or - at the start of the line (if not, ignore
@@ -47,7 +46,6 @@ do
 		
                 if [[ $line == "-"* ]]
                 then
-                    echo "Removed diff line with value $tmp_float_num"
 		    before_val=$tmp_float_num
 		    if [[ $is_recv_diffline != "true" ]]
 		    then
@@ -55,7 +53,6 @@ do
 		    fi
                 elif [[ $line == "+"* ]]
                 then
-                    echo "Added diff line with value $tmp_float_num"
 		    after_val=$tmp_float_num
 		    if [[ $is_recv_diffline != "true" ]]
 		    then
@@ -63,12 +60,14 @@ do
 		    fi
                 elif [[ $line == "~" ]]
                 then
-                    echo "End of diff"
-		    
-		    if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
+		    if [[ $is_recv_diffline == "true" ]];
 		    then
-		    	tc_passed=false
-			echo "Value outside tolerance"
+		        echo "Checking recv_time diff ($before_val vs $after_val)
+		    	if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
+		    	then
+			    tc_passed=false
+			    echo "-outside tolerance (> .000001)"
+		        fi
 		    fi
                 fi
             done <<< "$test_diff"
