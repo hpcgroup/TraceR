@@ -28,6 +28,7 @@ do
         then
 	    before_val=0
 	    after_val=0
+	    has_non_recv_diffline=false
             test_diff=$(echo "$test_diff" | tail -n +5)
             while IFS= read -r line;
             do
@@ -48,6 +49,14 @@ do
                     fi
                 fi
 		
+		# check to make sure that the diff isn't for something other than recv_time
+		echo "$line" | grep "^[+-]";
+		rv=$?
+		if [[ $rv == 0 && $is_recv_diffline != "true" ]];
+		then
+		    has_non_recv_diffline=true
+		fi
+		
                 if [[ $line == "-"* ]]
                 then
 		    before_val=$tmp_float_num
@@ -64,8 +73,8 @@ do
 		    fi
                 elif [[ $line == "~" ]]
                 then
-		    echo "Checking changed line..."
-		    if [[ $is_recv_diffline == "true" ]];
+		    echo "Checking difference..."
+		    if [[ $has_nonrecv_diffline == "false" ]];
 		    then
 		        echo "- checking recv_time diff [$before_val vs $after_val]"
 		    	if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
@@ -77,8 +86,10 @@ do
 		        fi
 		    else
 			tc_passed=false
-			echo "- diff was not for recv_time"
+			echo "- diff contained a change that wasn't recv_time"
 		    fi
+		    # reset flag for detecting a non-recv_time change
+		    has_nonrecv_diffline=false
                 fi
             done <<< "$test_diff"
 
