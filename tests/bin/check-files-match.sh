@@ -23,7 +23,6 @@ do
 	    echo "=========================================="
         test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- $fRun $f)
 	rv=$?
-	set -x
         if [[ $rv != 0 ]]
         then
 	    before_val=0
@@ -99,7 +98,6 @@ do
             	echo "FAILED $f does not match"
 	    fi
         fi
-	set +x
     esac
 done
 
