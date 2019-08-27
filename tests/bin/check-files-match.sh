@@ -60,14 +60,20 @@ do
 		    fi
                 elif [[ $line == "~" ]]
                 then
+		    echo "Checking changed line..."
 		    if [[ $is_recv_diffline == "true" ]];
 		    then
-		        echo "Checking recv_time diff [$before_val vs $after_val]"
+		        echo "- checking recv_time diff [$before_val vs $after_val]"
 		    	if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
 		    	then
 			    tc_passed=false
-			    echo "-outside tolerance [> .000001]"
+			    echo "-- outside tolerance [> .000001]"
+			else
+			    echo "-- within tolerance [<= .000001]"
 		        fi
+		    else
+			tc_passed=false
+			echo "- diff was not for recv_time"
 		    fi
                 fi
             done <<< "$test_diff"
