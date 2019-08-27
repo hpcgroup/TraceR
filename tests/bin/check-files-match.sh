@@ -62,7 +62,7 @@ do
                 then
 		    if [[ $is_recv_diffline == "true" ]];
 		    then
-		        echo "Checking recv_time diff [$before_val vs $after_val]
+		        echo "Checking recv_time diff [$before_val vs $after_val]"
 		    	if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
 		    	then
 			    tc_passed=false
