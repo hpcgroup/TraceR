@@ -22,8 +22,9 @@ do
 	    echo "diff: $f"
 	    echo "=========================================="
         test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- $fRun $f)
+	rv=$?
 	set -x
-        if [[ $? != 0 ]]
+        if [[ $rv != 0 ]]
         then
 	    before_val=0
 	    after_val=0
@@ -32,8 +33,10 @@ do
             do
                 tmp_float_num=-1
 		is_recv_diffline=false
-                # grep returns 0 if recv_time is present prefixed with + or - at the start of the line (if not, ignore
-                if echo "$line" | grep "^[+-]recv_time";
+                # grep returns 0 if recv_time is present prefixed with + or - at the start of the line (if not, ignore)
+		echo "$line" | grep "^[+-]recv_time";
+		rv=$?
+                if [[ $rv == 0 ]]
                 then
 		    is_recv_diffline=true
 		    # remove everything but the number following a "recv_time:" prefixed by a single character
