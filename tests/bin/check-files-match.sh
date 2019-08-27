@@ -74,7 +74,7 @@ do
                 elif [[ $line == "~" ]]
                 then
 		    echo "Checking difference..."
-		    if [[ $has_nonrecv_diffline == "false" ]];
+		    if [[ $has_non_recv_diffline == "false" ]];
 		    then
 		        echo "- checking recv_time diff [$before_val vs $after_val]"
 		    	if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
