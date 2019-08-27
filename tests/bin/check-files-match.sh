@@ -65,7 +65,7 @@ do
                 then
                     echo "End of diff"
 		    
-		    if [[ $(echo "sqrt(($after_val - $before_val)^2) >= 0.000001" | bc -l) == 1 ]]
+		    if [[ $(echo "sqrt(($after_val - $before_val)^2) > 0.000001" | bc -l) == 1 ]]
 		    then
 		    	tc_passed=false
 			echo "Value outside tolerance"
