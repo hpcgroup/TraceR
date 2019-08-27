@@ -4,9 +4,9 @@ testDir=$1
 
 passed=true
 
-for f in $testDir/*
+for f in "$testDir"/*
 do
-    echo $f
+    echo "$f"
     fRun=${f/regression/output}
     tc_passed=true
     
@@ -21,7 +21,7 @@ do
         echo "=========================================="
 	    echo "diff: $f"
 	    echo "=========================================="
-        test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- $fRun $f)
+        test_diff=$(git diff -U0 --word-diff=porcelain --no-index -- "$fRun" "$f")
 	rv=$?
         if [[ $rv != 0 ]]
         then
@@ -42,7 +42,7 @@ do
 		    # remove everything but the number following a "recv_time:" prefixed by a single character
                     tmp_float_num=${line##?recv_time:}
                     # grep returns 1 if there are only 0-9 and . in the string (fail if other content)
-                    if echo "$tmp_float_num" | grep [^0-9.];
+                    if echo "$tmp_float_num" | grep "[^0-9.]";
                     then
                         tc_passed=false
                     fi
@@ -88,7 +88,7 @@ do
 			echo "- diff contained a change that wasn't recv_time"
 		    fi
 		    # reset flag for detecting a non-recv_time change
-		    has_nonrecv_diffline=false
+		    has_non_recv_diffline=false
                 fi
             done <<< "$test_diff"
 
