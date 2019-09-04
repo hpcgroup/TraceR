@@ -9,11 +9,43 @@ do
     echo "$f"
     fRun=${f/regression/output}
     tc_passed=true
-    
+
     case $f in
     *-msg-stats)
         # direct comparison won't work, times vary
-	    ;;
+        echo "=========================================="
+	    echo "checking: $f"
+	    echo "=========================================="
+        paste -d@ "$fRun" "$f" | while IFS="@" read -r line1 line2;
+        do
+            flds1=( $line1 )
+            flds2=( $line2 )
+            if [[ ${#flds1[@]} !=  ${#flds2[@]} ]];
+            then
+                tc_passed=false
+                echo "Failed (different number of fields): $line1 != $ line2"
+            else
+                for ((i=0; i<${#flds1[@]}; i++));
+                do
+                    if [[ $i != 6 ]];
+                    then
+                        if [[ ${flds1[i]} != ${flds2[i]} ]];
+                        then
+                            tc_passed=false
+                            echo "Failed (field $i mismatch): $line1 != $line2"
+                        fi
+                    else
+                        # Special check for field 6 (a time value that can vary some)
+                        if [[ ${flds1[i]} != ${flds2[i]} ]];
+                        then
+                            tc_passed=false
+                            echo "The time field doesn't match: $line1 != $line2"
+                        fi
+                    fi
+                done
+            fi
+        done
+        ;;
     *~)
         continue
         ;;
@@ -47,7 +79,7 @@ do
                         tc_passed=false
                     fi
                 fi
-		
+
 		# check to make sure that the diff isn't for something other than recv_time
 		echo "$line" | grep "^[+-]";
 		rv=$?
@@ -55,7 +87,7 @@ do
 		then
 		    has_non_recv_diffline=true
 		fi
-		
+
                 if [[ $line == "-"* ]]
                 then
 		    before_val=$tmp_float_num
@@ -92,13 +124,14 @@ do
                 fi
             done <<< "$test_diff"
 
-	    if [[ $tc_passed == false ]];
-	    then
-	    	passed=false
-            	echo "FAILED $f does not match"
-	    fi
         fi
     esac
+
+    if [[ $tc_passed == false ]];
+    then
+        passed=false
+        echo "FAILED $f does not match"
+    fi
 done
 
 if [ $passed = "true" ]
