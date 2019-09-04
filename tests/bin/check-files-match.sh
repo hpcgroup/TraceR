@@ -127,14 +127,14 @@ do
         fi
     esac
 
-    if [[ $tc_passed == false ]];
+    if [[ $tc_passed == "false" ]];
     then
         passed=false
         echo "FAILED $f does not match"
     fi
 done
 
-if [ $passed = "true" ]
+if [[ $passed == "true" ]]
 then
    exit 0
 else
