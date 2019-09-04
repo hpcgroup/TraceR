@@ -47,10 +47,18 @@ do
                     then
                         if [[ $i == $ignore_time_fld ]];
                         then
-                            echo "Ignoring time field mismatch"
+                            :
+                            #echo "Ignoring time field mismatch"
                         elif [[ $i == $tol_time_fld ]];
                         then
-                            echo "Check time field within tolerance"
+                            echo "Checking time field..."
+                            if [[ $(echo "sqrt((${flds1[i]} - ${flds2[i]})^2) > 0.000001" | bc -l) == 1 ]]
+		    	            then
+			                    tc_passed=false
+			                    echo "-- outside tolerance [> .000001]"
+			                else
+			                    echo "-- within tolerance [<= .000001]"
+		                    fi
                         else
                             tc_passed=false
                             echo ***
