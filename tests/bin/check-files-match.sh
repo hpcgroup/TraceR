@@ -11,12 +11,12 @@ do
     tc_passed=true
 
     case $f in
-    *-msg-stats)
+    *msg-stats)
         # direct comparison won't work, times vary
         echo "=========================================="
 	    echo "checking: $f"
 	    echo "=========================================="
-        paste -d@ "$fRun" "$f" | while IFS="@" read -r line1 line2;
+        while IFS="@" read -r line1 line2;
         do
             flds1=( $line1 )
             flds2=( $line2 )
@@ -32,19 +32,22 @@ do
                         if [[ ${flds1[i]} != ${flds2[i]} ]];
                         then
                             tc_passed=false
-                            echo "Failed (field $i mismatch): $line1 != $line2"
+                            echo "Failed (field $i mismatch): ${flds1[i]} != ${flds2[i]}"
+                            echo "Output: $line1"
+                            echo "Regression: $line2"
                         fi
+                    # A tolerance check needs to be added for field 4; small variation between Travis and LC run
                     else
-                        # Special check for field 6 (a time value that can vary some)
+                        # Special check for field 7 (time value varies a lot... likely best to ignore)
                         if [[ ${flds1[i]} != ${flds2[i]} ]];
                         then
                             tc_passed=false
-                            echo "The time field doesn't match: $line1 != $line2"
+                            echo "Time field doesn't match: ${flds1[i]} != ${flds2[i]}"
                         fi
                     fi
                 done
             fi
-        done
+        done <<< "$(paste -d@ "$fRun" "$f")"
         ;;
     *~)
         continue
@@ -127,17 +130,12 @@ do
         fi
     esac
 
-    if [[ $tc_passed == "false" ]];
+    if [[ "$tc_passed" == "false" ]];
     then
         passed=false
         echo "FAILED $f does not match"
     fi
 done
 
-if [[ $passed == "true" ]]
-then
-   exit 0
-else
-   exit 1
-fi
-
+# Passed should be either true or false, corresponding to the right command
+$passed
