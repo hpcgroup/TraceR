@@ -16,6 +16,22 @@ do
         echo "=========================================="
 	    echo "checking: $f"
 	    echo "=========================================="
+        IFS=">" read -ra header <<< "$(head -n 1 $f)"
+        ignore_time_fld=-1
+        tol_time_fld=-1
+        for ((i=0; i<${#header[@]}; i++));
+        do
+            if [[ ${header[i]} == *"Busy Time"* ]];
+            then
+                ignore_time_fld=$i
+                echo "Ignoring times in field index $ignore_time_fld"
+            elif [[ ${header[i]} == *"Time"* ]];
+            then
+                tol_time_fld=$i
+                echo "Checking time tol for field index $tol_time_fld"
+            fi
+        done
+
         while IFS="@" read -r line1 line2;
         do
             flds1=( $line1 )
@@ -27,22 +43,21 @@ do
             else
                 for ((i=0; i<${#flds1[@]}; i++));
                 do
-                    if [[ $i != 6 ]];
+                    if [[ ${flds1[i]} != ${flds2[i]} ]];
                     then
-                        if [[ ${flds1[i]} != ${flds2[i]} ]];
+                        if [[ $i == $ignore_time_fld ]];
                         then
+                            echo "Ignoring time field mismatch"
+                        elif [[ $i == $tol_time_fld ]];
+                        then
+                            echo "Check time field within tolerance"
+                        else
                             tc_passed=false
+                            echo ***
                             echo "Failed (field $i mismatch): ${flds1[i]} != ${flds2[i]}"
                             echo "Output: $line1"
                             echo "Regression: $line2"
-                        fi
-                    # A tolerance check needs to be added for field 4; small variation between Travis and LC run
-                    else
-                        # Special check for field 7 (time value varies a lot... likely best to ignore)
-                        if [[ ${flds1[i]} != ${flds2[i]} ]];
-                        then
-                            tc_passed=false
-                            echo "Time field doesn't match: ${flds1[i]} != ${flds2[i]}"
+                            echo ***
                         fi
                     fi
                 done
