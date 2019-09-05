@@ -34,9 +34,8 @@ do
 
         while IFS="@" read -r line1 line2;
         do
-            flds1=( $line1 )
-	    read -a
-            flds2=( $line2 )
+            read -ra flds1 <<< "$line1"
+            read -ra flds2 <<< "$line2"
             if [[ "${#flds1[@]}" !=  "${#flds2[@]}" ]];
             then
                 tc_passed=false
