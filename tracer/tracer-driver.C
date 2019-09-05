@@ -385,7 +385,7 @@ int main(int argc, char **argv)
               MPI_Abort(MPI_COMM_WORLD, 1);
             }
             size_t rv = fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
-            if(rv != num_workers && feof(rfile) == 0) {
+            if(rv != static_cast<size_t>(num_workers) && feof(rfile) == 0) {
               // Error occurred while reading other than end of file
             }
             fclose(rfile);
