@@ -1467,7 +1467,6 @@ void perform_a2a_blocked_rev(
     tw_bf * b,
     int isEvent) {
   Task *t;
-  /*int64_t seq = ns->my_pe->currentCollSeq;*/
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
@@ -2103,7 +2102,6 @@ void handle_coll_complete_rev_event(
   ns->my_pe->currentCollSeq = m->msgId.seq;
   ns->my_pe->currentCollComm = m->msgId.comm;
   ns->my_pe->currentCollRank = m->coll_info;
-  /*Task *t = &ns->my_pe->myTasks[m->executed.taskid];*/
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
   if(m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALLGATHER_LARGE || 

@@ -323,10 +323,7 @@ int main(int argc, char **argv)
       /* replace all messages of size = x */
       if(next == 'S' || next == 's') {
         int size_value, size_by, jobid;
-        if(fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by) != 3)
-        {
-          /* read or matching error for some of the parameters; any defaults or abort? */
-        }
+        assert(fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by) != 3 && "Wrong message size replacement format");
         addMsgSizeSub(jobid, size_value, size_by, num_jobs);
         if(!rank)
           printf("Will replace all messages of size %d by %d for job %d\n",
@@ -334,10 +331,7 @@ int main(int argc, char **argv)
       }
       /* replace all compute tasks with exec time greater x */
       if(next == 'T' || next == 't') {
-        if(fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by) != 2)
-        {
-          /* read or matching error for some of the parameters; any defaults or abort? */
-        }
+        assert(fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by) != 2 && "Wrong task execution time replacement format");
         if(!rank)
           printf("Will replace all methods with exec time greater than %lf by %lf\n", 
               time_replace_limit, time_replace_by);
@@ -347,10 +341,7 @@ int main(int argc, char **argv)
         double etime;
         int jobid;
         char eName[256];
-        if(fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime) != 3)
-        {
-          /* read or matching error for some of the parameters, any defaults or abort? */
-        }
+        assert(fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime) != 3 && "Wrong specific region/event time replacement format");
         if(!rank)
           printf("Will make all events with name %s run for %lf s for job %d; if scale_all, events will be scaled down\n", 
             eName, etime, jobid);
@@ -718,7 +709,6 @@ void proc_finalize(
     if(dump_topo_only) return;
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
-    /* tw_stime finalTime = tw_now(lp); */
 
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
