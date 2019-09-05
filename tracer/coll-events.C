@@ -1441,7 +1441,7 @@ void perform_a2a_blocked(
       dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + i) 
         %  ns->my_pe->currentCollSize;
       assert(dest >= 0);
-      assert(dest < g.members.size());
+      assert(static_cast<unsigned int>(dest) < g.members.size());
       if(dest == ns->my_pe->currentCollRank) break;
       dest = g.members[dest];
       tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;

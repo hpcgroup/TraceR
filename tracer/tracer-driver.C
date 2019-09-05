@@ -384,7 +384,10 @@ int main(int argc, char **argv)
                   jobs[i].map_file);
               MPI_Abort(MPI_COMM_WORLD, 1);
             }
-            fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+            size_t rv = fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+            if(rv != num_workers && feof(jobs[i].rankMap) == 0) {
+              // Error occurred while reading other than end of file
+            }
             fclose(rfile);
           }
           MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
@@ -793,7 +796,8 @@ void handle_kickoff_event(
     }
   
     //Safety check if the pe_to_lpid converter is correct
-    assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
+    assert(pe_to_lpid(my_pe_num, my_job) >= 0)
+    assert(static_cast<unsigned int>(pe_to_lpid(my_pe_num, my_job)) == lp->gid);
     assert(PE_is_busy(ns->my_pe) == false);
     TaskPair pair;
     pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);

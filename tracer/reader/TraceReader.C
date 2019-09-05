@@ -404,8 +404,8 @@ void TraceReader_readOTF2Trace(PE* pe, int my_pe_num, int my_job, double *startT
        || t->event_id == TRACER_RECV_EVT || t->event_id == TRACER_RECV_COMP_EVT
        || t->event_id == TRACER_COLL_EVT)
     { 
-      if(size_replace_limit[pe->jobNum] != -1 && 
-          t->myEntry.msgId.size >= size_replace_limit[pe->jobNum]) {
+      if(size_replace_limit[pe->jobNum] > -1 && 
+          t->myEntry.msgId.size >= static_cast<unsigned int>(size_replace_limit[pe->jobNum])) {
         t->myEntry.msgId.size = size_replace_by[pe->jobNum];
       }
       if(msgSizeSub != NULL) {
