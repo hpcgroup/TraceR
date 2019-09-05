@@ -16,7 +16,7 @@ do
         echo "=========================================="
 	    echo "checking: $f"
 	    echo "=========================================="
-        IFS=">" read -ra header <<< "$(head -n 1 $f)"
+        IFS=">" read -ra header <<< "$(head -n 1 "$f")"
         ignore_time_fld=-1
         tol_time_fld=-1
         for ((i=0; i<${#header[@]}; i++));
@@ -35,21 +35,22 @@ do
         while IFS="@" read -r line1 line2;
         do
             flds1=( $line1 )
+	    read -a
             flds2=( $line2 )
-            if [[ ${#flds1[@]} !=  ${#flds2[@]} ]];
+            if [[ "${#flds1[@]}" !=  "${#flds2[@]}" ]];
             then
                 tc_passed=false
                 echo "Failed (different number of fields): $line1 != $ line2"
             else
                 for ((i=0; i<${#flds1[@]}; i++));
                 do
-                    if [[ ${flds1[i]} != ${flds2[i]} ]];
+                    if [[ "${flds1[i]}" != "${flds2[i]}" ]];
                     then
-                        if [[ $i == $ignore_time_fld ]];
+                        if [[ "$i" == "$ignore_time_fld" ]];
                         then
                             :
                             #echo "Ignoring time field mismatch"
-                        elif [[ $i == $tol_time_fld ]];
+                        elif [[ "$i" == "$tol_time_fld" ]];
                         then
                             echo "Checking time field..."
                             if [[ $(echo "sqrt((${flds1[i]} - ${flds2[i]})^2) > 0.000001" | bc -l) == 1 ]]
@@ -61,11 +62,11 @@ do
 		                    fi
                         else
                             tc_passed=false
-                            echo ***
+                            echo "***"
                             echo "Failed (field $i mismatch): ${flds1[i]} != ${flds2[i]}"
                             echo "Output: $line1"
                             echo "Regression: $line2"
-                            echo ***
+                            echo "***"
                         fi
                     fi
                 done
