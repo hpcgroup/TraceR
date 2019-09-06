@@ -33,8 +33,8 @@ is used for simulating the communication on the network.
    Optionally, mapping files can also be provided. See :ref:`userguide-tracer-config-file`, :ref:`userguide-codes-config-file`,
    and :ref:`userguide-job-placement-file` in the user guide for instructions on creating the files.
 
-4. Run the simulation using ``mpirun``. For details on options available, see the
-   :ref:`quickstart section of the user guide <userguide-quickstart>`. This command will
+4. Run the simulation using ``mpirun``. For details on options available, see
+   :ref:`userguide-quickstart` in the user guide. This command will
    run a simulation in optimistic mode::
     
     mpirun -np <p> ../traceR --sync=3  -- <network_config> <tracer_config>
