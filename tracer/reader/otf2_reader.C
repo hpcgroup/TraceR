@@ -227,12 +227,14 @@ callbackEvtEnd( OTF2_LocationRef    location,
   LocationData* ld = (LocationData*)(((AllData *)userData)->ld);
   AllData *globalData = (AllData *)userData;
   if(globalData->regions[region].isTracerPrintEvt) {
+    addUserEvt(userData, time);
     ld->tasks.push_back(Task());
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
     new_task.event_id = region;
   }
   if(globalData->regions[region].isLoopEvt) {
+    addUserEvt(userData, time);
     ld->tasks.push_back(Task());
     Task &new_task = ld->tasks[ld->tasks.size() - 1];
     new_task.execTime = 0;
