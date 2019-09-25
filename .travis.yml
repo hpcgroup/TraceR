@@ -59,6 +59,7 @@ script:
     mkdir -p ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly
     mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly --sync=3 -- ../conf/dfly.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1 > ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/std.out
     rv=$?
+    cat ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/std.out
     popd
     if [[ $rv == 0 ]]; then true; else false; fi
   - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-dfly
@@ -67,6 +68,7 @@ script:
     mkdir -p ${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree
     mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree --sync=3 -- ../conf/fattree.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1 > ${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree/std.out
     rv=$?
+    cat ${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree/std.out
     popd
     if [[ $rv == 0 ]]; then true; else false; fi
   - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-fattree
@@ -75,6 +77,7 @@ script:
     mkdir -p ${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre
     mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre --sync=3 -- ../conf/hypreX_expressMesh.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1 > ${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre/std.out
     rv=$?
+    cat ${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre/std.out
     popd
     if [[ $rv == 0 ]]; then true; else false; fi
   - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-hypre
@@ -83,6 +86,7 @@ script:
     mkdir -p ${TRAVIS_BUILD_DIR}/tests/output/test-output-torus
     mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-torus --sync=3 -- ../conf/torus.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1 > ${TRAVIS_BUILD_DIR}/tests/output/test-output-torus/std.out
     rv=$?
+    cat ${TRAVIS_BUILD_DIR}/tests/output/test-output-torus/std.out
     popd
     if [[ $rv == 0 ]]; then true; else false; fi
   - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-torus
