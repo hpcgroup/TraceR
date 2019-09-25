@@ -12,5 +12,3 @@ Set num_servers per router 4, servers per injection queue per router 4, servers 
 [ 0 0 : Begin TRACER_WallTime_InLoop 0.000593 ]
 [ 1 0 : End TRACER_WallTime_Loop 0.000654 ]
 [ 0 0 : End TRACER_WallTime_Loop 0.001170 ]
-GVT #2174: simulation 100% complete, max event queue size 454 (GVT = MAX).
-AVL tree size: 0
