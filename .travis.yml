@@ -57,7 +57,7 @@ script:
   - |
     pushd examples/stencil4d-otf
     mkdir -p ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly
-    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly --sync=3 -- ../conf/dfly.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1 > ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/std.out
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly --sync=3 -- ../conf/dfly.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -1
     rv=$?
     cat ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/std.out
     popd
