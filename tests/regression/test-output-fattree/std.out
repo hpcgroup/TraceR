@@ -1,10 +1,13 @@
-[ 0 0 : time at task 0/100 0.000000 ]
+
 PE0 - LP_GID:120 : START SIMULATION, TASKS COUNT: 100, FIRST TASK: 0, RUN TIME TILL NOW=0.000000 s, CURRENT SIM TIME 1.026656
+PE0 - LP_GID:0 : START SIMULATION, TASKS COUNT: 100, FIRST TASK: 0, RUN TIME TILL NOW=0.000000 s, CURRENT SIM TIME 1.005877
+Set num_servers per router 8, servers per injection queue per router 8, servers per node copy queue per node 1
+[ 0 0 : time at task 0/100 0.000000 ]
+[ 0 0 : Begin TRACER_WallTime_Loop 0.000010 ]
 [ 1 0 : time at task 0/100 0.000000 ]
 [ 1 0 : Begin TRACER_WallTime_Loop 0.000008 ]
-[ 0 0 : Begin TRACER_WallTime_Loop 0.000010 ]
-Set num_servers per router 8, servers per injection queue per router 8, servers per node copy queue per node 1
 [ 1 0 : Begin TRACER_WallTime_InLoop 0.000017 ]
 [ 0 0 : Begin TRACER_WallTime_InLoop 0.000021 ]
 [ 1 0 : Begin TRACER_WallTime_InLoop 0.000183 ]
-[ 1 0 : End TRACER_WallTime_Loop 0.000382 ]
+[ 0 0 : Begin TRACER_WallTime_InLoop 0.000386 ]
+[ 0 0 : End TRACER_WallTime_Loop 0.000787 ]
