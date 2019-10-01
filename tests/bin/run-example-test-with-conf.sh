@@ -15,7 +15,7 @@ echo exampleName=$exampleName
 echo confName=$confName
 
 pushd ${examplePath}/${exampleName}
-mpirun -np 2 ${basePath}/install-test/bin/traceR --lp-io-dir=${testPath}/output/test-output-${confName} --sync=3 -- ../conf/${confName}.conf tracer_config | sed -n '/START * SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
+mpirun -np 2 ${basePath}/install-test/bin/traceR --lp-io-dir=${testPath}/output/test-output-${confName} --sync=3 -- ../conf/${confName}.conf tracer_config | sed -n '/START (PARALLEL|SEQUENTIAL)* SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
 rv=$?
 cat std.out
 mv std.out ${testPath}/output/test-output-${confName}/std.out
