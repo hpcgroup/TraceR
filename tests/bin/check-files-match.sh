@@ -29,6 +29,9 @@ do
             then
                 tol_time_fld=$i
                 echo "Checking time tol for field index $tol_time_fld"
+            elif [[ ${header[i]} == *"Avg packet latency"* ]];
+                tol_time_fld=$i
+                echo "Checking time tol for field index $tol_time_fld"
             fi
         done
 
