@@ -416,7 +416,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   ld->tasks.push_back(Task());
   Task &new_task = ld->tasks[ld->tasks.size() - 1];
   new_task.execTime = soft_delay_mpi;
-  new_task.event_id = TRACER_RECV_COMP_EVT;
+  new_task.event_id = TRACER_RECV_EVT;
   Group& group = globalData->groups[globalData->communicators[communicator]];
   new_task.myEntry.msgId.pe = locationID;
   new_task.myEntry.msgId.id = msgTag;
@@ -430,6 +430,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
 
   std::map<int, int>::iterator it = ((AllData *)userData)->matchRecvIds.find(requestID);
   assert(it != ((AllData *)userData)->matchRecvIds.end());
+  /*
   Task &postTask = ld->tasks[it->second];
   postTask.event_id = TRACER_RECV_POST_EVT;
   postTask.myEntry.msgId.pe = locationID;
@@ -438,6 +439,7 @@ callbackIrecvCompEvt(OTF2_LocationRef locationID,
   postTask.myEntry.msgId.comm = communicator;
   postTask.myEntry.msgId.coll_type = -1;
   postTask.myEntry.node = new_task.myEntry.node;
+  */
   ((AllData *)userData)->matchRecvIds.erase(it);
 #endif
   ld->lastLogTime = time;
