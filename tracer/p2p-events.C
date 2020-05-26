@@ -470,6 +470,7 @@ tw_stime exec_task(
     m->saved_task = ns->my_pe->currentTask;
     ns->my_pe->currentTask = task_id.taskid;
 
+
 #if TRACER_BIGSIM_TRACES
     //For each entry of the task, create a recv event and send them out to
     //whereever it belongs       
@@ -716,6 +717,23 @@ tw_stime exec_task(
     exec_comp(ns, task_id.iter, task_id.taskid, 0, finish_time, 0, lp);
     if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
       ns->end_ts = tw_now(lp);
+    }
+    
+    if(t->event_id == TRACER_LOOP_EVT && ns->region_start == 0){
+        ns->computation_t = 0;
+        ns->regionruntime_t = 0;
+        ns->region_start = 1;
+    }
+    else if (t->event_id == TRACER_LOOP_EVT && ns->region_start == 1){
+	ns->region_end = 1;
+    }
+    
+    /*Computation time add*/
+    if(t->event_id == TRACER_USER_EVT && ns->region_end == 0){
+        ns->computation_t += time;
+         printf("[%d:%d] COMP: ns->computation_t %f finish_time %f codes_local_latency(lp) %f sendFinishTime %f recvFinishTime %f time %f tw_now(lp) %f\n", ns->my_job,
+          ns->my_pe_num, ns->computation_t, finish_time, codes_local_latency(lp), sendFinishTime, recvFinishTime, time, tw_now(lp));
+        
     }
     //Return the execution time of the task
     return time;

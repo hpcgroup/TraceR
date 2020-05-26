@@ -45,6 +45,10 @@ struct proc_state
 {
     tw_stime start_ts;  /* time when first event is processed */
     tw_stime end_ts;    /* time when last event is processed */
+    tw_stime computation_t; /* store time spend in computation*/
+    tw_stime regionruntime_t; /* store runtime time spend in a region*/
+    int region_start;
+    int region_end;
     PE* my_pe;          /* stores all core information */
 #if TRACER_BIGSIM_TRACES
     TraceReader* trace_reader; /* for reading the bigsim traces */

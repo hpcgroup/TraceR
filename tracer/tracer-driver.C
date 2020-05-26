@@ -460,6 +460,16 @@ void proc_init(
     /* skew each kickoff event slightly to help avoid event ties later on */
     kickoff_time = startTime + g_tw_lookahead + tw_rand_unif(lp->rng);
     ns->end_ts = 0;
+    
+    /* Initialize net time spend in computation by a processes to 0*/
+    ns->computation_t = 0;
+    /* Initialize net runtime time spend in a region  by a processes to 0*/
+    ns->regionruntime_t = 0;
+    /* Flag to indicate the start of a region*/
+    ns->region_start = 0;
+    /* Flag to indicate the end of a region*/
+    ns->region_end = 0;
+    
     /* maintain message sequencing for MPI */
     ns->my_pe->sendSeq = new int64_t[jobs[ns->my_job].numRanks];
     ns->my_pe->recvSeq = new int64_t[jobs[ns->my_job].numRanks];
@@ -678,6 +688,11 @@ void proc_finalize(
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
           ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
+   
+    tw_stime commTime = ns->regionruntime_t - ns->computation_t;
+   if(lpid_to_pe(lp->gid) == 0)
+    printf("Job[%d]PE[%d]: Computation time in %f seconds.\n", ns->my_job,
+      ns->my_pe_num, ns_to_s(ns->computation_t));
 
 #if TRACER_OTF_TRACES
     PE_printStat(ns->my_pe, -1);
