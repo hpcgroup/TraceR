@@ -40,15 +40,24 @@ typedef struct CoreInf {
     int mapsTo, jobID;
 } CoreInf;
 
+/* stores mapping of core to Communication Time and Computation Time */
+typedef struct TimeInfo{
+    int jobID;
+    int rank;
+    tw_stime comm_time;
+    tw_stime comp_time;
+} TimeInfo;
+
 /* ROSS level state information for each core */
 struct proc_state
 {
     tw_stime start_ts;  /* time when first event is processed */
     tw_stime end_ts;    /* time when last event is processed */
     tw_stime computation_t; /* store time spend in computation*/
-    tw_stime regionruntime_t; /* store runtime time spend in a region*/
-    int region_start;
-    int region_end;
+    int region_start;/* flag to mark the start of a region*/
+    int region_end;/* flag to mark end of a region*/
+    int region_start_sim_time;/* store current simulation time when the region starts*/
+    int region_end_sim_time;/* store current simulation time when region ends*/
     PE* my_pe;          /* stores all core information */
 #if TRACER_BIGSIM_TRACES
     TraceReader* trace_reader; /* for reading the bigsim traces */

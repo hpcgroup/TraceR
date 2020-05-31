@@ -718,14 +718,16 @@ tw_stime exec_task(
     if(PE_isEndEvent(ns->my_pe, task_id.taskid)) {
       ns->end_ts = tw_now(lp);
     }
-    
+    /* Marks beginning of region */   
     if(t->event_id == TRACER_LOOP_EVT && ns->region_start == 0){
-        ns->computation_t = 0;
-        ns->regionruntime_t = 0;
+        ns->computation_t = 0; 
+        ns->region_start_sim_time = tw_now(lp);
         ns->region_start = 1;
     }
+    /* Marks End of Region */
     else if (t->event_id == TRACER_LOOP_EVT && ns->region_start == 1){
-	ns->region_end = 1;
+	ns->region_end_sim_time = tw_now(lp);
+        ns->region_end = 1;
     }
     
     /*Computation time add*/
