@@ -420,7 +420,7 @@ int main(int argc, char **argv)
         for(int i = 0; i < num_jobs; i++) {
             printf("Job %d Time %f s\n", i, ns_to_s(jobTimesMax[i]));
         }
-#if DEBUG_PRINT
+#if WRITE_APP_TIME
         FILE *fptr = fopen("mpi_rank_times.txt","w");
 	for (int i = 0; i < num_servers; i++){
 		fprintf(fptr,"Job %d Rank %d Comp Time %f Comm Time %f\n", time_rank[i].jobID, time_rank[i].rank, time_rank[i].comp_time, time_rank[i].comm_time);
