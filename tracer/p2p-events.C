@@ -721,20 +721,25 @@ tw_stime exec_task(
     /* Marks beginning of region */   
     if(t->event_id == TRACER_LOOP_EVT && ns->region_start == 0){
         ns->computation_t = 0; 
-        ns->region_start_sim_time = tw_now(lp);
+        ns->region_start_sim_time = finish_time;
         ns->region_start = 1;
     }
     /* Marks End of Region */
     else if (t->event_id == TRACER_LOOP_EVT && ns->region_start == 1){
 	ns->region_end_sim_time = tw_now(lp);
-        ns->region_end = 1;
+#if DEBUG_PRINT
+         printf("[%d:%d] COMP: ns->computation_t %f start_time %f finish_time %f  tw_now(lp) %f region_end_sim_time %f\n", ns->my_job,ns->my_pe_num, ns->computation_t, ns->region_start_sim_time, finish_time, tw_now(lp), ns->region_end_sim_time);
+#endif     
+   ns->region_end = 1;
     }
     
     /*Computation time add*/
     if(t->event_id == TRACER_USER_EVT && ns->region_end == 0){
         ns->computation_t += time;
-         printf("[%d:%d] COMP: ns->computation_t %f finish_time %f codes_local_latency(lp) %f sendFinishTime %f recvFinishTime %f time %f tw_now(lp) %f\n", ns->my_job,
+#if DEBUG_PRINT 
+        printf("[%d:%d] COMP: ns->computation_t %f finish_time %f codes_local_latency(lp) %f sendFinishTime %f recvFinishTime %f time %f tw_now(lp) %f\n", ns->my_job,
           ns->my_pe_num, ns->computation_t, finish_time, codes_local_latency(lp), sendFinishTime, recvFinishTime, time, tw_now(lp));
+#endif
         
     }
     //Return the execution time of the task

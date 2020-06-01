@@ -728,10 +728,6 @@ void proc_finalize(
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
           ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
-   
-   if(lpid_to_pe(lp->gid) == 0)
-    printf("Job[%d]PE[%d]: Computation time in %f seconds.\n", ns->my_job,
-      ns->my_pe_num, ns_to_s(ns->computation_t));
 
 #if TRACER_OTF_TRACES
     PE_printStat(ns->my_pe, -1);
