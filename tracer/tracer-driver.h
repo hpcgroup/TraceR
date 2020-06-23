@@ -56,8 +56,8 @@ struct proc_state
     tw_stime computation_t; /* store time spend in computation*/
     int region_start;/* flag to mark the start of a region*/
     int region_end;/* flag to mark end of a region*/
-    int region_start_sim_time;/* store current simulation time when the region starts*/
-    int region_end_sim_time;/* store current simulation time when region ends*/
+    tw_stime region_start_sim_time;/* store current simulation time when the region starts*/
+    tw_stime region_end_sim_time;/* store current simulation time when region ends*/
     PE* my_pe;          /* stores all core information */
 #if TRACER_BIGSIM_TRACES
     TraceReader* trace_reader; /* for reading the bigsim traces */
@@ -144,6 +144,7 @@ int pe_to_lpid(int pe, int job);
 int pe_to_job(int pe);
 int lpid_to_pe(int lp_gid);
 int lpid_to_job(int lp_gid);
+int lpid_to_global_rank(int lp_gid);
 
 /* change of units for time */
 tw_stime ns_to_s(tw_stime ns);

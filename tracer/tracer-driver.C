@@ -48,6 +48,8 @@ int total_ranks;
 tw_stime *jobTimes;
 tw_stime *commTimes;
 tw_stime *compTimes;
+tw_stime *maxCompTime;
+tw_stime *maxCommTime;
 int num_jobs = 0;
 tw_stime soft_delay_mpi = 100;
 tw_stime nic_delay = 400;
@@ -254,7 +256,8 @@ int main(int argc, char **argv)
     compTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     commTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
-
+    maxCommTime = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
+    maxCompTime = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     /* read per job information */
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
@@ -273,6 +276,8 @@ int main(int argc, char **argv)
         jobTimes[i] = 0;
         compTimes[i] = 0;
         commTimes[i] = 0;
+        maxCompTime[i] = 0;
+	maxCommTime[i] = 0;
         if(!rank) {
           printf("Job %d - ranks %d, trace folder %s, rank file %s, iters %d\n",
             i, jobs[i].numRanks, jobs[i].traceDir, jobs[i].map_file, jobs[i].numIters);
@@ -420,22 +425,28 @@ int main(int argc, char **argv)
         for(int i = 0; i < num_jobs; i++) {
             printf("Job %d Time %f s\n", i, ns_to_s(jobTimesMax[i]));
         }
-#if WRITE_APP_TIME
+#ifdef WRITE_MPI_TIMES
         FILE *fptr = fopen("mpi_rank_times.txt","w");
 	for (int i = 0; i < num_servers; i++){
 		fprintf(fptr,"Job %d Rank %d Comp Time %f Comm Time %f\n", time_rank[i].jobID, time_rank[i].rank, time_rank[i].comp_time, time_rank[i].comm_time);
 	}
         fclose(fptr);
 #endif
-
 	for (int i = 0; i < num_servers; i++){
 		if (time_rank[i].jobID >= 0){
                         commTimes[time_rank[i].jobID] += time_rank[i].comm_time;
-                        compTimes[time_rank[i].jobID] += time_rank[i].comp_time;       
+                        compTimes[time_rank[i].jobID] += time_rank[i].comp_time; 
+                        if((time_rank[i].comm_time + time_rank[i].comp_time) > (maxCommTime[time_rank[i].jobID] + maxCompTime[time_rank[i].jobID])){
+				maxCommTime[time_rank[i].jobID] = time_rank[i].comm_time;
+				maxCompTime[time_rank[i].jobID] = time_rank[i].comp_time;
+			}
                 }
 	}
 	for (int i = 0; i < num_jobs; i++){
-		printf("Job[%d] : Communication Time %f, Computation Time %f\n", i, commTimes[i], compTimes[i]);
+		printf("Job[%d] : Total Communication Time %f, Total Computation Time %f\n", i, ns_to_s(commTimes[i]), ns_to_s(compTimes[i]));
+	}
+	for (int i = 0; i < num_jobs; i++){
+		printf("Job[%d] : Max Communication Time %f, Max Computation Time %f\n", i, ns_to_s(maxCommTime[i]), ns_to_s(maxCompTime[i]));
 	}
 
 	
@@ -721,10 +732,10 @@ void proc_finalize(
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
     tw_stime commTime = ((ns->region_end_sim_time - ns->region_start_sim_time) - ns->computation_t);
-    time_rank[ns->my_pe_num * (ns->my_job + 1)].jobID = ns->my_job;
-    time_rank[ns->my_pe_num * (ns->my_job + 1)].rank = ns->my_pe_num;
-    time_rank[ns->my_pe_num * (ns->my_job + 1)].comp_time = ns->computation_t;
-    time_rank[ns->my_pe_num * (ns->my_job + 1)].comm_time = commTime;
+    time_rank[lpid_to_global_rank(lp->gid)].jobID = ns->my_job;
+    time_rank[lpid_to_global_rank(lp->gid)].rank = ns->my_pe_num;
+    time_rank[lpid_to_global_rank(lp->gid)].comp_time = ns->computation_t;
+    time_rank[lpid_to_global_rank(lp->gid)].comm_time = commTime;
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
           ns->my_pe_num, ns_to_s(tw_now(lp)-ns->start_ts));
@@ -989,6 +1000,10 @@ inline int lpid_to_job(int lp_gid){
 }
 inline int pe_to_job(int pe){
     return global_rank[pe].jobID;;
+}
+inline int lpid_to_global_rank(int lp_gid){
+	int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
+        return server_num;
 }
 
 bool isPEonThisRank(int jobID, int i) {
