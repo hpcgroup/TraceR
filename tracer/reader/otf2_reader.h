@@ -59,6 +59,7 @@ struct Region {
   bool isTracerPrintEvt;
   bool isLoopEvt;
   bool isCommunication;
+  bool isExtraTracerEvt;
 };
 
 struct Group {
