@@ -27,6 +27,7 @@
 *.a
 *.d
 tracer/traceR
+bin/traceR
 
 # hide backups
 *~

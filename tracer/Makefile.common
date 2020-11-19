@@ -30,6 +30,7 @@ SEQ_CXX = ${CXX}
 # ROSS install directory
 ROSS_DIR = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/ross-7.0.0
 
+
 # CODES install directory
 CODES_DIR  = ${HOME}/spack/opt/spack/linux-rhel7-x86_64/gcc-4.9.3/codes-1.0.0
 CODES_LIBS = -L${CODES_DIR}/lib -Wl,-rpath,${CODES_DIR}/lib
