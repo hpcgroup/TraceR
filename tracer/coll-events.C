@@ -160,7 +160,7 @@ void enqueue_coll_msg(
       m_local.executed.taskid = ns->my_pe->currentCollTask;
 
 
-	int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), dest);
+	int prio = qosManager.getServiceLevel_coll(ns->my_job, lpid_to_pe(lp->id), dest);
       model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
       
       model_net_event(net_id, "coll", pe_to_lpid(dest, ns->my_job), size, 
@@ -249,7 +249,7 @@ void handle_coll_recv_post_event(
       size = m->msgId.size;
       m_remote.msgId.size = size;
     }
-       int prio = qosManager.getServiceLevel(ns->my_job, lpid_to_pe(lp->id), m->msgId.pe);
+       int prio = qosManager.getServiceLevel_coll(ns->my_job, lpid_to_pe(lp->id), m->msgId.pe);
     model_net_set_msg_param(MN_MSG_PARAM_SCHED, MN_SCHED_PARAM_PRIO, (void*)&prio);
     model_net_event(net_id, "coll", pe_to_lpid(m->msgId.pe, ns->my_job), 
         size, nic_delay, sizeof(proc_msg), 
