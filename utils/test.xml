@@ -1,0 +1,253 @@
+<Report>
+<LinkSummary>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>10M</CableLength>
+    <CableLabel>quartz0 opasw1-1</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>FI</NodeType>
+    <NodeDesc>quartz0 hfi1_0</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw1</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>10M</CableLength>
+    <CableLabel>quartz2 opasw2-1</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>FI</NodeType>
+    <NodeDesc>quartz2 hfi1_0</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw2</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>10M</CableLength>
+    <CableLabel>quartz3 opasw2-2</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>FI</NodeType>
+    <NodeDesc>quartz3 hfi1_0</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>2</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw2</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>5M</CableLength>
+    <CableLabel>opasw1-3 core1-101A-1</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>3</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw1</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101A</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>10M</CableLength>
+    <CableLabel>quartz1 opasw1-2</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>FI</NodeType>
+    <NodeDesc>quartz1 hfi1_0</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>2</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw1</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>5M</CableLength>
+    <CableLabel>opasw1-4 core1-101B-1</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>4</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw1</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>1</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101B</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>5M</CableLength>
+    <CableLabel>opasw2-3 core1-101A-2</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>3</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw2</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>2</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101A</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+    <CableLength>5M</CableLength>
+    <CableLabel>opasw2-4 core1-101B-2</CableLabel>
+    <CableDetails>Fibre</CableDetails>
+  </Cable>
+  <Port>
+    <PortNum>4</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opasw2</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>2</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101B</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+  </Cable>
+  <Port>
+    <PortNum>02</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 S201A</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>3</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101A</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+  </Cable>
+  <Port>
+    <PortNum>01</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 S201A</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>4</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101A</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+  </Cable>
+  <Port>
+    <PortNum>03</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 S201A</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>4</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101B</NodeDesc>
+  </Port>
+</Link>
+<Link>
+  <Rate>100g</Rate>
+  <Internal>0</Internal>
+  <Cable>
+  </Cable>
+  <Port>
+    <PortNum>04</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 S201A</NodeDesc>
+  </Port>
+  <Port>
+    <PortNum>3</PortNum>
+    <NodeType>SW</NodeType>
+    <NodeDesc>opacore1 L101B</NodeDesc>
+  </Port>
+</Link>
+</LinkSummary>
+<Nodes>
+<FIs>
+<Node>
+  <NodeDesc>quartz0 hfi1_0</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>quartz2 hfi1_0</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>quartz3 hfi1_0</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>quartz1 hfi1_0</NodeDesc>
+</Node>
+</FIs>
+<Switches>
+<Node>
+  <NodeDesc>opacore1 L101A</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>opacore1 L101B</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>opasw1</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>opasw2</NodeDesc>
+</Node>
+<Node>
+  <NodeDesc>opacore1 S201A</NodeDesc>
+</Node>
+</Switches>
+</Nodes>
+</Report>
