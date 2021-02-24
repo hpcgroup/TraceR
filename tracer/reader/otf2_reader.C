@@ -49,7 +49,7 @@ callbackDefClockProperties(void * userData,
   clockProperties.ticks_per_second = timerResolution;
   clockProperties.ticksToSecond = TIME_MULT * 1.0/timerResolution;
   if(!g_tw_mynode) 
-    printf("Clock Props: %lld %lld %f\n", clockProperties.ticks_per_second,
+    printf("Clock Props: %lu %d %f\n", clockProperties.ticks_per_second,
       TIME_MULT, clockProperties.ticksToSecond);
   fflush(stdout);
   clockProperties.time_offset = globalOffset;
@@ -180,6 +180,8 @@ addUserEvt(void*               userData,
   new_task.event_id = TRACER_USER_EVT;
 }
 
+// Function only used if NO_COMM_BUILD is defined
+#if NO_COMM_BUILD
 static void 
 addEmptyUserEvt(void* userData)
 {
@@ -189,7 +191,7 @@ addEmptyUserEvt(void* userData)
   new_task.execTime = 0;
   new_task.event_id = TRACER_USER_EVT;
 }
-
+#endif
 
 static OTF2_CallbackCode
 callbackEvtBegin( OTF2_LocationRef    location,

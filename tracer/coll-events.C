@@ -61,9 +61,7 @@ void handle_bcast_rev_event(
 {
   codes_local_latency_reverse(lp);
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 }
 
 
@@ -269,9 +267,7 @@ void handle_coll_recv_post_rev_event(
   }
   if(b->c2) {
     ns->my_pe->pendingRCollMsgs[key].push_front(m->coll_info);
-    for(int i = 0; i < m->model_net_calls; i++) {
-      model_net_event_rc(net_id, lp, 0);
-    }
+    model_net_event_rc2(lp, &(m->model_net_calls));
   }
 }
 
@@ -490,10 +486,7 @@ void perform_bcast_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
   send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_BCAST, lp, isEvent, m);
 }
 
@@ -631,10 +624,7 @@ void perform_reduction_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
   send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_REDUCE, lp, isEvent, m);
 }
 
@@ -773,10 +763,7 @@ void perform_a2a_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c13) {
     if(isEvent) {
@@ -1022,10 +1009,7 @@ void perform_allgather_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c13) {
     if(isEvent) {
@@ -1264,10 +1248,7 @@ void perform_bruck_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c13) {
     if(isEvent) {
@@ -1460,7 +1441,7 @@ void perform_a2a_blocked(
       dest = (ns->my_pe->currentCollRank + ns->my_pe->currentCollPartner + i) 
         %  ns->my_pe->currentCollSize;
       assert(dest >= 0);
-      assert(dest < g.members.size());
+      assert(static_cast<unsigned int>(dest) < g.members.size());
       if(dest == ns->my_pe->currentCollRank) break;
       dest = g.members[dest];
       tw_stime copyTime = copy_per_byte * t->myEntry.msgId.size;
@@ -1486,7 +1467,6 @@ void perform_a2a_blocked_rev(
     tw_bf * b,
     int isEvent) {
   Task *t;
-  int64_t seq = ns->my_pe->currentCollSeq;
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
     ns->my_pe->currentCollComm = ns->my_pe->currentCollTask =
@@ -1510,10 +1490,7 @@ void perform_a2a_blocked_rev(
   }
   
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c15) {
     send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_ALLTOALL_BLOCKED, lp, isEvent, m);
@@ -1784,10 +1761,7 @@ void perform_scatter_small_rev(
   }
 
   codes_local_latency_reverse(lp);
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
   send_coll_comp_rev(ns, 0, TRACER_COLLECTIVE_SCATTER_SMALL, lp, isEvent, m);
 }
 
@@ -1970,10 +1944,7 @@ void perform_scatter_rev(
 {
   Task *t;
   int64_t seq = ns->my_pe->currentCollSeq;
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(!isEvent) {
     t = &ns->my_pe->myTasks[taskid];
@@ -2030,7 +2001,7 @@ void handle_scatter_send_comp_event(
   //move to the next destination by reducing the distance
   ns->my_pe->currentCollPartner >>= 1;
   //send to self
-  tw_event *e = codes_event_new(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
+  tw_event *e = tw_event_new_bounded(lp->gid, soft_delay_mpi + codes_local_latency(lp), lp);
   proc_msg *m_new = (proc_msg*)tw_event_data(e);
   m_new->msgId.pe = ns->my_pe->currentCollRank;
   m_new->msgId.comm = ns->my_pe->currentCollComm;
@@ -2131,7 +2102,6 @@ void handle_coll_complete_rev_event(
   ns->my_pe->currentCollSeq = m->msgId.seq;
   ns->my_pe->currentCollComm = m->msgId.comm;
   ns->my_pe->currentCollRank = m->coll_info;
-  Task *t = &ns->my_pe->myTasks[m->executed.taskid];
   Group &g = jobs[ns->my_job].allData->groups[jobs[ns->my_job].allData->communicators[ns->my_pe->currentCollComm]];
   if(m->msgId.coll_type == TRACER_COLLECTIVE_ALLTOALL_LARGE || 
      m->msgId.coll_type == TRACER_COLLECTIVE_ALLGATHER_LARGE || 
@@ -2190,6 +2160,7 @@ int send_coll_comp_rev(
     proc_msg *m)
 {
   if(isEvent) ns->my_pe->currentCollTask = m->executed.taskid;
+  return 0;
 }
 #endif
 

@@ -183,7 +183,8 @@ int main(int argc, char **argv)
     if(lp_io_dir[0]) {
       ret = lp_io_prepare(lp_io_dir, 0, &handle, MPI_COMM_WORLD);
     } else {
-      ret = lp_io_prepare("tracer-out", LP_IO_UNIQ_SUFFIX, &handle, 
+      char tmpIoDir[] = "tracer-out";
+      ret = lp_io_prepare(tmpIoDir, LP_IO_UNIQ_SUFFIX, &handle, 
                           MPI_COMM_WORLD);
     }
     assert(ret == 0);
@@ -197,7 +198,10 @@ int main(int argc, char **argv)
     }
     char globalIn[256];
     /* global mapping file */
-    fscanf(jobIn, "%s", globalIn);
+    if(fscanf(jobIn, "%s", globalIn) != 1)
+    {
+      globalIn[0] = 0; /* read or matching error, set to empty string */
+    }
 
     global_rank = (CoreInf*) malloc(num_servers * sizeof(CoreInf));
 
@@ -235,7 +239,10 @@ int main(int argc, char **argv)
       MPI_Bcast(global_rank, 2 * num_servers, MPI_INT, 0, MPI_COMM_WORLD);
     }
 
-    fscanf(jobIn, "%d", &num_jobs);    /* number of jobs */
+    if(fscanf(jobIn, "%d", &num_jobs) != 1)    /* number of jobs */
+    {
+      num_jobs = 0; /* read or matching error */
+    }
     jobs = (JobInf*) malloc(num_jobs * sizeof(JobInf));
     jobTimes = (tw_stime*) malloc(num_jobs * sizeof(tw_stime));
     total_ranks = 0;
@@ -244,14 +251,29 @@ int main(int argc, char **argv)
     for(int i = 0; i < num_jobs; i++) {
 #if TRACER_BIGSIM_TRACES
         char tempTrace[200];
-        fscanf(jobIn, "%s", tempTrace);
+        if(fscanf(jobIn, "%s", tempTrace) != 1)
+        {
+          tempTrace[0] = 0; /* read or matching error, set to empty string */
+        }
         sprintf(jobs[i].traceDir, "%s%s", tempTrace, "/bgTrace");
 #else
-        fscanf(jobIn, "%s", jobs[i].traceDir);
+        if(fscanf(jobIn, "%s", jobs[i].traceDir) != 1)
+        {
+          jobs[i].traceDir[0] = 0; /* read or matching error, set to empty string */
+        }
 #endif
-        fscanf(jobIn, "%s", jobs[i].map_file);
-        fscanf(jobIn, "%d", &jobs[i].numRanks); /* number of processes */
-        fscanf(jobIn, "%d", &jobs[i].numIters); /* number of repetitions */
+        if(fscanf(jobIn, "%s", jobs[i].map_file) != 1)
+        {
+          jobs[i].map_file[0] = 0; /* read or matching error, set to empty string */
+        }
+        if(fscanf(jobIn, "%d", &jobs[i].numRanks) != 1) /* number of processes */
+        {
+          jobs[i].numRanks = 0; /* read or matching error */
+        }
+        if(fscanf(jobIn, "%d", &jobs[i].numIters) != 1) /* number of repetitions */
+        {
+          jobs[i].numIters = 0; /* read or matching error */
+        }
         total_ranks += jobs[i].numRanks;
         jobs[i].rankMap = (int*) malloc(jobs[i].numRanks * sizeof(int));
         jobs[i].skipMsgId = -1;
@@ -280,12 +302,18 @@ int main(int argc, char **argv)
     }
 
     char next = ' ';
-    fscanf(jobIn, "%c", &next);
+    if(fscanf(jobIn, "%c", &next) != 1)
+    {
+      next = ' '; /* read or matching error, set to skip char */
+    }
     while(next != ' ') {
       /* replace all messages of size greater than x */
       if(next == 'M' || next == 'm') {
         int size_limit, size_by, jobid;
-        fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by);
+        if(fscanf(jobIn, "%d %d %d", &jobid, &size_limit, &size_by) != 3)
+        {
+          /* read or matching error for some of the parameters; any defaults or abort? */
+        }
         size_replace_limit[jobid] = size_limit;
         size_replace_by[jobid] = size_by;
         if(!rank)
@@ -295,7 +323,7 @@ int main(int argc, char **argv)
       /* replace all messages of size = x */
       if(next == 'S' || next == 's') {
         int size_value, size_by, jobid;
-        fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by);
+        assert(fscanf(jobIn, "%d %d %d", &jobid, &size_value, &size_by) != 3 && "Wrong message size replacement format");
         addMsgSizeSub(jobid, size_value, size_by, num_jobs);
         if(!rank)
           printf("Will replace all messages of size %d by %d for job %d\n",
@@ -303,7 +331,7 @@ int main(int argc, char **argv)
       }
       /* replace all compute tasks with exec time greater x */
       if(next == 'T' || next == 't') {
-        fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by);
+        assert(fscanf(jobIn, "%lf %lf", &time_replace_limit, &time_replace_by) != 2 && "Wrong task execution time replacement format");
         if(!rank)
           printf("Will replace all methods with exec time greater than %lf by %lf\n", 
               time_replace_limit, time_replace_by);
@@ -313,14 +341,17 @@ int main(int argc, char **argv)
         double etime;
         int jobid;
         char eName[256];
-        fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime);
+        assert(fscanf(jobIn, "%d %s %lf", &jobid, eName, &etime) != 3 && "Wrong specific region/event time replacement format");
         if(!rank)
           printf("Will make all events with name %s run for %lf s for job %d; if scale_all, events will be scaled down\n", 
             eName, etime, jobid);
         addEventSub(jobid, eName, etime, num_jobs);
       }
       next = ' ';
-      fscanf(jobIn, "%c", &next);
+      if(fscanf(jobIn, "%c", &next) != 1)
+      {
+        next = ' '; /* read or matching error, set to skip char */
+      }
     }
 
     int ranks_till_now = 0;
@@ -344,7 +375,10 @@ int main(int argc, char **argv)
                   jobs[i].map_file);
               MPI_Abort(MPI_COMM_WORLD, 1);
             }
-            fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+            size_t rv = fread(jobs[i].rankMap, sizeof(int), num_workers, rfile);
+            if(rv != static_cast<size_t>(num_workers) && feof(rfile) == 0) {
+              // Error occurred while reading other than end of file
+            }
             fclose(rfile);
           }
           MPI_Bcast(jobs[i].rankMap, num_workers, MPI_INT, 0, MPI_COMM_WORLD);
@@ -554,7 +588,7 @@ void proc_event(
       handle_coll_complete_event(ns, b, m, lp);
       break;
     default:
-      printf("\n Invalid message type %d event %lld ", 
+      printf("\n Invalid message type %d event %p ", 
           m->proc_event_type, m);
       assert(0);
       break;
@@ -650,15 +684,17 @@ void proc_commit_event(
     tw_bf * b,
     proc_msg * m,
     tw_lp * lp) {
+  int iter = m->iteration;
   switch (m->proc_event_type)
   {
     case EXEC_COMPLETE:
-      int iter = m->iteration;
       if(b->c1) {
         delete [] ns->my_pe->taskStatus[iter];
         delete [] ns->my_pe->taskExecuted[iter];
         delete [] ns->my_pe->msgStatus[iter];
       }
+      break;
+    default:
       break;
   }
 }
@@ -673,7 +709,6 @@ void proc_finalize(
     if(dump_topo_only) return;
 
     tw_stime jobTime = ns->end_ts - ns->start_ts;
-    tw_stime finalTime = tw_now(lp);
 
     if(lpid_to_pe(lp->gid) == 0)
         printf("Job[%d]PE[%d]: FINALIZE in %f seconds.\n", ns->my_job,
@@ -685,18 +720,18 @@ void proc_finalize(
 
     if(ns->my_pe->pendingMsgs.size() != 0 ||
        ns->my_pe->pendingRMsgs.size() != 0) {
-      printf("%d psize %d pRsize %d\n", ns->my_pe_num, 
+      printf("%d psize %zu pRsize %zu\n", ns->my_pe_num, 
         ns->my_pe->pendingMsgs.size(), ns->my_pe->pendingRMsgs.size());
     }
 
     if(ns->my_pe->pendingReqs.size() != 0 ||
       ns->my_pe->pendingRReqs.size() != 0) {
-      printf("%d rsize %d rRsize %d\n", ns->my_pe_num, 
+      printf("%d rsize %zu rRsize %zu\n", ns->my_pe_num, 
         ns->my_pe->pendingReqs.size(), ns->my_pe->pendingRReqs.size());
     }
 
     if(ns->my_pe->pendingRCollMsgs.size() != 0) {
-      printf("%d rcollsize %d \n", ns->my_pe_num, 
+      printf("%d rcollsize %zu \n", ns->my_pe_num, 
         ns->my_pe->pendingRCollMsgs.size());
     }
 
@@ -751,7 +786,8 @@ void handle_kickoff_event(
     }
   
     //Safety check if the pe_to_lpid converter is correct
-    assert(pe_to_lpid(my_pe_num, my_job) == lp->gid);
+    assert(pe_to_lpid(my_pe_num, my_job) >= 0);
+    assert(static_cast<unsigned int>(pe_to_lpid(my_pe_num, my_job)) == lp->gid);
     assert(PE_is_busy(ns->my_pe) == false);
     TaskPair pair;
     pair.iter = 0; pair.taskid = PE_getFirstTask(ns->my_pe);
@@ -930,11 +966,11 @@ int pe_to_lpid(int pe, int job){
 //Utility function to convert tw_lpid to simulated pe number
 //Assuming the servers come first in lp registration in terms of global id
 int lpid_to_pe(int lp_gid){
-    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, 0);
     return global_rank[server_num].mapsTo;
 }
 inline int lpid_to_job(int lp_gid){
-    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, NULL);
+    int server_num = codes_mapping_get_lp_relative_id(lp_gid, 0, 0);
     return global_rank[server_num].jobID;;
 }
 inline int pe_to_job(int pe){

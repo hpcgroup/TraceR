@@ -296,9 +296,7 @@ void handle_recv_post_rev_event(
   }
   if(b->c2) {
      ns->my_pe->pendingRMsgs[key].push_front(m->executed.taskid);
-     for(int i = 0; i < m->model_net_calls; i++) {
-       model_net_event_rc(net_id, lp, 0);
-     }
+     model_net_event_rc2(lp, &(m->model_net_calls));
   }
 }
 
@@ -379,7 +377,7 @@ tw_stime exec_task(
 
     //else continue
     bool needPost = false, returnAtEnd = false;
-    int64_t seq;
+    int64_t seq = 0; /* can this safely be set to ns->my_pe->recvSeq[t->myEntry.node] instead? */
     if(t->event_id == TRACER_RECV_POST_EVT) {
       seq = ns->my_pe->recvSeq[t->myEntry.node];
       ns->my_pe->pendingRReqs[t->req_id] = seq;
@@ -744,7 +742,7 @@ void exec_task_rev(
     ns->my_pe->recvSeq[t->myEntry.node]--;
   }
 
-  int64_t seq;
+  int64_t seq = 0; /* is there a better value to set if the if statement doesn't set it? */
   if(b->c7) {
     if(t->event_id == TRACER_RECV_COMP_EVT) {
       ns->my_pe->pendingRReqs[t->req_id] = t->myEntry.msgId.seq;
@@ -756,10 +754,7 @@ void exec_task_rev(
     }
   }
   
-  for(int i = 0; i < m->model_net_calls; i++) {
-    //TODO use the right size to rc
-    model_net_event_rc(net_id, lp, 0);
-  }
+  model_net_event_rc2(lp, &(m->model_net_calls));
 
   if(b->c21 || b->c22) {
     MsgKey key(t->myEntry.node, t->myEntry.msgId.id, t->myEntry.msgId.comm, seq);
