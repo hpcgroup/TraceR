@@ -1,0 +1,14 @@
+
+PE0 - LP_GID:192 : START SIMULATION, TASKS COUNT: 100, FIRST TASK: 0, RUN TIME TILL NOW=0.000000 s, CURRENT SIM TIME 0.386247
+PE0 - LP_GID:0 : START SIMULATION, TASKS COUNT: 100, FIRST TASK: 0, RUN TIME TILL NOW=0.000000 s, CURRENT SIM TIME 1.005877
+Set num_servers per router 1, servers per injection queue per router 1, servers per node copy queue per node 1
+[ 1 0 : time at task 0/100 0.000000 ]
+[ 0 0 : time at task 0/100 0.000000 ]
+[ 1 0 : Begin TRACER_WallTime_Loop 0.000008 ]
+[ 0 0 : Begin TRACER_WallTime_Loop 0.000010 ]
+[ 1 0 : Begin TRACER_WallTime_InLoop 0.000017 ]
+[ 0 0 : Begin TRACER_WallTime_InLoop 0.000021 ]
+[ 1 0 : Begin TRACER_WallTime_InLoop 0.000105 ]
+[ 0 0 : Begin TRACER_WallTime_InLoop 0.000180 ]
+[ 1 0 : End TRACER_WallTime_Loop 0.000218 ]
+GVT #2121: simulation 100% complete, max event queue size 889 (GVT = MAX).

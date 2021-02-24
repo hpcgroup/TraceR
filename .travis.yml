@@ -6,6 +6,7 @@ addons:
     packages:
       - libtool-bin
       - libmpich-dev
+      - mpich
 
 install:
   # Install ROSS
@@ -46,7 +47,46 @@ install:
     export PATH=$PATH:${TRAVIS_BUILD_DIR}/ci-deps/OTF2/bin
     
 script:
-  - cd tracer
+  - pushd tracer
   - make all PREFIX=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR="${TRAVIS_BUILD_DIR}/ci-deps/ROSS" CODES_DIR="${TRAVIS_BUILD_DIR}/ci-deps/CODES" SELECT_TRACE="-DTRACER_OTF_TRACES=1"
+  - make install PREFIX=${TRAVIS_BUILD_DIR}/install-test CXX=mpicc CXX=mpicxx ROSS_DIR="${TRAVIS_BUILD_DIR}/ci-deps/ROSS" CODES_DIR="${TRAVIS_BUILD_DIR}/ci-deps/CODES" SELECT_TRACE="-DTRACER_OTF_TRACES=1"
   - cd ../utils
   - make
+  - popd
+  - mkdir ${TRAVIS_BUILD_DIR}/tests/output
+  - |
+    pushd examples/stencil4d-otf
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly --sync=3 -- ../conf/dfly.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
+    rv=$?
+    cat std.out
+    mv std.out ${TRAVIS_BUILD_DIR}/tests/output/test-output-dfly/std.out
+    popd
+    if [[ $rv == 0 ]]; then true; else false; fi
+  - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-dfly
+  - |
+    pushd examples/stencil4d-otf
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree --sync=3 -- ../conf/fattree.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
+    rv=$?
+    cat std.out
+    mv std.out ${TRAVIS_BUILD_DIR}/tests/output/test-output-fattree/std.out
+    popd
+    if [[ $rv == 0 ]]; then true; else false; fi
+  - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-fattree
+  - |
+    pushd examples/stencil4d-otf
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre --sync=3 -- ../conf/hypreX_expressMesh.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
+    rv=$?
+    cat std.out
+    mv std.out ${TRAVIS_BUILD_DIR}/tests/output/test-output-hypre/std.out
+    popd
+    if [[ $rv == 0 ]]; then true; else false; fi
+  - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-hypre
+  - |
+    pushd examples/stencil4d-otf
+    mpirun -np 2 ${TRAVIS_BUILD_DIR}/install-test/bin/traceR --lp-io-dir=${TRAVIS_BUILD_DIR}/tests/output/test-output-torus --sync=3 -- ../conf/torus.conf tracer_config | sed -n '/START PARALLEL OPTIMISTIC SIMULATION/,/END SIMULATION/p' | tail -n +2 | head -n -3 > std.out
+    rv=$?
+    cat std.out
+    mv std.out ${TRAVIS_BUILD_DIR}/tests/output/test-output-torus/std.out
+    popd
+    if [[ $rv == 0 ]]; then true; else false; fi
+  - ${TRAVIS_BUILD_DIR}/tests/bin/check-files-match.sh ${TRAVIS_BUILD_DIR}/tests/regression/test-output-torus
