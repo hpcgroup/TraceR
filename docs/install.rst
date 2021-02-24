@@ -6,7 +6,7 @@ TraceR can be downloaded from `GitHub <https://github.com/LLNL/TraceR>`_.
 Dependencies
 ------------
 
-TraceR depends on `CODES <https://xgitlab.cels.anl.gov/codes/codes>`_ and `ROSS <https://github.com/ROSS-org/ROSS>`_.
+TraceR depends on `CODES <https://github.com/codes-org/codes>`_ and `ROSS <https://github.com/ROSS-org/ROSS>`_.
 
 Build
 -----
@@ -42,5 +42,5 @@ TraceR supports two different trace formats as input. For each format, you need 
 2. AMPI-based BigSim format: To use BigSim traces as input to TraceR, you need to download and build `Charm++ <https://github.com/UIUC-PPL/charm>`_.
 
 The instructions to build Charm++ are in the `Charm++ manual
-<http://charm.cs.illinois.edu/manuals/html/charm++/A.html>`_. You should use
+<https://charm.readthedocs.io/en/latest/charm++/manual.html#installing-charm>`_. You should use
 the "charm++" target and pass "bigemulator" as a build option.

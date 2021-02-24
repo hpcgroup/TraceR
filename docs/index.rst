@@ -13,10 +13,11 @@ Computing applications on interconnection networks.
 
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
+   :caption: Contents
 
    install
    userguide
+   workflow
    tutorial
    autogen/doxygen
 
